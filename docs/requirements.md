@@ -256,7 +256,7 @@ La interfaz de usuario deberá presentarse en español.
 
 Los importes monetarios deberán presentarse en pesos argentinos.
 
-## 3.5 Atributos del sistema
+## 3.6 Atributos del sistema
 
 ### RNF-SEG-001 — Confirmación de eliminación
 
@@ -279,7 +279,7 @@ deberán corresponder a los cortes almacenados.
 El sistema deberá funcionar en los navegadores de escritorio definidos para
 el proyecto.
 
-## 3.6 Otros requisitos
+## 3.7 Otros requisitos
 
 ### RO-001 — Documentación para el usuario
 
