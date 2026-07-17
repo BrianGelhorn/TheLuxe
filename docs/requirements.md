@@ -16,9 +16,9 @@ Autor: Brian Gelhorn
 
 ## 1.1 Propósito
 
-El documento actual va a definir y especificar los requisitos funcionales y no funcionales del sistema de gestion de barberia The Luxe.
+El documento actual va a definir y especificar los requisitos funcionales y no funcionales del sistema de gestión de barbería The Luxe.
 
-El documento está dirigido a los dueños de la barberia The Luxe.
+El documento está dirigido a los dueños de la barbería The Luxe.
 
 ## 1.2 Alcance
 
@@ -30,7 +30,7 @@ El sistema buscará reemplazar el uso de planillas independientes de Excel y
 facilitar la visualización general de la jornada, el control de caja y el pago a los 
 barberos.
 
-En su primera versión, el sistema estará orientado exclusívamente a la gestión interna de la
+En su primera versión, el sistema estará orientado exclusivamente a la gestión interna de la
 barbería. No incluirá reservas de turnos para clientes ni comercio electrónico.
 
 ## 1.3 Definiciones, siglas y abreviaturas
@@ -42,7 +42,7 @@ barbería. No incluirá reservas de turnos para clientes ni comercio electrónic
 - **Corte:** Término utilizado operativamente por el cliente para referirse al
   registro de un servicio realizado.
 - **Jornada:** Día de trabajo sobre el cual se registran operaciones.
-- **Medio de pago:** Forma mediante la cual se cobra una operación, En este caso puede
+- **Medio de pago:** Forma mediante la cual se cobra una operación. En este caso puede
   ser en efectivo o Mercado Pago.
 - **Caja teórica:** Importe que debería existir según las operaciones registradas.
 - **Caja real:** Importe efectivamente contabilizado al cerrar la jornada.
@@ -63,9 +63,9 @@ barbería.
 El producto, en su primera versión inicial, va a funcionar exclusivamente en el navegador y
 guardará los datos en una base de datos PostgreSQL local.
 
-La base de datos contendrá todos los datos de caja diarios asi como información de barberos e información
+La base de datos contendrá todos los datos de caja diarios, así como información de barberos e información
 sobre los servicios que la misma brinde.
-Esta base de datos realizará periódicamente backups locales de los mismos.
+Esta base de datos realizará periódicamente copias de seguridad locales de los mismos.
 
 ## 2.2 Funciones del producto 
 
@@ -99,7 +99,7 @@ Podrá registrar tanto ventas como servicios hechos por los barberos.
 ## 2.4 Restricciones
 
 - La interfaz deberá poder utilizarse desde una computadora de escritorio. El
-uso a travez de un dispositivo movil se encuentra pendiente de confirmación.
+uso a través de un dispositivo móvil se encuentra pendiente de confirmación.
 - El sistema deberá presentar importes expresados en pesos argentinos.
 - El idioma principal de la interfaz será español.
 - El sistema funcionará de forma local sin acceso desde internet al mismo.
