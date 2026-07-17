@@ -42,8 +42,7 @@ barbería. No incluirá reservas de turnos para clientes ni comercio electrónic
 - **Corte:** Término utilizado operativamente por el cliente para referirse al
   registro de un servicio realizado.
 - **Jornada:** Día de trabajo sobre el cual se registran operaciones.
-- **Medio de pago:** Forma mediante la cual se cobra una operación. En este caso puede
-  ser en efectivo o Mercado Pago.
+- **Medio de pago:** Forma mediante la cual se cobra una operación. En este caso puede ser en efectivo, Mercado Pago o ambos.
 - **Caja teórica:** Importe que debería existir según las operaciones registradas.
 - **Caja real:** Importe efectivamente contabilizado al cerrar la jornada.
 - **Usuario:** Persona autorizada para utilizar el sistema.
@@ -122,13 +121,18 @@ uso a través de un dispositivo móvil se encuentra pendiente de confirmación.
 #### IU-001 — Visualización del panel diario
 
 El sistema deberá presentar los barberos de la jornada en una vista conjunta,
-sin requerir que el usuario abra una pantalla individual para cada barbero.
-
-En una resolución de escritorio de 1366x768, la interfaz deberá mostrar
-simultáneamente al menos cinco barberos.
+en forma de columnas contiguas sobre una única fila horizontal, similar a una
+tabla de Excel, sin apilarlas verticalmente ni requerir que el usuario abra una
+pantalla individual para cada barbero. Cuando las columnas excedan el ancho
+disponible, el panel deberá permitir el desplazamiento horizontal.
 
 El sistema deberá mostrar cada corte directamente dentro del sector
 correspondiente al barbero que lo realizó.
+
+Cada columna debe tener un boton para poder adicionar un corte para cada barbero.
+
+En una resolución de escritorio de 1366x768, la interfaz deberá mostrar
+simultáneamente al menos cinco barberos.
 
 Sin requerir que el usuario abra una vista individual, cada corte deberá mostrar:
 
@@ -137,6 +141,7 @@ Sin requerir que el usuario abra una vista individual, cada corte deberá mostra
 - Precio.
 - Medio de pago.
 - Propina, cuando corresponda.
+- Nota adicional, cuando corresponda.
 
 #### IU-002 — Acceso al detalle de un corte
 
