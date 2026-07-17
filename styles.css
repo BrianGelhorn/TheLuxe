@@ -58,15 +58,18 @@ textarea { resize: vertical; }
 .barber-column-header span { display: block; margin-top: 3px; color: var(--gold); font-size: .78rem; }
 .add-cut { flex: 0 0 auto; width: 32px; height: 32px; border: 1px solid #6e5936; border-radius: 50%; background: var(--gold); color: #17120b; cursor: pointer; font-size: 1.2rem; font-weight: 800; line-height: 1; }
 .barber-services { display: grid; gap: 1px; min-height: 155px; background: var(--line); }
-.barber-service { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; width: 100%; padding: 6px 9px; border: 0; background: var(--surface); color: inherit; text-align: left; cursor: pointer; }
+.barber-service { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 5px; width: 100%; padding: 6px 9px; overflow: hidden; border: 0; background: var(--surface); color: inherit; text-align: left; cursor: pointer; }
 .barber-service:hover { background: var(--surface-2); }
 .barber-service strong { font-size: .82rem; }
-.barber-service > span { color: var(--gold); font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .barber-service small { color: var(--muted); font-size: .68rem; }
-.service-name, .payment-detail { grid-column: 1 / -1; }
-.cut-time { align-self: center; }
-.payment-detail { white-space: nowrap; }
-.service-note { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.service-prices { display: grid; min-width: 0; max-width: 100%; justify-items: end; gap: 1px; white-space: nowrap; }
+.service-prices b { color: var(--gold); font-size: .78rem; }
+.service-prices .cash-price { color: #62a976; }
+.service-prices .mp-price { color: #5599e8; }
+.service-prices .tip-price { color: var(--muted); }
+.payment-detail { grid-column: 1 / -1; min-width: 0; white-space: nowrap; }
+.service-note { grid-column: 1; align-self: end; overflow-wrap: anywhere; }
+.cut-time { grid-column: 2; width: max-content; align-self: end; justify-self: end; white-space: nowrap; }
 .barber-empty { padding: 28px 15px; background: var(--surface); color: var(--muted); text-align: center; font-size: .8rem; }
 .barber-column-total { display: flex; justify-content: space-between; padding: 14px 15px; border-top: 1px solid var(--line); font-size: .82rem; }
 .barber-column-total strong { color: var(--gold); }
@@ -81,6 +84,8 @@ textarea { resize: vertical; }
 .field > span { color: #c7c3bc; font-size: .84rem; font-weight: 600; }
 .field small { color: var(--muted); font-weight: 400; }
 .full-width { grid-column: 1 / -1; }
+.split-payment { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 14px; border: 1px solid #6e5936; border-radius: 10px; background: var(--gold-soft); }
+.split-payment[hidden] { display: none; }
 .money-input { position: relative; }
 .money-input b { position: absolute; left: 13px; top: 12px; color: var(--gold); }
 .money-input input { padding-left: 30px; }
@@ -116,6 +121,7 @@ textarea { resize: vertical; }
   .metric strong { font-size: 1.15rem; }
   .daily-sheet { padding: 18px; }
   .cut-form { grid-template-columns: 1fr; }
+  .split-payment { grid-template-columns: 1fr; }
   .detail-list { grid-template-columns: 1fr; }
   .full-width, .primary-btn { grid-column: 1; }
   .primary-btn { width: 100%; }

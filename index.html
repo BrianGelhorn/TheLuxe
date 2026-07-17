@@ -89,8 +89,19 @@
               <select id="payment" name="payment" required>
                 <option>Efectivo</option>
                 <option>Mercado Pago</option>
+                <option>Ambos</option>
               </select>
             </label>
+            <div id="splitPayment" class="split-payment full-width" hidden>
+              <label class="field">
+                <span>Importe en efectivo</span>
+                <div class="money-input"><b>$</b><input id="cashAmount" name="cashAmount" type="number" min="0" step="500"></div>
+              </label>
+              <label class="field">
+                <span>Importe en Mercado Pago</span>
+                <div class="money-input"><b>$</b><input id="mpAmount" name="mpAmount" type="number" min="0" step="500"></div>
+              </label>
+            </div>
             <label class="field full-width">
               <span>Nota adicional <small>(opcional)</small></span>
               <textarea name="notes" rows="3" placeholder="Detalle del corte"></textarea>

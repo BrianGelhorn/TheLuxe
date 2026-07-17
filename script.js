@@ -16,6 +16,9 @@ const serviceInput = document.getElementById('service');
 const amountInput = document.getElementById('amount');
 const tipInput = form.elements.tip;
 const paymentInput = form.elements.payment;
+const splitPayment = document.getElementById('splitPayment');
+const cashAmountInput = form.elements.cashAmount;
+const mpAmountInput = form.elements.mpAmount;
 const notesInput = form.elements.notes;
 let entries = JSON.parse(localStorage.getItem(storageKey) || '[]');
 let editingId = null;
@@ -32,7 +35,17 @@ function selectedEntries() {
 }
 
 function paymentTotal(list, type) {
-  return list.reduce((sum, entry) => sum + (entry.payment === type ? Number(entry.amount) + Number(entry.tip || 0) : 0), 0);
+  return list.reduce((sum, entry) => sum + (entry.payment === 'Ambos'
+    ? Number(type === 'Efectivo' ? entry.cashAmount : entry.mpAmount)
+    : entry.payment === type ? Number(entry.amount) + Number(entry.tip || 0) : 0), 0);
+}
+
+function toggleSplitPayment() {
+  const split = paymentInput.value === 'Ambos';
+  splitPayment.hidden = !split;
+  cashAmountInput.required = split;
+  mpAmountInput.required = split;
+  cashAmountInput.setCustomValidity('');
 }
 
 function render() {
@@ -51,11 +64,17 @@ function barberColumn(barber, list) {
   const total = cuts.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0);
   const rows = cuts.length ? cuts.map((entry) => `
     <button class="barber-service" type="button" data-cut="${escapeHtml(entry.id)}">
-      <small class="cut-time">${escapeHtml(entry.time)}</small>
-      <span>${money.format(Number(entry.amount))}</span>
       <strong class="service-name">${escapeHtml(entry.service)}</strong>
-      <small class="payment-detail">${escapeHtml(entry.payment)}${Number(entry.tip) ? ` · Propina ${money.format(entry.tip)}` : ''}</small>
+      <span class="service-prices">
+        <b>${money.format(Number(entry.amount))}</b>
+        ${entry.payment === 'Ambos' ? `
+          <small class="cash-price">${money.format(Number(entry.cashAmount))}</small>
+          <small class="mp-price">${money.format(Number(entry.mpAmount))}</small>` : ''}
+        ${Number(entry.tip) ? `<small class="tip-price">${money.format(Number(entry.tip))}</small>` : ''}
+      </span>
+      <small class="payment-detail">${entry.payment === 'Mercado Pago' ? 'MP' : escapeHtml(entry.payment)}</small>
       ${entry.notes ? `<small class="service-note">Nota: ${escapeHtml(entry.notes)}</small>` : ''}
+      <small class="cut-time">${escapeHtml(entry.time)}</small>
     </button>`).join('') : '<div class="barber-empty">Sin cortes cargados</div>';
   return `
     <section class="barber-column">
@@ -70,6 +89,7 @@ function barberColumn(barber, list) {
 
 function openCutDialog(barber) {
   form.reset();
+  toggleSplitPayment();
   editingId = null;
   barberInput.value = barber;
   timeInput.value = nowTime();
@@ -89,6 +109,10 @@ function openDetail(id) {
     ['Servicio', entry.service],
     ['Precio', money.format(Number(entry.amount))],
     ['Medio de pago', entry.payment],
+    ...(entry.payment === 'Ambos' ? [
+      ['En efectivo', money.format(Number(entry.cashAmount))],
+      ['En Mercado Pago', money.format(Number(entry.mpAmount))],
+    ] : []),
     ['Propina', money.format(Number(entry.tip || 0))],
     ['Notas', entry.notes || 'Sin notas'],
   ].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
@@ -105,6 +129,9 @@ function openEditDialog(id) {
   amountInput.value = entry.amount;
   tipInput.value = entry.tip || '';
   paymentInput.value = entry.payment;
+  cashAmountInput.value = entry.cashAmount || '';
+  mpAmountInput.value = entry.mpAmount || '';
+  toggleSplitPayment();
   notesInput.value = entry.notes || '';
   document.getElementById('formMode').textContent = 'MODIFICAR CORTE';
   document.getElementById('dialogTitle').textContent = `Corte de ${entry.barber}`;
@@ -122,10 +149,16 @@ document.getElementById('barberColumns').addEventListener('click', (event) => {
 serviceInput.addEventListener('change', (event) => {
   amountInput.value = prices[event.target.value] || '';
 });
+paymentInput.addEventListener('change', toggleSplitPayment);
+[amountInput, tipInput, cashAmountInput, mpAmountInput].forEach((input) => input.addEventListener('input', () => cashAmountInput.setCustomValidity('')));
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form));
+  if (values.payment === 'Ambos' && Number(values.cashAmount) + Number(values.mpAmount) !== Number(values.amount) + Number(values.tip || 0)) {
+    cashAmountInput.setCustomValidity('La suma debe coincidir con el precio del corte más la propina.');
+    return form.reportValidity();
+  }
   const entry = { ...values, date: workday.value, amount: Number(values.amount), tip: Number(values.tip || 0), id: editingId || crypto.randomUUID() };
   entries = editingId ? entries.map((cut) => cut.id === editingId ? entry : cut) : [...entries, entry];
   save();
@@ -151,3 +184,4 @@ document.getElementById('deleteCut').addEventListener('click', () => {
 
 render();
 console.assert(paymentTotal([{ payment: 'Efectivo', amount: 1000, tip: 200 }], 'Efectivo') === 1200);
+console.assert(paymentTotal([{ payment: 'Ambos', cashAmount: 500, mpAmount: 700 }], 'Mercado Pago') === 700);
