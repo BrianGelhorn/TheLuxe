@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>The Luxe — Gestión de barbería</title>
+  <title>The Luxe — Panel diario</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
@@ -16,185 +16,106 @@
         <span class="brand-mark">TL</span>
         <span><strong>The Luxe</strong><small>Barber studio</small></span>
       </a>
-
       <nav class="nav" aria-label="Secciones principales">
-        <button class="nav-item active" data-view="summaryView" aria-current="page">
-          <span class="nav-icon">⌁</span> Hoy
-        </button>
-        <button class="nav-item" data-view="generalView">
-          <span class="nav-icon">▦</span> Reportes
-        </button>
-        <button class="nav-item" data-view="settingsView">
-          <span class="nav-icon">⚙</span> Configuración
-        </button>
+        <button class="nav-item active" type="button" aria-current="page"><span class="nav-icon">⌁</span> Panel diario</button>
       </nav>
-
-      <div class="sidebar-note">
-        <span class="status-dot"></span>
-        Los datos se guardan en este dispositivo.
-      </div>
+      <div class="sidebar-note"><span class="status-dot"></span>Los datos se guardan en este dispositivo.</div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div>
-          <p class="eyebrow" id="viewEyebrow">OPERACIÓN DIARIA</p>
-          <h1 id="viewTitle">Hoy</h1>
+          <p class="eyebrow">OPERACIÓN DIARIA</p>
+          <h1>Panel diario</h1>
         </div>
-        <div class="today" id="todayLabel"></div>
+        <label class="date-field">
+          <span>Jornada</span>
+          <input id="workday" type="date">
+        </label>
       </header>
 
-      <dialog id="cutDialog" class="cut-dialog">
-          <article class="form-card">
-            <div class="card-heading">
-              <div>
-                <span class="step">NUEVO SERVICIO</span>
-                <h2>Datos del corte</h2>
-              </div>
-              <button id="closeDialog" class="close-btn" type="button" aria-label="Cerrar">×</button>
-            </div>
-
-            <form id="cutForm" class="cut-form">
-              <label class="field">
-                <span>Barbero</span>
-                <select name="barber" required>
-                  <option value="">Seleccionar barbero</option>
-                  <option>Mateo</option>
-                  <option>Julián</option>
-                  <option>Nicolás</option>
-                  <option>Tomás</option>
-                  <option>Franco</option>
-                  <option>Agustín</option>
-                  <option>Lucas</option>
-                  <option>Bruno</option>
-                  <option>Santino</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Servicio</span>
-                <select id="service" name="service" required>
-                  <option value="">Seleccionar servicio</option>
-                  <option>Corte clásico</option>
-                  <option>Corte + barba</option>
-                  <option>Barba</option>
-                  <option>Diseño</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Precio</span>
-                <div class="money-input"><b>$</b><input id="amount" name="amount" type="number" min="0" step="500" placeholder="15.000" required></div>
-              </label>
-              <label class="field">
-                <span>Propina <small>(opcional)</small></span>
-                <div class="money-input"><b>$</b><input name="tip" type="number" min="0" step="500" placeholder="0"></div>
-              </label>
-              <label class="field">
-                <span>Medio de pago</span>
-                <select id="payment" name="payment" required>
-                  <option>Efectivo</option>
-                  <option>Transferencia</option>
-                  <option value="Mixto">Pago mixto</option>
-                </select>
-              </label>
-              <div id="mixedPayment" class="mixed-payment full-width" hidden>
-                <label class="field">
-                  <span>Parte en efectivo</span>
-                  <div class="money-input"><b>$</b><input id="cashAmount" name="cashAmount" type="number" min="0" step="500" placeholder="0"></div>
-                </label>
-                <label class="field">
-                  <span>Parte por transferencia <small>(precio + propina)</small></span>
-                  <div class="money-input"><b>$</b><input id="transferAmount" name="transferAmount" type="number" min="0" step="500" placeholder="0"></div>
-                </label>
-              </div>
-              <label class="field full-width">
-                <span>Nota <small>(opcional)</small></span>
-                <textarea name="notes" rows="3" placeholder="Algún detalle que quieras recordar"></textarea>
-              </label>
-              <button class="primary-btn" type="submit">Guardar corte <span>→</span></button>
-            </form>
-            <p id="formStatus" class="form-status" role="status" aria-live="polite"></p>
-          </article>
-      </dialog>
-
-      <section id="summaryView" class="view active">
-        <div class="summary-actions">
-          <p>Movimientos cargados automáticamente en el día de hoy.</p>
-          <button id="openDialog" class="primary-btn" type="button">＋ Registrar corte</button>
-        </div>
+      <section class="view active">
         <div class="metrics">
-          <article class="metric featured"><span>Recaudado hoy</span><strong id="dailyTotal">$ 0</strong><small id="dailyCount">0 servicios</small></article>
-          <article class="metric"><span>Propinas</span><strong id="tipsTotal">$ 0</strong><small>Incluidas en el total</small></article>
-          <article class="metric"><span>Efectivo</span><strong id="cashTotal">$ 0</strong><small>Cobrado hoy</small></article>
-          <article class="metric"><span>Transferencias</span><strong id="transferTotal">$ 0</strong><small>Cobrado hoy</small></article>
+          <article class="metric featured"><span>Recaudado</span><strong id="dailyTotal">$ 0</strong><small id="dailyCount">0 cortes</small></article>
+          <article class="metric"><span>Propinas</span><strong id="tipsTotal">$ 0</strong><small>Registradas</small></article>
+          <article class="metric"><span>Efectivo</span><strong id="cashTotal">$ 0</strong><small>Cobrado</small></article>
+          <article class="metric"><span>Mercado Pago</span><strong id="mpTotal">$ 0</strong><small>Cobrado</small></article>
         </div>
 
         <article class="card daily-sheet">
-          <div class="section-heading"><div><span class="step">PLANILLA DEL DÍA</span><h2>Servicios por barbero</h2></div><button id="clearEntries" class="danger-btn" type="button">Borrar día</button></div>
+          <div class="section-heading">
+            <div><span class="step">PLANILLA DEL DÍA</span><h2>Servicios por barbero</h2></div>
+          </div>
           <div id="barberColumns" class="barber-columns"></div>
         </article>
       </section>
 
-      <section id="generalView" class="view" hidden>
-        <div class="report-tabs" role="tablist" aria-label="Tipo de resumen">
-          <button class="report-tab active" data-report-tab="generalOverview" role="tab" aria-selected="true">General</button>
-          <button class="report-tab" data-report-tab="barberOverview" role="tab" aria-selected="false">Por barbero</button>
-        </div>
-        <article class="card filters-card">
-          <div class="section-heading"><div><span class="step">FILTROS</span><h2>Consultar movimientos</h2></div><button id="clearFilters" class="text-action" type="button">Limpiar filtros</button></div>
-          <div class="filters">
-            <div class="field"><span>Mes</span><details class="multi-select"><summary id="monthSummary">Todos los meses</summary><div id="filterMonth" class="multi-options"></div></details></div>
-            <div class="field"><span>Semana</span><details class="multi-select"><summary id="weekSummary">Todas las semanas</summary><div id="filterWeek" class="multi-options"></div></details></div>
-            <label class="field barber-filter" hidden><span>Barbero</span><select id="filterBarber"><option value="">Todos</option><option>Mateo</option><option>Julián</option><option>Nicolás</option><option>Tomás</option><option>Franco</option><option>Agustín</option><option>Lucas</option><option>Bruno</option><option>Santino</option></select></label>
-            <label class="field"><span>Servicio</span><select id="filterService"><option value="">Todos</option><option>Corte clásico</option><option>Corte + barba</option><option>Barba</option><option>Diseño</option></select></label>
-            <label class="field"><span>Medio de pago</span><select id="filterPayment"><option value="">Todos</option><option>Efectivo</option><option>Transferencia</option><option value="Mixto">Pago mixto</option></select></label>
+      <dialog id="cutDialog" class="cut-dialog">
+        <article class="form-card">
+          <div class="card-heading">
+            <div>
+              <span id="formMode" class="step">NUEVO CORTE</span>
+              <h2 id="dialogTitle">Datos del corte</h2>
+            </div>
+            <button id="closeDialog" class="close-btn" type="button" aria-label="Cerrar">×</button>
+          </div>
+
+          <form id="cutForm" class="cut-form">
+            <input id="barber" name="barber" type="hidden">
+            <label class="field">
+              <span>Hora</span>
+              <input id="time" name="time" type="time" required>
+            </label>
+            <label class="field">
+              <span>Servicio</span>
+              <select id="service" name="service" required>
+                <option value="">Seleccionar servicio</option>
+                <option>Corte clásico</option>
+                <option>Corte + barba</option>
+                <option>Barba</option>
+                <option>Diseño</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Precio</span>
+              <div class="money-input"><b>$</b><input id="amount" name="amount" type="number" min="0" step="500" required></div>
+            </label>
+            <label class="field">
+              <span>Propina <small>(opcional)</small></span>
+              <div class="money-input"><b>$</b><input name="tip" type="number" min="0" step="500" placeholder="0"></div>
+            </label>
+            <label class="field">
+              <span>Medio de pago</span>
+              <select id="payment" name="payment" required>
+                <option>Efectivo</option>
+                <option>Mercado Pago</option>
+              </select>
+            </label>
+            <label class="field full-width">
+              <span>Nota adicional <small>(opcional)</small></span>
+              <textarea name="notes" rows="3" placeholder="Detalle del corte"></textarea>
+            </label>
+            <button class="primary-btn" type="submit">Guardar corte <span>→</span></button>
+          </form>
+        </article>
+      </dialog>
+
+      <dialog id="detailDialog" class="cut-dialog">
+        <article class="form-card">
+          <div class="card-heading">
+            <div>
+              <span class="step">DETALLE DEL CORTE</span>
+              <h2 id="detailTitle">Datos completos</h2>
+            </div>
+            <button id="closeDetailDialog" class="close-btn" type="button" aria-label="Cerrar">×</button>
+          </div>
+          <dl id="cutDetail" class="detail-list"></dl>
+          <div class="detail-actions">
+            <button id="editCut" class="secondary-btn" type="button">Modificar</button>
+            <button id="deleteCut" class="danger-btn" type="button">Eliminar</button>
           </div>
         </article>
-
-        <div id="generalOverview" class="report-pane active" role="tabpanel">
-          <div class="metrics general-metrics">
-            <article class="metric featured"><span>Recaudación</span><strong id="generalTotal">$ 0</strong><small>Según los filtros</small></article>
-            <article class="metric"><span>Cortes</span><strong id="generalCount">0</strong><small>Servicios realizados</small></article>
-            <article class="metric"><span>Propinas</span><strong id="generalTips">$ 0</strong><small>Total registrado</small></article>
-            <article class="metric"><span>Ticket promedio</span><strong id="generalAverage">$ 0</strong><small>Por servicio</small></article>
-          </div>
-
-          <article class="card report-card">
-            <div class="section-heading"><div><span class="step">HISTORIAL</span><h2>Resumen por día</h2></div></div>
-            <div class="table-scroll"><table><thead><tr><th>Día</th><th>Fecha</th><th>Cortes</th><th>Transferencias</th><th>Efectivo</th><th>Propinas</th><th>Total</th></tr></thead><tbody id="dailyReport"></tbody></table></div>
-          </article>
-        </div>
-
-        <div id="barberOverview" class="report-pane" role="tabpanel" hidden>
-          <div class="metrics barber-metrics">
-            <article class="metric featured"><span>Total cortes</span><strong id="barberSales">$ 0</strong><small id="barberName">Barbero</small></article>
-            <article class="metric"><span>Total propinas</span><strong id="barberTips">$ 0</strong><small>Según el período</small></article>
-            <article class="metric"><span>Cantidad de cortes</span><strong id="barberCuts">0</strong><small>Servicios realizados</small></article>
-            <article class="metric"><span>Comisión estimada</span><strong id="barberCommission">$ 0</strong><small>Sobre servicios</small></article>
-          </div>
-          <article class="card report-card">
-            <div class="section-heading"><div><span class="step">BARBERO</span><h2 id="barberReportTitle">Detalle por día</h2></div></div>
-            <div class="table-scroll"><table><thead><tr><th>Día</th><th>Fecha</th><th>Cantidad de cortes</th><th>Total cortes</th><th>Propinas</th><th>Total</th></tr></thead><tbody id="barberReport"></tbody></table></div>
-          </article>
-        </div>
-      </section>
-
-      <section id="settingsView" class="view" hidden>
-        <form id="settingsForm">
-          <div class="settings-grid">
-            <article class="card settings-card">
-              <div class="section-heading"><div><span class="step">SERVICIOS</span><h2>Precios</h2></div></div>
-              <p class="settings-copy">Se usarán para completar el precio al registrar un corte.</p>
-              <div id="serviceSettings" class="settings-list"></div>
-            </article>
-            <article class="card settings-card">
-              <div class="section-heading"><div><span class="step">EQUIPO</span><h2>Comisiones</h2></div></div>
-              <p class="settings-copy">Porcentaje general para todos los barberos, calculado sobre los servicios sin propinas.</p>
-              <div id="commissionSettings" class="settings-list"></div>
-            </article>
-          </div>
-          <div class="settings-actions"><p id="settingsStatus" role="status" aria-live="polite"></p><button class="primary-btn" type="submit">Guardar configuración</button></div>
-        </form>
-      </section>
+      </dialog>
     </main>
   </div>
   <script src="script.js"></script>
