@@ -127,8 +127,6 @@ sin requerir que el usuario abra una pantalla individual para cada barbero.
 En una resolución de escritorio de 1366x768, la interfaz deberá mostrar
 simultáneamente al menos cinco barberos.
 
-#### IU-002 — Información visible de cada corte en el panel diario
-
 El sistema deberá mostrar cada corte directamente dentro del sector
 correspondiente al barbero que lo realizó.
 
@@ -140,10 +138,7 @@ Sin requerir que el usuario abra una vista individual, cada corte deberá mostra
 - Medio de pago.
 - Propina, cuando corresponda.
 
-La forma de visualizar las notas y de acceder a las acciones de edición y
-eliminación se encuentra pendiente de definición.
-
-#### IU-003 — Acceso al detalle de un corte
+#### IU-002 — Acceso al detalle de un corte
 
 Al seleccionar un corte en el panel diario, el sistema deberá mostrar sus datos
 completos y las acciones disponibles para su modificación o eliminación.
