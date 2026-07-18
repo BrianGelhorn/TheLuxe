@@ -434,6 +434,9 @@ totales afectados.
 
 ### RF-006 — Registrar una venta
 
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
+
 El sistema deberá permitir al usuario registrar una venta de productos durante una jornada.
 
 Para cada venta, el sistema deberá registrar como mínimo:
@@ -455,6 +458,9 @@ Por defecto la cantidad va a ser de una unidad.
 
 ### RF-007 — Modificar una venta
 
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
+
 El sistema deberá permitir al usuario modificar los datos de una venta previamente registrada.
 
 Antes de guardar la modificación, el sistema deberá validar los nuevos datos y recalcular el importe total de la venta.
@@ -463,6 +469,9 @@ Después de confirmar la modificación, el sistema deberá actualizar los totale
 
 ### RF-008 — Eliminar una venta
 
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
+
 El sistema deberá permitir al usuario eliminar una venta previamente registrada.
 
 Antes de realizar la eliminación, el sistema deberá solicitar confirmación al usuario.
@@ -470,6 +479,9 @@ Antes de realizar la eliminación, el sistema deberá solicitar confirmación al
 Una vez confirmada, el sistema deberá eliminar la venta y recalcular los totales de la jornada y del medio de pago correspondiente.
 
 ### RF-009 — Registrar un adelanto de caja
+
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
 
 El sistema deberá permitir al usuario registrar un adelanto entregado a un barbero durante una jornada.
 
@@ -492,11 +504,17 @@ Después de confirmar la operación, el sistema deberá:
 
 ### RF-010 — Modificar un adelanto de caja
 
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
+
 El sistema deberá permitir al usuario modificar los datos de un adelanto previamente registrado.
 
 Después de confirmar la modificación, el sistema deberá actualizar la salida de caja, el total de adelantos del barbero y su liquidación correspondiente.
 
 ### RF-011 — Eliminar un adelanto de caja
+
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
 
 El sistema deberá permitir al usuario eliminar un adelanto previamente registrado.
 
@@ -510,6 +528,9 @@ Una vez confirmada, el sistema deberá eliminar el adelanto y recalcular:
 - La liquidación correspondiente al barbero.
 
 ### RF-012 — Consultar resúmenes por período
+
+- **Estado:** Implementado
+- **Version de software:** v0.3.0
 
 El sistema deberá permitir consultar la información consolidada de las jornadas
 por período semanal, mensual o anual.
@@ -530,6 +551,9 @@ permitir consultar los resúmenes diarios del mes; y la vista anual deberá sepa
 la información por mes.
 
 ### RF-013 — Consultar resúmenes por barbero
+
+- **Estado:** Implementado
+- **Version de software:** v0.3.0
 
 El sistema deberá mostrar, dentro del período seleccionado, un resumen para cada
 barbero que haya registrado actividad.
