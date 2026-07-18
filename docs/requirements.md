@@ -1,8 +1,8 @@
 # Especificación de Requisitos de Software
 ## Sistema de gestión de barbería The Luxe
 
-Versión: 0.1
-Fecha: 13/07/2026
+Versión: 0.2
+Fecha: 18/07/2026
 Estado: Borrador
 Autor: Brian Gelhorn
 
@@ -10,7 +10,8 @@ Autor: Brian Gelhorn
 
 | Versión | Fecha | Autor | Descripción |
 |---------|-------|-------|-------------|
-| 0.1 | 13/07/2026 | Brian Gelhorn | Creación inicial |
+| 0.1 | 13/07/2026 | Brian Gelhorn | Creación inicial maqueta|
+| 0.2 | 18/07/2026 | Brian Gelhorn | Primera version estable | 
 
 # 1. Introducción
 
@@ -46,6 +47,8 @@ barbería. No incluirá reservas de turnos para clientes ni comercio electrónic
 - **Caja teórica:** Importe que debería existir según las operaciones registradas.
 - **Caja real:** Importe efectivamente contabilizado al cerrar la jornada.
 - **Usuario:** Persona autorizada para utilizar el sistema.
+- **Venta:** venta de un producto, separada de los servicios realizados.
+- **Adelanto de caja:** dinero retirado de la caja y entregado anticipadamente a un barbero, que luego deberá descontarse de su liquidación.
 
 ## 1.4 Referencias
 
@@ -79,6 +82,10 @@ El sistema ofrecerá las siguientes funciones principales:
 - Consultar reportes generales y por barbero.
 - Administrar barberos, servicios, precios y comisiones.
 - Registrar y controlar movimientos de caja.
+- Registrar, modificar y eliminar ventas de productos.
+- Registrar, modificar y eliminar adelantos entregados a los barberos.
+- Incorporar las ventas y los adelantos en los cálculos correspondientes de caja.
+- Considerar los adelantos al calcular la liquidación de cada barbero.
 
 ## 2.3 Características de los usuarios
 
@@ -93,7 +100,7 @@ Se espera que posea experiencia con la operativa de la barbería.
 ### Operador
 
 Podrá registrar servicios durante la jornada. 
-Podrá registrar tanto ventas como servicios hechos por los barberos.
+Podrá registrar tanto ventas como servicios y adelantos hechos por los barberos.
 
 ## 2.4 Restricciones
 
@@ -118,7 +125,7 @@ uso a través de un dispositivo móvil se encuentra pendiente de confirmación.
 ## 3.1 Requisitos de interfaces externas
 ### 3.1.1 Interfaz de usuario
 
-#### IU-001 — Visualización del panel diario
+#### IU-001 — Visualización de servicios por barbero en panel diario.
 
 El sistema deberá presentar los barberos de la jornada en una vista conjunta,
 en forma de columnas contiguas sobre una única fila horizontal, similar a una
@@ -143,13 +150,94 @@ Sin requerir que el usuario abra una vista individual, cada corte deberá mostra
 - Propina, cuando corresponda.
 - Nota adicional, cuando corresponda.
 
-#### IU-002 — Acceso al detalle de un corte
+A su vez esta interfaz debe tener un boton para poder acceder a la interfaz IU-005.
+
+#### IU-001.1 — Formulario para registrar un corte
+
+El sistema deberá mostrar un formulario para registrar un corte al seleccionar la acción de agregar ubicada en la columna de un barbero.
+
+El formulario deberá mostrar el barbero seleccionado y asociarlo automáticamente al nuevo corte. El usuario deberá poder ingresar:
+
+- Hora del servicio.
+- Tipo de servicio.
+- Precio del servicio.
+- Propina, cuando corresponda.
+- Medio de pago.
+- Importes abonados en efectivo y Mercado Pago cuando el pago sea combinado.
+- Nota adicional, cuando corresponda.
+
+El formulario deberá validar los campos obligatorios y los importes ingresados.
+Cuando el medio de pago sea combinado, la suma de efectivo y Mercado Pago deberá coincidir con el precio del servicio más la propina.
+
+La interfaz deberá permitir guardar el corte o cancelar la operación sin realizar cambios. Después de guardar, el corte deberá aparecer en la columna del barbero y deberán actualizarse los totales de la jornada.
+
+#### IU-001.2 — Acceso al detalle de un corte
 
 Al seleccionar un corte en el panel diario, el sistema deberá mostrar sus datos
 completos y las acciones disponibles para su modificación o eliminación.
 
 La forma de presentación del detalle —ventana emergente, panel lateral u otro
 mecanismo— se encuentra pendiente de definición.
+
+#### IU-003 — Gestión de ventas y adelantos
+
+El sistema deberá proporcionar una interfaz única para consultar y gestionar las ventas y los adelantos correspondientes a la jornada seleccionada.
+
+La interfaz deberá diferenciar visualmente ambos tipos de operación y permitir al usuario acceder a las funciones de registro, modificación y eliminación.
+
+
+#### IU-003.1 — Formulario para registrar un adelanto
+
+El sistema deberá mostrar un formulario para registrar un adelanto entregado a
+un barbero. El usuario deberá poder ingresar:
+
+- Hora del adelanto.
+- Barbero destinatario.
+- Importe.
+- Medio utilizado para entregar el dinero.
+- Motivo o descripción, cuando corresponda.
+
+El formulario deberá indicar que el adelanto será registrado como una salida de
+caja y quedará asociado al barbero seleccionado. La hora, el barbero, el importe
+y el medio de entrega deberán ser obligatorios; el importe deberá ser mayor que
+cero.
+
+La interfaz deberá permitir guardar el adelanto o cancelar la operación sin
+realizar cambios. Después de guardar, deberá mostrar el adelanto en la jornada
+seleccionada y actualizar los totales afectados.
+
+#### IU-003.2 — Formulario para registrar una venta
+
+El sistema deberá mostrar un formulario para registrar una venta de productos.
+El usuario deberá poder ingresar:
+
+- Hora de la venta.
+- Producto vendido.
+- Cantidad.
+- Precio unitario.
+- Medio de pago.
+- Notas, cuando existan.
+
+La hora, el producto, la cantidad, el precio unitario y el medio de pago deberán
+ser obligatorios. La cantidad deberá ser un número entero mayor que cero y el
+precio unitario deberá ser mayor que cero.
+
+El formulario deberá calcular y mostrar el importe total de la venta antes de
+confirmar la operación. La interfaz deberá permitir guardar la venta o cancelar
+la operación sin realizar cambios. Después de guardar, deberá mostrar la venta
+en la jornada seleccionada y actualizar los totales afectados.
+
+##### Comportamiento general
+
+La interfaz deberá:
+
+- Mantener visible la jornada actualmente seleccionada.
+- Diferenciar claramente las ventas de los adelantos.
+- Mostrar mensajes cuando existan datos obligatorios faltantes o inválidos.
+- Permitir cancelar una carga o modificación sin guardar cambios.
+- Solicitar confirmación antes de eliminar una venta o un adelanto.
+- Actualizar la información y los totales afectados después de cada operación.
+
 
 ## 3.2 Requisitos funcionales
 
@@ -207,6 +295,83 @@ El sistema deberá permitir eliminar un corte previamente registrado.
 Antes de realizar la eliminación, el sistema deberá solicitar confirmación
 al usuario. Una vez confirmada, deberá eliminar el corte y recalcular los
 totales afectados.
+
+### RF-006 — Registrar una venta
+
+El sistema deberá permitir al usuario registrar una venta de productos durante una jornada.
+
+Para cada venta, el sistema deberá registrar como mínimo:
+
+- Fecha.
+- Hora.
+- Producto vendido.
+- Cantidad.
+- Precio unitario.
+- Importe total.
+- Medio de pago.
+- Notas, cuando existan.
+
+El sistema deberá calcular el importe total de la venta multiplicando la cantidad por el precio unitario.
+
+Después de confirmar la operación, el sistema deberá incorporar el importe de la venta a los totales de la jornada y al medio de pago correspondiente.
+
+Por defecto la cantidad va a ser de una unidad.
+
+### RF-007 — Modificar una venta
+
+El sistema deberá permitir al usuario modificar los datos de una venta previamente registrada.
+
+Antes de guardar la modificación, el sistema deberá validar los nuevos datos y recalcular el importe total de la venta.
+
+Después de confirmar la modificación, el sistema deberá actualizar los totales de la jornada y del medio de pago correspondiente.
+
+### RF-008 — Eliminar una venta
+
+El sistema deberá permitir al usuario eliminar una venta previamente registrada.
+
+Antes de realizar la eliminación, el sistema deberá solicitar confirmación al usuario.
+
+Una vez confirmada, el sistema deberá eliminar la venta y recalcular los totales de la jornada y del medio de pago correspondiente.
+
+### RF-009 — Registrar un adelanto de caja
+
+El sistema deberá permitir al usuario registrar un adelanto entregado a un barbero durante una jornada.
+
+Para cada adelanto, el sistema deberá registrar como mínimo:
+
+- Fecha.
+- Hora.
+- Barbero destinatario.
+- Importe.
+- Medio utilizado para entregar el dinero.
+- Motivo o descripción, cuando corresponda.
+
+Después de confirmar la operación, el sistema deberá:
+
+- Asociar el adelanto al barbero seleccionado.
+- Registrar el adelanto como una salida de caja.
+- Incorporar el importe al total de adelantos del barbero.
+- Actualizar los totales de caja afectados.
+- Considerar el adelanto en la liquidación posterior del barbero.
+
+### RF-010 — Modificar un adelanto de caja
+
+El sistema deberá permitir al usuario modificar los datos de un adelanto previamente registrado.
+
+Después de confirmar la modificación, el sistema deberá actualizar la salida de caja, el total de adelantos del barbero y su liquidación correspondiente.
+
+### RF-011 — Eliminar un adelanto de caja
+
+El sistema deberá permitir al usuario eliminar un adelanto previamente registrado.
+
+Antes de realizar la eliminación, el sistema deberá solicitar confirmación al usuario.
+
+Una vez confirmada, el sistema deberá eliminar el adelanto y recalcular:
+
+- Las salidas de caja de la jornada.
+- Los totales de caja afectados.
+- El total de adelantos del barbero.
+- La liquidación correspondiente al barbero.
 
 ## 3.3 Requisitos de rendimiento
 
@@ -270,6 +435,38 @@ Un barbero podrá estar asociado a múltiples cortes.
 Cada corte deberá registrar un único tipo de servicio.
 
 Un mismo tipo de servicio podrá aparecer en múltiples cortes.
+
+### RLD-004 — Información de las ventas
+
+El sistema deberá guardar, como mínimo, la siguiente información de cada venta:
+
+- Identificador único.
+- Fecha.
+- Hora.
+- Producto.
+- Cantidad.
+- Precio unitario.
+- Importe total.
+- Medio de pago.
+- Notas, cuando existan.
+- Fecha y hora de creación.
+- Fecha y hora de última modificación.
+
+### RLD-005 — Información de los adelantos
+
+El sistema deberá conservar, como mínimo, la siguiente información de cada adelanto:
+
+- Identificador único.
+- Fecha.
+- Hora.
+- Barbero destinatario.
+- Importe.
+- Medio utilizado para la entrega.
+- Motivo o descripción.
+- Notas, cuando existan.
+- Estado de liquidación.
+- Fecha y hora de creación.
+- Fecha y hora de última modificación.
 
 ## 3.5 Restricciones de diseño
 
