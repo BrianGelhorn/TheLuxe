@@ -38,17 +38,35 @@ barbería. No incluirá reservas de turnos para clientes ni comercio electrónic
 
 - **RF:** Requisito funcional.
 - **RNF:** Requisito no funcional.
+- **IU:** Requisito de interfaz de usuario.
+- **RLD:** Requisito lógico de la base de datos.
 - **Barbero:** Trabajador al cual se asignan los servicios realizados.
 - **Servicio:** Prestación realizada por un barbero, como corte, barba o color.
+- **Producto:** Artículo ofrecido por la barbería para su venta.
 - **Corte:** Término utilizado operativamente por el cliente para referirse al
   registro de un servicio realizado.
 - **Jornada:** Día de trabajo sobre el cual se registran operaciones.
+- **Propina:** Importe adicional entregado voluntariamente al barbero, separado
+  del precio del servicio.
 - **Medio de pago:** Forma mediante la cual se cobra una operación. En este caso puede ser en efectivo, Mercado Pago o ambos.
+- **Pago combinado:** Operación abonada parcialmente en efectivo y parcialmente
+  mediante Mercado Pago.
 - **Caja teórica:** Importe que debería existir según las operaciones registradas.
 - **Caja real:** Importe efectivamente contabilizado al cerrar la jornada.
 - **Usuario:** Persona autorizada para utilizar el sistema.
 - **Venta:** venta de un producto, separada de los servicios realizados.
 - **Adelanto de caja:** dinero retirado de la caja y entregado anticipadamente a un barbero, que luego deberá descontarse de su liquidación.
+- **Comisión:** Porcentaje del precio de los servicios que corresponde al
+  barbero que los realizó. El sistema utiliza un único porcentaje general para
+  todos los barberos y no incluye propinas, ventas ni adelantos.
+- **Liquidación:** Cálculo del importe que corresponde pagar a un barbero según
+  sus comisiones, propinas y adelantos registrados.
+- **Período:** Rango de fechas semanal, mensual o anual utilizado para agrupar y
+  consultar la información de las jornadas.
+- **Resumen general:** Consolidación de cortes, ingresos, ventas, propinas,
+  adelantos, medios de pago y balance dentro de un período.
+- **Balance:** Resultado económico calculado a partir de los ingresos y las
+  salidas registradas en el período seleccionado.
 
 ## 1.4 Referencias
 
@@ -238,6 +256,117 @@ La interfaz deberá:
 - Solicitar confirmación antes de eliminar una venta o un adelanto.
 - Actualizar la información y los totales afectados después de cada operación.
 
+#### IU-004 — Resumen general de jornadas
+
+El sistema deberá proporcionar una interfaz para consultar de forma consolidada
+los resúmenes diarios de la barbería.
+
+La interfaz deberá permitir seleccionar uno de los siguientes períodos:
+
+- Semanal.
+- Mensual.
+- Anual.
+
+El usuario deberá poder elegir la semana, el mes o el año que desea consultar,
+según el período seleccionado. La interfaz deberá indicar claramente el rango de
+fechas incluido en el resumen.
+
+Para el período seleccionado, el sistema deberá mostrar como mínimo:
+
+- Cantidad total de cortes realizados.
+- Ingresos por servicios.
+- Ingresos por ventas.
+- Propinas registradas.
+- Adelantos entregados.
+- Totales por medio de pago.
+- Balance general del período.
+
+La interfaz también deberá mostrar un resumen individual de cada barbero con
+actividad dentro del período seleccionado. Para cada barbero deberá informar:
+
+- Cantidad de cortes realizados.
+- Ingresos generados por servicios.
+- Propinas registradas.
+- Adelantos recibidos.
+- Balance correspondiente al período.
+
+El resumen por barbero deberá actualizarse junto con el resumen general al
+cambiar el período o la fecha seleccionada.
+
+En la vista semanal, la información deberá presentarse separada por día. En la
+vista mensual, deberá permitir consultar los resúmenes diarios correspondientes
+al mes seleccionado. En la vista anual, la información deberá presentarse
+separada por mes.
+
+Cada división del período deberá mostrar sus propios totales y permitir acceder
+al resumen diario correspondiente cuando exista ese nivel de detalle.
+
+Cuando no existan movimientos para el período seleccionado, la interfaz deberá
+mostrar un mensaje informativo en lugar de valores o secciones vacías.
+
+Al cambiar el período o la fecha seleccionada, el sistema deberá actualizar el
+resumen sin modificar los datos registrados.
+
+#### IU-005 — Configuración
+
+El sistema deberá proporcionar una interfaz de configuración para administrar
+los servicios, los productos destinados a la venta, los barberos y la comisión
+general aplicada al trabajo de los barberos.
+
+##### Configuración de servicios
+
+La interfaz deberá mostrar los servicios disponibles y permitir registrar,
+modificar o eliminar cada servicio con los siguientes datos:
+
+- Nombre del servicio.
+- Precio.
+
+El nombre deberá ser obligatorio y el precio deberá ser un importe mayor que
+cero. Los servicios configurados deberán estar disponibles al registrar o
+modificar un corte.
+
+##### Configuración de productos
+
+La interfaz deberá mostrar los productos disponibles para la venta y permitir
+registrar, modificar o eliminar cada producto con los siguientes datos:
+
+- Nombre del producto.
+- Precio unitario de venta.
+
+El nombre deberá ser obligatorio y el precio deberá ser un importe mayor que
+cero. Los productos configurados deberán estar disponibles al registrar o
+modificar una venta.
+
+##### Configuración de barberos
+
+La interfaz deberá mostrar los barberos registrados y permitir agregar,
+modificar o eliminar cada barbero. Para cada barbero se deberá registrar como
+mínimo su nombre.
+
+Los barberos configurados deberán estar disponibles en el panel diario, en el
+registro de cortes, en el registro de adelantos y en los resúmenes por período.
+
+##### Configuración de comisión
+
+La interfaz deberá permitir establecer un único porcentaje de comisión general.
+Este porcentaje deberá aplicarse de igual manera a todos los barberos y no se
+configurará individualmente para cada uno.
+
+La comisión deberá aceptar un valor entre 0 % y 100 %. Cuando el porcentaje sea
+modificado, el sistema deberá utilizar el nuevo valor en los cálculos posteriores
+sin alterar los importes ya registrados.
+
+##### Comportamiento general
+
+La interfaz deberá:
+
+- Validar los campos obligatorios y los valores ingresados.
+- Permitir guardar los cambios o cancelar la operación.
+- Solicitar confirmación antes de eliminar un servicio, producto o barbero.
+- Informar cuando un elemento no pueda eliminarse por estar asociado a
+  operaciones registradas.
+- Actualizar las opciones disponibles después de guardar una configuración.
+
 
 ## 3.2 Requisitos funcionales
 
@@ -273,6 +402,13 @@ correspondiente a un barbero en el panel diario.
 
 El sistema deberá asociar automáticamente el nuevo corte con el barbero desde
 el cual se inició el registro, sin requerir que el usuario vuelva a seleccionarlo.
+
+El sistema deberá registrar la hora, el servicio, el precio, la propina cuando
+corresponda, el medio de pago y las notas opcionales.
+
+Cuando el medio de pago sea combinado, deberá registrar los importes abonados en
+efectivo y Mercado Pago. La suma de ambos deberá coincidir con el precio del
+servicio más la propina antes de permitir guardar el corte.
 
 ### RF-004 — Modificar un corte
 
@@ -373,6 +509,82 @@ Una vez confirmada, el sistema deberá eliminar el adelanto y recalcular:
 - El total de adelantos del barbero.
 - La liquidación correspondiente al barbero.
 
+### RF-012 — Consultar resúmenes por período
+
+El sistema deberá permitir consultar la información consolidada de las jornadas
+por período semanal, mensual o anual.
+
+El usuario deberá poder seleccionar el período y una fecha de referencia. El
+sistema deberá determinar el rango de fechas correspondiente y calcular:
+
+- Cantidad de cortes realizados.
+- Ingresos por servicios.
+- Ingresos por ventas.
+- Propinas registradas.
+- Adelantos entregados.
+- Totales por medio de pago.
+- Balance general del período.
+
+La vista semanal deberá separar la información por día; la vista mensual deberá
+permitir consultar los resúmenes diarios del mes; y la vista anual deberá separar
+la información por mes.
+
+### RF-013 — Consultar resúmenes por barbero
+
+El sistema deberá mostrar, dentro del período seleccionado, un resumen para cada
+barbero que haya registrado actividad.
+
+Para cada barbero deberá calcular la cantidad de cortes, los ingresos generados
+por servicios, las propinas, los adelantos y el balance correspondiente.
+
+Los totales por barbero deberán obtenerse de las mismas operaciones utilizadas
+para calcular el resumen general del período.
+
+### RF-014 — Administrar servicios
+
+El sistema deberá permitir registrar, modificar y eliminar servicios indicando
+su nombre y precio.
+
+El nombre deberá ser obligatorio y el precio deberá ser mayor que cero. Los
+servicios configurados deberán estar disponibles en el formulario de cortes.
+
+Un servicio asociado a cortes registrados no deberá eliminarse si la operación
+compromete la conservación del historial.
+
+### RF-015 — Administrar productos
+
+El sistema deberá permitir registrar, modificar y eliminar productos indicando
+su nombre y precio unitario de venta.
+
+El nombre deberá ser obligatorio y el precio deberá ser mayor que cero. Los
+productos configurados deberán estar disponibles en el formulario de ventas.
+
+Un producto asociado a ventas registradas no deberá eliminarse si la operación
+compromete la conservación del historial.
+
+### RF-016 — Administrar barberos
+
+El sistema deberá permitir registrar, modificar y eliminar barberos. El nombre
+del barbero deberá ser obligatorio.
+
+Los barberos configurados deberán estar disponibles en el panel diario, los
+formularios de cortes y adelantos, y los resúmenes por período.
+
+Un barbero asociado a operaciones registradas no deberá eliminarse si la
+operación compromete la conservación del historial.
+
+### RF-017 — Configurar la comisión general
+
+El sistema deberá permitir establecer un único porcentaje de comisión general,
+aplicable por igual a todos los barberos.
+
+El porcentaje deberá encontrarse entre 0 % y 100 %. La comisión deberá calcularse
+sobre el precio de los servicios realizados por cada barbero; no deberá incluir
+propinas, ventas ni adelantos.
+
+Cuando el porcentaje sea modificado, el nuevo valor deberá aplicarse a las
+operaciones posteriores sin alterar las comisiones previamente registradas.
+
 ## 3.3 Requisitos de rendimiento
 
 ### RNF-REN-001 — Tiempo de actualización del panel diario
@@ -467,6 +679,46 @@ El sistema deberá conservar, como mínimo, la siguiente información de cada ad
 - Estado de liquidación.
 - Fecha y hora de creación.
 - Fecha y hora de última modificación.
+
+### RLD-006 — Información de los servicios
+
+El sistema deberá conservar, como mínimo, la siguiente información de cada
+servicio:
+
+- Identificador único.
+- Nombre.
+- Precio vigente.
+- Fecha y hora de creación.
+- Fecha y hora de última modificación.
+
+### RLD-007 — Información de los productos
+
+El sistema deberá conservar, como mínimo, la siguiente información de cada
+producto:
+
+- Identificador único.
+- Nombre.
+- Precio unitario de venta vigente.
+- Fecha y hora de creación.
+- Fecha y hora de última modificación.
+
+### RLD-008 — Información de los barberos
+
+El sistema deberá conservar, como mínimo, la siguiente información de cada
+barbero:
+
+- Identificador único.
+- Nombre.
+- Fecha y hora de creación.
+- Fecha y hora de última modificación.
+
+### RLD-009 — Información de la comisión
+
+El sistema deberá conservar el porcentaje de comisión general vigente y su fecha
+de modificación.
+
+Cada corte deberá conservar el porcentaje de comisión aplicado y el importe de
+comisión resultante para mantener la consistencia de los cálculos históricos.
 
 ## 3.5 Restricciones de diseño
 
