@@ -159,6 +159,18 @@ Cada columna debe tener un boton para poder adicionar un corte para cada barbero
 En una resolución de escritorio de 1366x768, la interfaz deberá mostrar
 simultáneamente al menos cinco barberos.
 
+La interfaz deberá mostrar de manera general un resumen de:
+
+- Total en la caja (efectivo).
+- Total en Mercado Pago.
+- Cantidad de cortes.
+
+A su vez deberá tener de manera fácilmente visible los siguientes campos editables:
+
+- Caja inicial.
+- Retiro.
+- Aclaraciones.
+
 Sin requerir que el usuario abra una vista individual, cada corte deberá mostrar:
 
 - Hora.
@@ -167,6 +179,13 @@ Sin requerir que el usuario abra una vista individual, cada corte deberá mostra
 - Medio de pago.
 - Propina, cuando corresponda.
 - Nota adicional, cuando corresponda.
+
+Debajo de cada columna se debe mostrar un resumen del barbero que incluya:
+- Cantidad de cortes.
+- Total facturado de .cortes (Sin contar comisión ni adelantos).
+- Total de propinas.
+- Total adelantado.
+- Total despues de comisión y adelantos.
 
 A su vez esta interfaz debe tener un boton para poder acceder a la interfaz IU-005.
 
