@@ -1,6 +1,8 @@
 const storageKey = 'theluxe-rf001-003-cuts';
 const salesStorageKey = 'theluxe-rf006-008-sales';
 const advancesStorageKey = 'theluxe-rf009-011-advances';
+const expensesStorageKey = 'theluxe-rf018-020-expenses';
+const cashRegistersStorageKey = 'theluxe-cash-registers';
 const configStorageKey = 'theluxe-rf014-017-config';
 const defaultConfig = {
   services: [{ id: 'corte', name: 'Corte clásico', price: 15000 }, { id: 'corte-barba', name: 'Corte + barba', price: 22000 }, { id: 'barba', name: 'Barba', price: 10000 }, { id: 'diseno', name: 'Diseño', price: 18000 }],
@@ -39,6 +41,11 @@ const saleDetailDialog = document.getElementById('saleDetailDialog');
 const advanceForm = document.getElementById('advanceForm');
 const advanceDialog = document.getElementById('advanceDialog');
 const advanceDetailDialog = document.getElementById('advanceDetailDialog');
+const expenseForm = document.getElementById('expenseForm');
+const expenseDialog = document.getElementById('expenseDialog');
+const expenseDetailDialog = document.getElementById('expenseDetailDialog');
+const openingCashForm = document.getElementById('openingCashForm');
+const cashRegisterForm = document.getElementById('cashRegisterForm');
 const serviceConfigForm = document.getElementById('serviceConfigForm');
 const productConfigForm = document.getElementById('productConfigForm');
 const barberConfigForm = document.getElementById('barberConfigForm');
@@ -47,12 +54,17 @@ const configDialogs = { services: document.getElementById('serviceConfigDialog')
 let entries = JSON.parse(localStorage.getItem(storageKey) || '[]');
 let sales = JSON.parse(localStorage.getItem(salesStorageKey) || '[]');
 let advances = JSON.parse(localStorage.getItem(advancesStorageKey) || '[]');
+let expenses = JSON.parse(localStorage.getItem(expensesStorageKey) || '[]');
+let cashRegisters = JSON.parse(localStorage.getItem(cashRegistersStorageKey) || '{}');
 let editingId = null;
 let selectedId = null;
 let editingSaleId = null;
 let selectedSaleId = null;
 let editingAdvanceId = null;
 let selectedAdvanceId = null;
+let editingExpenseId = null;
+let selectedExpenseId = null;
+let editingOpening = false;
 
 workday.value = today();
 document.getElementById('summaryDate').value = today().slice(0, 7);
@@ -73,6 +85,14 @@ function saveSales() {
 
 function saveAdvances() {
   localStorage.setItem(advancesStorageKey, JSON.stringify(advances));
+}
+
+function saveExpenses() {
+  localStorage.setItem(expensesStorageKey, JSON.stringify(expenses));
+}
+
+function saveCashRegisters() {
+  localStorage.setItem(cashRegistersStorageKey, JSON.stringify(cashRegisters));
 }
 
 function saveConfig() {
@@ -154,6 +174,15 @@ function selectedAdvances() {
   return advances.filter((advance) => advance.date === workday.value);
 }
 
+function selectedExpenses() {
+  return expenses.filter((expense) => expense.date === workday.value);
+}
+
+function isDayOpen(date) {
+  const register = cashRegisters[date];
+  return Boolean(register && (register.opened === true || 'initialCash' in register || 'initialMp' in register));
+}
+
 function paymentTotal(list, type) {
   return list.reduce((sum, entry) => sum + (entry.payment === 'Ambos'
     ? Number(type === 'Efectivo' ? entry.cashAmount : entry.mpAmount)
@@ -172,16 +201,32 @@ function render() {
   const list = selectedEntries();
   const daySales = selectedSales();
   const dayAdvances = selectedAdvances();
+  const dayExpenses = selectedExpenses();
+  const register = cashRegisters[workday.value] || {};
+  const opened = isDayOpen(workday.value);
   const total = list.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0)
     + daySales.reduce((sum, sale) => sum + sale.total, 0);
   document.getElementById('dailyTotal').textContent = money.format(total);
   document.getElementById('dailyCount').textContent = `${list.length} ${list.length === 1 ? 'corte' : 'cortes'} · ${daySales.length} ${daySales.length === 1 ? 'venta' : 'ventas'}`;
   document.getElementById('tipsTotal').textContent = money.format(list.reduce((sum, entry) => sum + Number(entry.tip || 0), 0));
-  document.getElementById('cashTotal').textContent = money.format(paymentTotal(list, 'Efectivo') + salePaymentTotal(daySales, 'Efectivo') - advancePaymentTotal(dayAdvances, 'Efectivo'));
-  document.getElementById('mpTotal').textContent = money.format(paymentTotal(list, 'Mercado Pago') + salePaymentTotal(daySales, 'Mercado Pago') - advancePaymentTotal(dayAdvances, 'Mercado Pago'));
+  document.getElementById('cashTotal').textContent = money.format(Number(register.initialCash || 0) + paymentTotal(list, 'Efectivo') + salePaymentTotal(daySales, 'Efectivo') - advancePaymentTotal(dayAdvances, 'Efectivo') - expensePaymentTotal(dayExpenses, 'Efectivo'));
+  document.getElementById('mpTotal').textContent = money.format(Number(register.initialMp || 0) + paymentTotal(list, 'Mercado Pago') + salePaymentTotal(daySales, 'Mercado Pago') - advancePaymentTotal(dayAdvances, 'Mercado Pago') - expensePaymentTotal(dayExpenses, 'Mercado Pago'));
   document.getElementById('barberColumns').innerHTML = barbers.map((barber) => barberColumn(barber, list)).join('');
   renderSales(daySales);
   renderAdvances(dayAdvances);
+  renderExpenses(dayExpenses);
+  ['initialCash', 'initialMp'].forEach((name) => { openingCashForm.elements[name].value = name in register ? formatAmount(register[name]) : ''; });
+  ['realCash', 'realMp'].forEach((name) => { cashRegisterForm.elements[name].value = name in register ? formatAmount(register[name]) : ''; });
+  const openingStatus = document.getElementById('openingStatus');
+  openingStatus.textContent = opened ? 'Jornada iniciada' : 'Pendiente';
+  openingStatus.classList.toggle('open', opened);
+  openingCashForm.hidden = opened && !editingOpening;
+  document.getElementById('openingSaved').hidden = !opened || editingOpening;
+  document.getElementById('openingCashValue').textContent = money.format(Number(register.initialCash || 0));
+  document.getElementById('openingMpValue').textContent = money.format(Number(register.initialMp || 0));
+  openingCashForm.querySelector('button').textContent = opened ? 'Guardar cambios' : 'Iniciar jornada';
+  ['addSale', 'addAdvance', 'addExpense'].forEach((id) => { document.getElementById(id).disabled = !opened; });
+  cashRegisterForm.querySelector('button').disabled = !opened;
   renderSummary();
 }
 
@@ -193,6 +238,10 @@ function advancePaymentTotal(list, type) {
   return list.reduce((sum, advance) => sum + (advance.payment === type ? advance.amount : 0), 0);
 }
 
+function expensePaymentTotal(list, type) {
+  return list.reduce((sum, expense) => sum + (expense.payment === type ? expense.amount : 0), 0);
+}
+
 function renderSales(list) {
   document.getElementById('salesRows').innerHTML = list.sort((a, b) => a.time.localeCompare(b.time)).map((sale) => `
     <tr data-sale="${escapeHtml(sale.id)}" tabindex="0">
@@ -202,6 +251,9 @@ function renderSales(list) {
       <td>${escapeHtml(sale.notes || '—')}</td>
     </tr>`).join('');
   document.getElementById('salesEmpty').hidden = list.length > 0;
+  document.getElementById('salesCashTotal').textContent = money.format(salePaymentTotal(list, 'Efectivo'));
+  document.getElementById('salesMpTotal').textContent = money.format(salePaymentTotal(list, 'Mercado Pago'));
+  document.getElementById('salesGrandTotal').textContent = money.format(list.reduce((sum, sale) => sum + sale.total, 0));
 }
 
 function renderAdvances(list) {
@@ -212,6 +264,17 @@ function renderAdvances(list) {
       <td>${escapeHtml(advance.reason || '—')}</td>
     </tr>`).join('');
   document.getElementById('advancesEmpty').hidden = list.length > 0;
+  document.getElementById('advancesCashTotal').textContent = money.format(advancePaymentTotal(list, 'Efectivo'));
+  document.getElementById('advancesMpTotal').textContent = money.format(advancePaymentTotal(list, 'Mercado Pago'));
+  document.getElementById('advancesGrandTotal').textContent = money.format(list.reduce((sum, advance) => sum + advance.amount, 0));
+}
+
+function renderExpenses(list) {
+  document.getElementById('expenseRows').innerHTML = list.sort((a, b) => a.time.localeCompare(b.time)).map((expense) => `<tr data-expense="${escapeHtml(expense.id)}" tabindex="0"><td>${escapeHtml(expense.time)}</td><td>${escapeHtml(expense.reason)}</td><td>${money.format(expense.amount)}</td><td>${escapeHtml(expense.payment === 'Mercado Pago' ? 'MP' : expense.payment)}</td></tr>`).join('');
+  document.getElementById('expensesEmpty').hidden = list.length > 0;
+  document.getElementById('expensesCashTotal').textContent = money.format(expensePaymentTotal(list, 'Efectivo'));
+  document.getElementById('expensesMpTotal').textContent = money.format(expensePaymentTotal(list, 'Mercado Pago'));
+  document.getElementById('expensesGrandTotal').textContent = money.format(list.reduce((sum, expense) => sum + expense.amount, 0));
 }
 
 function isoDate(date) {
@@ -264,16 +327,26 @@ function updateWeekOptions() {
   select.innerHTML = Array.from({ length: count }, (_, index) => `<option value="${index + 1}">Semana ${index + 1}</option>`).join('');
 }
 
-function summarize(cuts, periodSales, periodAdvances) {
+function cutValueByPayment(cuts, type, field) {
+  return cuts.reduce((sum, cut) => {
+    if (cut.payment !== 'Ambos') return sum + (cut.payment === type ? Number(cut[field] || 0) : 0);
+    const total = Number(cut.amount) + Number(cut.tip || 0);
+    const paid = Number(type === 'Efectivo' ? cut.cashAmount : cut.mpAmount);
+    return sum + (total ? paid * Number(cut[field] || 0) / total : 0);
+  }, 0);
+}
+
+function summarize(cuts, periodSales, periodAdvances, periodExpenses = []) {
   const services = cuts.reduce((sum, cut) => sum + Number(cut.amount), 0);
   const tips = cuts.reduce((sum, cut) => sum + Number(cut.tip || 0), 0);
   const salesTotal = periodSales.reduce((sum, sale) => sum + sale.total, 0);
   const advancesTotal = periodAdvances.reduce((sum, advance) => sum + advance.amount, 0);
+  const expensesTotal = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   return {
-    cuts: cuts.length, services, sales: salesTotal, tips, advances: advancesTotal,
-    balance: services + tips + salesTotal - advancesTotal,
-    cash: paymentTotal(cuts, 'Efectivo') + salePaymentTotal(periodSales, 'Efectivo') - advancePaymentTotal(periodAdvances, 'Efectivo'),
-    mp: paymentTotal(cuts, 'Mercado Pago') + salePaymentTotal(periodSales, 'Mercado Pago') - advancePaymentTotal(periodAdvances, 'Mercado Pago'),
+    cuts: cuts.length, saleCount: periodSales.length, services, sales: salesTotal, tips, advances: advancesTotal, expenses: expensesTotal,
+    invoiced: services + salesTotal, balance: services + tips + salesTotal - advancesTotal - expensesTotal,
+    cash: paymentTotal(cuts, 'Efectivo') + salePaymentTotal(periodSales, 'Efectivo') - advancePaymentTotal(periodAdvances, 'Efectivo') - expensePaymentTotal(periodExpenses, 'Efectivo'),
+    mp: paymentTotal(cuts, 'Mercado Pago') + salePaymentTotal(periodSales, 'Mercado Pago') - advancePaymentTotal(periodAdvances, 'Mercado Pago') - expensePaymentTotal(periodExpenses, 'Mercado Pago'),
   };
 }
 
@@ -284,22 +357,36 @@ function renderSummary() {
   const periodCuts = entries.filter(inRange);
   const periodSales = sales.filter(inRange);
   const periodAdvances = advances.filter(inRange);
-  const total = summarize(periodCuts, periodSales, periodAdvances);
+  const periodExpenses = expenses.filter(inRange);
+  const total = summarize(periodCuts, periodSales, periodAdvances, periodExpenses);
   const dateLabel = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   document.getElementById('summaryRange').textContent = `${dateLabel.format(new Date(`${from}T00:00:00`))} — ${dateLabel.format(new Date(`${to}T00:00:00`))}`;
-  ['Cuts', 'Services', 'Sales', 'Tips', 'Advances', 'Balance', 'Cash', 'Mp'].forEach((name) => {
-    document.getElementById(`summary${name}`).textContent = name === 'Cuts' ? total.cuts : money.format(total[name.toLowerCase()]);
-  });
+  document.getElementById('summaryCuts').textContent = total.cuts;
+  document.getElementById('summarySaleCount').textContent = total.saleCount;
+  ['Services', 'Sales', 'Invoiced', 'Tips', 'Advances', 'Expenses', 'Balance'].forEach((name) => { document.getElementById(`summary${name}`).textContent = money.format(total[name.toLowerCase()]); });
+
+  document.getElementById('cashSummaryRows').innerHTML = ['Efectivo', 'Mercado Pago'].map((type) => {
+    const suffix = type === 'Efectivo' ? 'Cash' : 'Mp';
+    const initial = Number(cashRegisters[from]?.[`initial${suffix}`] || 0);
+    const real = Number(cashRegisters[to]?.[`real${suffix}`] || 0);
+    const serviceEntries = cutValueByPayment(periodCuts, type, 'amount');
+    const tipsByType = cutValueByPayment(periodCuts, type, 'tip');
+    const entriesTotal = serviceEntries + salePaymentTotal(periodSales, type);
+    const advanceTotal = advancePaymentTotal(periodAdvances, type);
+    const expenseTotal = expensePaymentTotal(periodExpenses, type);
+    const theoretical = initial + entriesTotal + tipsByType - advanceTotal - expenseTotal;
+    return `<tr><td>${type}</td><td>${money.format(initial)}</td><td>${money.format(entriesTotal)}</td><td>${money.format(tipsByType)}</td><td>${money.format(advanceTotal)}</td><td>${money.format(expenseTotal)}</td><td>${money.format(theoretical)}</td><td>${money.format(real)}</td><td>${money.format(real - theoretical)}</td></tr>`;
+  }).join('');
 
   const groupKey = (item) => period === 'year' ? item.date.slice(0, 7) : item.date;
-  const keys = [...new Set([...periodCuts, ...periodSales, ...periodAdvances].map(groupKey))].sort();
+  const keys = [...new Set([...periodCuts, ...periodSales, ...periodAdvances, ...periodExpenses].map(groupKey))].sort();
   const monthLabel = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' });
   document.getElementById('summaryBreakdownTitle').textContent = period === 'year' ? 'Resumen por mes' : 'Resumen por día';
   document.getElementById('summaryRows').innerHTML = keys.map((key) => {
     const matches = (item) => groupKey(item) === key;
-    const row = summarize(periodCuts.filter(matches), periodSales.filter(matches), periodAdvances.filter(matches));
+    const row = summarize(periodCuts.filter(matches), periodSales.filter(matches), periodAdvances.filter(matches), periodExpenses.filter(matches));
     const label = period === 'year' ? monthLabel.format(new Date(`${key}-01T00:00:00`)) : dateLabel.format(new Date(`${key}T00:00:00`));
-    return `<tr><td>${escapeHtml(label)}</td><td>${row.cuts}</td><td>${money.format(row.services)}</td><td>${money.format(row.sales)}</td><td>${money.format(row.tips)}</td><td>${money.format(row.advances)}</td><td>${money.format(row.balance)}</td></tr>`;
+    return `<tr><td>${escapeHtml(label)}</td><td>${row.cuts}</td><td>${money.format(row.services)}</td><td>${money.format(row.sales)}</td><td>${money.format(row.tips)}</td><td>${money.format(row.advances)}</td><td>${money.format(row.expenses)}</td><td>${money.format(row.balance)}</td></tr>`;
   }).join('');
   document.getElementById('summaryEmpty').hidden = keys.length > 0;
 
@@ -336,7 +423,7 @@ function barberColumn(barber, list) {
     <section class="barber-column">
       <header class="barber-column-header">
         <div><strong>${escapeHtml(barber)}</strong><span>${cuts.length} ${cuts.length === 1 ? 'corte' : 'cortes'}</span></div>
-        <button class="add-cut" type="button" data-barber="${escapeHtml(barber)}" aria-label="Registrar corte para ${escapeHtml(barber)}" title="Agregar corte">+</button>
+        <button class="add-cut" type="button" data-barber="${escapeHtml(barber)}" aria-label="Registrar corte para ${escapeHtml(barber)}" title="Agregar corte" ${isDayOpen(workday.value) ? '' : 'disabled'}>+</button>
       </header>
       <div class="barber-services">${rows}</div>
       <footer class="barber-column-total"><span>Total</span><strong>${money.format(total)}</strong></footer>
@@ -457,6 +544,28 @@ function openAdvanceDetail(id) {
   advanceDetailDialog.showModal();
 }
 
+function openExpenseDialog(id = null) {
+  expenseForm.reset();
+  editingExpenseId = id;
+  const expense = expenses.find((item) => item.id === id);
+  expenseForm.elements.time.value = expense?.time || nowTime();
+  expenseForm.elements.amount.value = expense ? formatAmount(expense.amount) : '';
+  expenseForm.elements.payment.value = expense?.payment || 'Efectivo';
+  expenseForm.elements.reason.value = expense?.reason || '';
+  document.getElementById('expenseFormMode').textContent = expense ? 'MODIFICAR SALIDA' : 'NUEVA SALIDA';
+  expenseDetailDialog.close();
+  expenseDialog.showModal();
+}
+
+function openExpenseDetail(id) {
+  const expense = expenses.find((item) => item.id === id);
+  if (!expense) return;
+  selectedExpenseId = id;
+  document.getElementById('expenseDetailTitle').textContent = expense.reason;
+  document.getElementById('expenseDetail').innerHTML = [['Hora', expense.time], ['Motivo', expense.reason], ['Importe', money.format(expense.amount)], ['Medio de salida', expense.payment]].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
+  expenseDetailDialog.showModal();
+}
+
 document.getElementById('barberColumns').addEventListener('click', (event) => {
   const cut = event.target.closest('[data-cut]');
   if (cut) return openDetail(cut.dataset.cut);
@@ -472,7 +581,7 @@ document.querySelector('.nav').addEventListener('click', (event) => {
     item.toggleAttribute('aria-current', item === button);
   });
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === button.dataset.view));
-  document.querySelector('h1').textContent = button.dataset.view === 'salesView' ? 'Ventas y adelantos' : button.dataset.view === 'summaryView' ? 'Resúmenes' : button.dataset.view === 'configView' ? 'Configuración' : 'Panel diario';
+  document.querySelector('h1').textContent = button.dataset.view === 'salesView' ? 'Caja y movimientos' : button.dataset.view === 'summaryView' ? 'Resúmenes' : button.dataset.view === 'configView' ? 'Configuración' : 'Panel diario';
 });
 
 document.getElementById('summaryPeriod').addEventListener('change', () => {
@@ -496,6 +605,12 @@ document.getElementById('addAdvance').addEventListener('click', () => openAdvanc
   if (type === 'keydown' && event.key !== 'Enter') return;
   const row = event.target.closest('[data-advance]');
   if (row) openAdvanceDetail(row.dataset.advance);
+}));
+document.getElementById('addExpense').addEventListener('click', () => openExpenseDialog());
+['click', 'keydown'].forEach((type) => document.getElementById('expenseRows').addEventListener(type, (event) => {
+  if (type === 'keydown' && event.key !== 'Enter') return;
+  const row = event.target.closest('[data-expense]');
+  if (row) openExpenseDetail(row.dataset.expense);
 }));
 [saleForm.elements.quantity, saleForm.elements.unitPrice].forEach((input) => input.addEventListener('input', updateSaleTotal));
 
@@ -524,6 +639,37 @@ advanceForm.addEventListener('submit', (event) => {
   saveAdvances();
   editingAdvanceId = null;
   advanceDialog.close();
+  render();
+});
+
+expenseForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(expenseForm));
+  expenseForm.elements.amount.setCustomValidity(parseAmount(values.amount) > 0 ? '' : 'El importe debe ser mayor que cero.');
+  if (!expenseForm.reportValidity()) return;
+  const expense = { ...values, amount: parseAmount(values.amount), date: workday.value, id: editingExpenseId || crypto.randomUUID() };
+  expenses = editingExpenseId ? expenses.map((item) => item.id === editingExpenseId ? expense : item) : [...expenses, expense];
+  saveExpenses();
+  editingExpenseId = null;
+  expenseDialog.close();
+  render();
+});
+
+openingCashForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(openingCashForm));
+  const current = cashRegisters[workday.value] || {};
+  cashRegisters[workday.value] = { ...current, initialCash: parseAmount(values.initialCash), initialMp: parseAmount(values.initialMp), opened: true, openedAt: current.openedAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+  saveCashRegisters();
+  editingOpening = false;
+  render();
+});
+
+cashRegisterForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(cashRegisterForm));
+  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), realCash: parseAmount(values.realCash), realMp: parseAmount(values.realMp), updatedAt: new Date().toISOString() };
+  saveCashRegisters();
   render();
 });
 
@@ -558,7 +704,14 @@ form.addEventListener('submit', (event) => {
   render();
 });
 
-workday.addEventListener('change', render);
+document.getElementById('editOpeningCash').addEventListener('click', () => {
+  editingOpening = true;
+  render();
+});
+workday.addEventListener('change', () => {
+  editingOpening = false;
+  render();
+});
 document.getElementById('closeDialog').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
 document.getElementById('closeDetailDialog').addEventListener('click', () => detailDialog.close());
@@ -598,6 +751,19 @@ document.getElementById('deleteAdvance').addEventListener('click', () => {
   advanceDetailDialog.close();
   render();
 });
+document.getElementById('closeExpenseDialog').addEventListener('click', () => expenseDialog.close());
+expenseDialog.addEventListener('click', (event) => { if (event.target === expenseDialog) expenseDialog.close(); });
+document.getElementById('closeExpenseDetail').addEventListener('click', () => expenseDetailDialog.close());
+expenseDetailDialog.addEventListener('click', (event) => { if (event.target === expenseDetailDialog) expenseDetailDialog.close(); });
+document.getElementById('editExpense').addEventListener('click', () => openExpenseDialog(selectedExpenseId));
+document.getElementById('deleteExpense').addEventListener('click', () => {
+  if (!selectedExpenseId || !confirm('¿Eliminar esta salida de caja?')) return;
+  expenses = expenses.filter((expense) => expense.id !== selectedExpenseId);
+  saveExpenses();
+  selectedExpenseId = null;
+  expenseDetailDialog.close();
+  render();
+});
 
 serviceConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('services', serviceConfigForm); });
 productConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('products', productConfigForm); });
@@ -635,6 +801,7 @@ console.assert(paymentTotal([{ payment: 'Efectivo', amount: 1000, tip: 200 }], '
 console.assert(paymentTotal([{ payment: 'Ambos', cashAmount: 500, mpAmount: 700 }], 'Mercado Pago') === 700);
 console.assert(salePaymentTotal([{ payment: 'Efectivo', total: 1500 }], 'Efectivo') === 1500);
 console.assert(advancePaymentTotal([{ payment: 'Efectivo', amount: 500 }], 'Efectivo') === 500);
+console.assert(expensePaymentTotal([{ payment: 'Mercado Pago', amount: 800 }], 'Mercado Pago') === 800);
 console.assert(parseAmount('15.000') === 15000);
 console.assert(periodBounds('week', '2026-07', 1).join() === '2026-07-06,2026-07-12');
 console.assert(periodBounds('week', '2026-07', 4).join() === '2026-07-27,2026-08-02');

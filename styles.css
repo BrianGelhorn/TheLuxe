@@ -11,7 +11,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: "DM Sans", sans-serif; }
+body { margin: 0; min-height: 100vh; zoom: .9; background: var(--bg); color: var(--text); font-family: "DM Sans", sans-serif; }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 
@@ -61,6 +61,20 @@ textarea { resize: vertical; }
 .sales-table tbody tr:hover { background: var(--surface-2); }
 .sales-table td:nth-child(2), .sales-table td:last-child { white-space: normal; }
 .total-preview { min-height: 43px; padding: 12px 13px; border: 1px solid #6e5936; border-radius: 9px; background: var(--gold-soft); color: var(--gold); font-weight: 800; }
+.movement-summary { display: flex; justify-content: flex-end; gap: 24px; padding-top: 16px; color: var(--muted); font-size: .8rem; }
+.movement-summary strong { display: block; margin-top: 3px; color: #62a976; }
+.movement-summary.outgoing strong { color: #f0a29b; }
+.cash-register-form { display: grid; grid-template-columns: repeat(4, 1fr) auto; align-items: end; gap: 14px; }
+.cash-register-form[hidden] { display: none; }
+.opening-card { margin-bottom: 14px; border-color: #6e5936; }
+.opening-form { grid-template-columns: repeat(2, 1fr) auto; }
+.opening-saved { display: flex; align-items: center; gap: 28px; }
+.opening-saved[hidden] { display: none; }
+.opening-saved span { color: var(--muted); font-size: .8rem; }
+.opening-saved strong { display: block; margin-top: 4px; color: var(--text); font-size: 1rem; }
+#openingStatus { color: #f0a29b; }
+#openingStatus.open { color: #62a976; }
+button:disabled { opacity: .45; cursor: not-allowed; }
 .config-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .config-form { display: grid; grid-template-columns: 1fr 140px auto; gap: 10px; margin-top: 20px; }
 .config-list { display: grid; gap: 1px; margin-top: 18px; background: var(--line); }
@@ -134,6 +148,7 @@ textarea { resize: vertical; }
   .summary-controls { grid-template-columns: 1fr 1fr; }
   .summary-range { grid-column: 1 / -1; }
   .config-grid { grid-template-columns: 1fr; }
+  .cash-register-form { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 560px) {
@@ -152,4 +167,7 @@ textarea { resize: vertical; }
   .primary-btn { width: 100%; }
   .summary-controls { grid-template-columns: 1fr; }
   .config-form { grid-template-columns: 1fr; }
+  .cash-register-form { grid-template-columns: 1fr; }
+  .movement-summary { justify-content: space-between; gap: 8px; }
+  .opening-saved { align-items: stretch; flex-direction: column; gap: 12px; }
 }

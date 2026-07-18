@@ -168,11 +168,27 @@ La interfaz deberá mostrar de manera general un resumen de:
 - Total en Mercado Pago.
 - Cantidad de cortes.
 
-A su vez deberá tener de manera fácilmente visible los siguientes campos editables:
+En la parte superior del Panel Diario, antes del resumen y de las columnas de
+barberos, la interfaz deberá mostrar la sección **Apertura de jornada**.
 
-- Caja inicial.
-- Retiro.
-- Aclaraciones.
+Esta sección deberá solicitar:
+
+- Caja inicial en Efectivo.
+- Caja inicial en Mercado Pago.
+
+La apertura deberá ser la primera operación de la jornada. Mientras no se hayan
+guardado ambos importes iniciales, el sistema no deberá permitir registrar
+cortes, ventas, adelantos ni salidas de caja.
+
+Después de guardar, la interfaz deberá indicar que la jornada fue iniciada,
+habilitar las acciones de registro y utilizar los importes como base para calcular
+las cajas teóricas. Los valores iniciales deberán permanecer visibles y podrán
+corregirse desde el mismo Panel Diario.
+
+Una vez iniciada la jornada, el sistema deberá ocultar el formulario de apertura
+para evitar modificaciones accidentales. En su lugar deberá mostrar un resumen
+compacto de las cajas iniciales y una acción **Editar caja inicial**. El formulario
+solo deberá volver a mostrarse cuando el usuario seleccione dicha acción.
 
 Sin requerir que el usuario abra una vista individual, cada corte deberá mostrar:
 
@@ -821,8 +837,8 @@ operaciones posteriores sin alterar las comisiones previamente registradas.
 
 ### RF-018 — Registrar una salida de caja
 
-- **Estado:** Pendiente
-- **Version de software:** -
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
 
 El sistema deberá permitir registrar una salida de caja asociada a la jornada
 seleccionada.
@@ -836,8 +852,8 @@ el balance de la jornada.
 
 ### RF-019 — Modificar una salida de caja
 
-- **Estado:** Pendiente
-- **Version de software:** -
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
 
 El sistema deberá permitir modificar una salida de caja previamente registrada.
 Antes de guardar, deberá validar los nuevos datos y el importe.
@@ -847,14 +863,32 @@ el total de salidas y el balance de la jornada.
 
 ### RF-020 — Eliminar una salida de caja
 
-- **Estado:** Pendiente
-- **Version de software:** -
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
 
 El sistema deberá permitir eliminar una salida de caja previamente registrada.
 Antes de eliminarla, deberá solicitar confirmación al usuario.
 
 Después de confirmar la eliminación, el sistema deberá recalcular los saldos, el
 total de salidas de caja y el balance de la jornada.
+
+### RF-021 — Iniciar una jornada
+
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
+
+El sistema deberá solicitar la caja inicial de Efectivo y la caja inicial de
+Mercado Pago desde el Panel Diario.
+
+El sistema no deberá permitir registrar cortes, ventas, adelantos ni salidas de
+caja hasta que la jornada haya sido iniciada.
+
+Después de guardar la apertura, deberá habilitar las operaciones de la jornada y
+utilizar los importes iniciales como base para calcular las cajas teóricas.
+
+El formulario de apertura deberá quedar oculto después de iniciar la jornada. El
+sistema deberá mostrar los importes guardados y permitir su modificación mediante
+una acción explícita de edición.
 
 ## 3.3 Requisitos de rendimiento
 
@@ -1003,6 +1037,18 @@ de caja:
 - Importe.
 - Medio utilizado para retirar el dinero.
 - Fecha y hora de creación.
+- Fecha y hora de última modificación.
+
+### RLD-011 — Información de apertura y cierre de jornada
+
+El sistema deberá conservar para cada jornada:
+
+- Caja inicial en Efectivo.
+- Caja inicial en Mercado Pago.
+- Estado de apertura de la jornada.
+- Caja real en Efectivo, cuando se registre el cierre.
+- Caja real en Mercado Pago, cuando se registre el cierre.
+- Fecha y hora de apertura.
 - Fecha y hora de última modificación.
 
 ## 3.5 Restricciones de diseño
