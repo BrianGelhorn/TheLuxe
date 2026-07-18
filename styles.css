@@ -49,6 +49,7 @@ textarea { resize: vertical; }
 .metric strong { display: block; margin: 14px 0 6px; font: 800 1.5rem Manrope; }
 .daily-sheet { margin-top: 14px; padding: 20px; overflow: hidden; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+.heading-actions { display: flex; align-items: center; gap: 12px; }
 .summary-controls { display: grid; grid-template-columns: 180px 200px 160px 1fr; align-items: end; gap: 20px; }
 .summary-range { grid-column: 4; }
 .summary-metrics { grid-template-columns: repeat(4, 1fr); margin-top: 14px; }

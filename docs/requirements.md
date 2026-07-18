@@ -83,12 +83,12 @@ The Luxe será un sistema nuevo destinado a sustituir progresivamente las
 planillas de Excel utilizadas para registrar y consolidar la actividad de la
 barbería.
 
-El producto, en su primera versión inicial, va a funcionar exclusivamente en el navegador y
-guardará los datos en una base de datos PostgreSQL local.
+La versión actual funcionará exclusivamente en el navegador y mantendrá los datos
+solo en memoria durante la sesión abierta. Al cerrar o recargar la aplicación, las
+operaciones y configuraciones cargadas deberán descartarse.
 
-La base de datos contendrá todos los datos de caja diarios, así como información de barberos e información
-sobre los servicios que la misma brinde.
-Esta base de datos realizará periódicamente copias de seguridad locales de los mismos.
+La persistencia en PostgreSQL y las copias de seguridad locales quedan fuera del
+alcance de esta versión.
 
 ## 2.2 Funciones del producto 
 
@@ -189,6 +189,10 @@ Una vez iniciada la jornada, el sistema deberá ocultar el formulario de apertur
 para evitar modificaciones accidentales. En su lugar deberá mostrar un resumen
 compacto de las cajas iniciales y una acción **Editar caja inicial**. El formulario
 solo deberá volver a mostrarse cuando el usuario seleccione dicha acción.
+
+El Panel Diario deberá incluir una acción **Cambiar comisión** que abra un diálogo
+para modificar el porcentaje general aplicable a los nuevos cortes, sin necesidad
+de ingresar a la interfaz de Configuración.
 
 Sin requerir que el usuario abra una vista individual, cada corte deberá mostrar:
 
@@ -436,6 +440,7 @@ El resumen deberá mostrar:
 - Total facturado por ventas de productos.
 - Total general facturado.
 - Total de propinas.
+- Total de comisiones generadas.
 - Cantidad de cortes realizados.
 - Cantidad de ventas registradas.
 
@@ -486,6 +491,13 @@ En la vista semanal, la información deberá presentarse separada por día. En l
 vista mensual, deberá permitir consultar los resúmenes diarios correspondientes
 al mes seleccionado. En la vista anual, la información deberá presentarse
 separada por mes.
+
+Al ingresar a la interfaz de Resúmenes, el sistema deberá seleccionar por defecto
+el período semanal, el mes actual y el número de semana correspondiente a la
+fecha actual.
+
+Cada fila del resumen por día deberá mostrar la comisión total generada durante
+esa jornada.
 
 Cada división del período deberá mostrar sus propios totales y permitir acceder
 al resumen diario correspondiente cuando exista ese nivel de detalle.
@@ -552,6 +564,9 @@ registro de cortes, en el registro de adelantos y en los resúmenes por período
 La interfaz deberá permitir establecer un único porcentaje de comisión general.
 Este porcentaje deberá aplicarse de igual manera a todos los barberos y no se
 configurará individualmente para cada uno.
+
+El porcentaje deberá poder modificarse desde Configuración y desde la acción
+disponible en el Panel Diario.
 
 La comisión deberá editarse directamente dentro de la interfaz de configuración,
 sin abrir un diálogo adicional.
@@ -747,6 +762,7 @@ sistema deberá determinar el rango de fechas correspondiente y calcular:
 - Ingresos por ventas.
 - Total general facturado.
 - Propinas registradas.
+- Comisiones generadas.
 - Adelantos entregados.
 - Salidas de caja registradas.
 - Cajas iniciales de Efectivo y Mercado Pago.
@@ -763,6 +779,9 @@ resumen general.
 La vista semanal deberá separar la información por día; la vista mensual deberá
 permitir consultar los resúmenes diarios del mes; y la vista anual deberá separar
 la información por mes.
+
+Al abrir la interfaz, el sistema deberá mostrar por defecto la semana actual. El
+desglose diario deberá incluir la comisión total correspondiente a cada jornada.
 
 ### RF-013 — Consultar resúmenes por barbero
 
@@ -827,6 +846,9 @@ operación compromete la conservación del historial.
 
 El sistema deberá permitir establecer un único porcentaje de comisión general,
 aplicable por igual a todos los barberos.
+
+El porcentaje deberá poder modificarse desde Configuración y desde el Panel
+Diario.
 
 El porcentaje deberá encontrarse entre 0 % y 100 %. La comisión deberá calcularse
 sobre el precio de los servicios realizados por cada barbero; no deberá incluir

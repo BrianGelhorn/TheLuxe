@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
   <div class="app-shell">
@@ -38,7 +38,7 @@
 
       <section id="dailyView" class="view active">
         <article class="card daily-sheet opening-card">
-          <div class="section-heading"><div><span class="step">APERTURA DE JORNADA</span><h2>Cajas iniciales</h2></div><small id="openingStatus">Pendiente</small></div>
+          <div class="section-heading"><div><span class="step">APERTURA DE JORNADA</span><h2>Cajas iniciales</h2></div><div class="heading-actions"><small id="openingStatus">Pendiente</small><button id="changeCommission" class="secondary-btn" type="button">Cambiar comisión</button></div></div>
           <form id="openingCashForm" class="cash-register-form opening-form">
             <label class="field"><span>Efectivo inicial</span><div class="money-input"><b>$</b><input name="initialCash" type="text" inputmode="numeric" required></div></label>
             <label class="field"><span>Mercado Pago inicial</span><div class="money-input"><b>$</b><input name="initialMp" type="text" inputmode="numeric" required></div></label>
@@ -126,6 +126,7 @@
           <article class="metric"><span>Ventas</span><strong id="summarySales">$ 0</strong></article>
           <article class="metric featured"><span>Total facturado</span><strong id="summaryInvoiced">$ 0</strong></article>
           <article class="metric"><span>Propinas</span><strong id="summaryTips">$ 0</strong></article>
+          <article class="metric"><span>Comisiones</span><strong id="summaryCommission">$ 0</strong></article>
           <article class="metric"><span>Adelantos</span><strong id="summaryAdvances">$ 0</strong></article>
           <article class="metric"><span>Salidas de caja</span><strong id="summaryExpenses">$ 0</strong></article>
           <article class="metric featured"><span>Balance</span><strong id="summaryBalance">$ 0</strong></article>
@@ -133,7 +134,7 @@
         <article class="card daily-sheet"><div class="section-heading"><div><span class="step">CAJAS</span><h2>Resumen por medio</h2></div></div><div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Medio</th><th>Inicial</th><th>Entradas</th><th>Propinas</th><th>Adelantos</th><th>Gastos</th><th>Teórica</th><th>Real</th><th>Diferencia</th></tr></thead><tbody id="cashSummaryRows"></tbody></table></div></article>
         <article class="card daily-sheet">
           <div class="section-heading"><div><span class="step">DESGLOSE</span><h2 id="summaryBreakdownTitle">Resumen por día</h2></div></div>
-          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Período</th><th>Cortes</th><th>Servicios</th><th>Ventas</th><th>Propinas</th><th>Adelantos</th><th>Gastos</th><th>Balance</th></tr></thead><tbody id="summaryRows"></tbody></table></div>
+          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Período</th><th>Cortes</th><th>Servicios</th><th>Ventas</th><th>Propinas</th><th>Comisiones</th><th>Adelantos</th><th>Gastos</th><th>Balance</th></tr></thead><tbody id="summaryRows"></tbody></table></div>
           <div id="summaryEmpty" class="barber-empty">Sin movimientos en el período</div>
         </article>
         <article class="card daily-sheet">
@@ -296,6 +297,7 @@
 
       <dialog id="expenseDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span id="expenseFormMode" class="step">NUEVA SALIDA</span><h2>Salida de caja</h2></div><button id="closeExpenseDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="expenseForm" class="cut-form"><label class="field"><span>Hora</span><input name="time" type="time" required></label><label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label><label class="field"><span>Medio de salida</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label><label class="field full-width"><span>Motivo o descripción</span><textarea name="reason" rows="3" required></textarea></label><button class="primary-btn" type="submit">Guardar salida</button></form></article></dialog>
       <dialog id="expenseDetailDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">DETALLE DE SALIDA</span><h2 id="expenseDetailTitle">Datos completos</h2></div><button id="closeExpenseDetail" class="close-btn" type="button" aria-label="Cerrar">×</button></div><dl id="expenseDetail" class="detail-list"></dl><div class="detail-actions"><button id="editExpense" class="secondary-btn" type="button">Modificar</button><button id="deleteExpense" class="danger-btn" type="button">Eliminar</button></div></article></dialog>
+      <dialog id="commissionDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">COMISIÓN GENERAL</span><h2>Cambiar comisión</h2></div><button id="closeCommissionDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="dailyCommissionForm" class="cut-form"><label class="field full-width"><span>Comisión para nuevos cortes (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn" type="submit">Guardar comisión</button></form></article></dialog>
 
       <dialog id="serviceConfigDialog" class="cut-dialog">
         <article class="form-card"><div class="card-heading"><div><span id="serviceConfigMode" class="step">NUEVO SERVICIO</span><h2>Servicio</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="serviceConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Precio</span><div class="money-input"><b>$</b><input name="price" type="text" inputmode="numeric" required></div></label><button class="primary-btn" type="submit">Guardar servicio</button></form></article>
@@ -308,6 +310,8 @@
       </dialog>
     </main>
   </div>
-  <script src="script.js?v=16"></script>
+  <script src="reports.js?v=1"></script>
+  <script src="dialogs.js?v=1"></script>
+  <script src="script.js?v=19"></script>
 </body>
 </html>

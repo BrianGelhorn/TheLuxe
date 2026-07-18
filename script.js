@@ -1,16 +1,11 @@
-const storageKey = 'theluxe-rf001-003-cuts';
-const salesStorageKey = 'theluxe-rf006-008-sales';
-const advancesStorageKey = 'theluxe-rf009-011-advances';
-const expensesStorageKey = 'theluxe-rf018-020-expenses';
-const cashRegistersStorageKey = 'theluxe-cash-registers';
-const configStorageKey = 'theluxe-rf014-017-config';
 const defaultConfig = {
   services: [{ id: 'corte', name: 'Corte clásico', price: 15000 }, { id: 'corte-barba', name: 'Corte + barba', price: 22000 }, { id: 'barba', name: 'Barba', price: 10000 }, { id: 'diseno', name: 'Diseño', price: 18000 }],
   products: [{ id: 'pomada', name: 'Pomada', price: 12000 }, { id: 'shampoo', name: 'Shampoo', price: 9000 }],
   barbers: ['Mateo', 'Julián', 'Nicolás', 'Tomás', 'Franco', 'Agustín', 'Lucas', 'Bruno', 'Santino'].map((name) => ({ id: name, name })),
   commission: 50,
 };
-let config = JSON.parse(localStorage.getItem(configStorageKey) || 'null') || defaultConfig;
+try { Object.keys(localStorage).filter((key) => key.startsWith('theluxe-')).forEach((key) => localStorage.removeItem(key)); } catch {}
+let config = structuredClone(defaultConfig);
 let barbers = config.barbers.map(({ name }) => name);
 let prices = Object.fromEntries(config.services.map(({ name, price }) => [name, price]));
 const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
@@ -46,16 +41,18 @@ const expenseDialog = document.getElementById('expenseDialog');
 const expenseDetailDialog = document.getElementById('expenseDetailDialog');
 const openingCashForm = document.getElementById('openingCashForm');
 const cashRegisterForm = document.getElementById('cashRegisterForm');
+const commissionDialog = document.getElementById('commissionDialog');
+const dailyCommissionForm = document.getElementById('dailyCommissionForm');
 const serviceConfigForm = document.getElementById('serviceConfigForm');
 const productConfigForm = document.getElementById('productConfigForm');
 const barberConfigForm = document.getElementById('barberConfigForm');
 const commissionForm = document.getElementById('commissionForm');
 const configDialogs = { services: document.getElementById('serviceConfigDialog'), products: document.getElementById('productConfigDialog'), barbers: document.getElementById('barberConfigDialog') };
-let entries = JSON.parse(localStorage.getItem(storageKey) || '[]');
-let sales = JSON.parse(localStorage.getItem(salesStorageKey) || '[]');
-let advances = JSON.parse(localStorage.getItem(advancesStorageKey) || '[]');
-let expenses = JSON.parse(localStorage.getItem(expensesStorageKey) || '[]');
-let cashRegisters = JSON.parse(localStorage.getItem(cashRegistersStorageKey) || '{}');
+let entries = [];
+let sales = [];
+let advances = [];
+let expenses = [];
+let cashRegisters = {};
 let editingId = null;
 let selectedId = null;
 let editingSaleId = null;
@@ -69,6 +66,7 @@ let editingOpening = false;
 workday.value = today();
 document.getElementById('summaryDate').value = today().slice(0, 7);
 updateWeekOptions();
+document.getElementById('summaryWeek').value = currentMonthWeek(today());
 populateSelectors();
 document.querySelectorAll('.money-input input').forEach((input) => input.addEventListener('input', () => {
   input.value = formatAmount(input.value);
@@ -76,27 +74,21 @@ document.querySelectorAll('.money-input input').forEach((input) => input.addEven
 }));
 
 function save() {
-  localStorage.setItem(storageKey, JSON.stringify(entries));
 }
 
 function saveSales() {
-  localStorage.setItem(salesStorageKey, JSON.stringify(sales));
 }
 
 function saveAdvances() {
-  localStorage.setItem(advancesStorageKey, JSON.stringify(advances));
 }
 
 function saveExpenses() {
-  localStorage.setItem(expensesStorageKey, JSON.stringify(expenses));
 }
 
 function saveCashRegisters() {
-  localStorage.setItem(cashRegistersStorageKey, JSON.stringify(cashRegisters));
 }
 
 function saveConfig() {
-  localStorage.setItem(configStorageKey, JSON.stringify(config));
   barbers = config.barbers.map(({ name }) => name);
   prices = Object.fromEntries(config.services.map(({ name, price }) => [name, price]));
   populateSelectors();
@@ -230,176 +222,6 @@ function render() {
   renderSummary();
 }
 
-function salePaymentTotal(list, type) {
-  return list.reduce((sum, sale) => sum + (sale.payment === type ? sale.total : 0), 0);
-}
-
-function advancePaymentTotal(list, type) {
-  return list.reduce((sum, advance) => sum + (advance.payment === type ? advance.amount : 0), 0);
-}
-
-function expensePaymentTotal(list, type) {
-  return list.reduce((sum, expense) => sum + (expense.payment === type ? expense.amount : 0), 0);
-}
-
-function renderSales(list) {
-  document.getElementById('salesRows').innerHTML = list.sort((a, b) => a.time.localeCompare(b.time)).map((sale) => `
-    <tr data-sale="${escapeHtml(sale.id)}" tabindex="0">
-      <td>${escapeHtml(sale.time)}</td><td>${escapeHtml(sale.product)}</td><td>${sale.quantity}</td>
-      <td>${money.format(sale.unitPrice)}</td><td>${money.format(sale.total)}</td>
-      <td>${escapeHtml(sale.payment === 'Mercado Pago' ? 'MP' : sale.payment)}</td>
-      <td>${escapeHtml(sale.notes || '—')}</td>
-    </tr>`).join('');
-  document.getElementById('salesEmpty').hidden = list.length > 0;
-  document.getElementById('salesCashTotal').textContent = money.format(salePaymentTotal(list, 'Efectivo'));
-  document.getElementById('salesMpTotal').textContent = money.format(salePaymentTotal(list, 'Mercado Pago'));
-  document.getElementById('salesGrandTotal').textContent = money.format(list.reduce((sum, sale) => sum + sale.total, 0));
-}
-
-function renderAdvances(list) {
-  document.getElementById('advanceRows').innerHTML = list.sort((a, b) => a.time.localeCompare(b.time)).map((advance) => `
-    <tr data-advance="${escapeHtml(advance.id)}" tabindex="0">
-      <td>${escapeHtml(advance.time)}</td><td>${escapeHtml(advance.barber)}</td>
-      <td>${money.format(advance.amount)}</td><td>${escapeHtml(advance.payment === 'Mercado Pago' ? 'MP' : advance.payment)}</td>
-      <td>${escapeHtml(advance.reason || '—')}</td>
-    </tr>`).join('');
-  document.getElementById('advancesEmpty').hidden = list.length > 0;
-  document.getElementById('advancesCashTotal').textContent = money.format(advancePaymentTotal(list, 'Efectivo'));
-  document.getElementById('advancesMpTotal').textContent = money.format(advancePaymentTotal(list, 'Mercado Pago'));
-  document.getElementById('advancesGrandTotal').textContent = money.format(list.reduce((sum, advance) => sum + advance.amount, 0));
-}
-
-function renderExpenses(list) {
-  document.getElementById('expenseRows').innerHTML = list.sort((a, b) => a.time.localeCompare(b.time)).map((expense) => `<tr data-expense="${escapeHtml(expense.id)}" tabindex="0"><td>${escapeHtml(expense.time)}</td><td>${escapeHtml(expense.reason)}</td><td>${money.format(expense.amount)}</td><td>${escapeHtml(expense.payment === 'Mercado Pago' ? 'MP' : expense.payment)}</td></tr>`).join('');
-  document.getElementById('expensesEmpty').hidden = list.length > 0;
-  document.getElementById('expensesCashTotal').textContent = money.format(expensePaymentTotal(list, 'Efectivo'));
-  document.getElementById('expensesMpTotal').textContent = money.format(expensePaymentTotal(list, 'Mercado Pago'));
-  document.getElementById('expensesGrandTotal').textContent = money.format(list.reduce((sum, expense) => sum + expense.amount, 0));
-}
-
-function isoDate(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function monthWeeks(value) {
-  const [year, month] = value.split('-').map(Number);
-  const firstMonday = new Date(year, month - 1, 1);
-  firstMonday.setDate(firstMonday.getDate() + ((8 - firstMonday.getDay()) % 7));
-  const lastDay = new Date(year, month, 0);
-  return Math.ceil((lastDay - firstMonday + 86400000) / 604800000);
-}
-
-function periodBounds(period, value, week = 1) {
-  let start;
-  let end;
-  if (period === 'week') {
-    const [year, month] = value.split('-').map(Number);
-    start = new Date(year, month - 1, 1);
-    start.setDate(start.getDate() + ((8 - start.getDay()) % 7) + (Number(week) - 1) * 7);
-    end = new Date(start);
-    end.setDate(start.getDate() + 6);
-  } else if (period === 'month') {
-    const [year, month] = value.split('-').map(Number);
-    start = new Date(year, month - 1, 1);
-    end = new Date(year, month, 0);
-  } else {
-    start = new Date(Number(value), 0, 1);
-    end = new Date(Number(value), 11, 31);
-  }
-  return [isoDate(start), isoDate(end)];
-}
-
-function updateSummaryReference() {
-  const period = document.getElementById('summaryPeriod').value;
-  const input = document.getElementById('summaryDate');
-  input.type = period === 'year' ? 'number' : 'month';
-  input.min = period === 'year' ? '2000' : '';
-  input.max = period === 'year' ? '2100' : '';
-  input.value = period === 'year' ? today().slice(0, 4) : today().slice(0, 7);
-  document.getElementById('summaryDateLabel').textContent = period === 'year' ? 'Año' : 'Mes';
-  document.getElementById('summaryWeekField').hidden = period !== 'week';
-  updateWeekOptions();
-}
-
-function updateWeekOptions() {
-  const select = document.getElementById('summaryWeek');
-  const count = monthWeeks(document.getElementById('summaryDate').value);
-  select.innerHTML = Array.from({ length: count }, (_, index) => `<option value="${index + 1}">Semana ${index + 1}</option>`).join('');
-}
-
-function cutValueByPayment(cuts, type, field) {
-  return cuts.reduce((sum, cut) => {
-    if (cut.payment !== 'Ambos') return sum + (cut.payment === type ? Number(cut[field] || 0) : 0);
-    const total = Number(cut.amount) + Number(cut.tip || 0);
-    const paid = Number(type === 'Efectivo' ? cut.cashAmount : cut.mpAmount);
-    return sum + (total ? paid * Number(cut[field] || 0) / total : 0);
-  }, 0);
-}
-
-function summarize(cuts, periodSales, periodAdvances, periodExpenses = []) {
-  const services = cuts.reduce((sum, cut) => sum + Number(cut.amount), 0);
-  const tips = cuts.reduce((sum, cut) => sum + Number(cut.tip || 0), 0);
-  const salesTotal = periodSales.reduce((sum, sale) => sum + sale.total, 0);
-  const advancesTotal = periodAdvances.reduce((sum, advance) => sum + advance.amount, 0);
-  const expensesTotal = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-  return {
-    cuts: cuts.length, saleCount: periodSales.length, services, sales: salesTotal, tips, advances: advancesTotal, expenses: expensesTotal,
-    invoiced: services + salesTotal, balance: services + tips + salesTotal - advancesTotal - expensesTotal,
-    cash: paymentTotal(cuts, 'Efectivo') + salePaymentTotal(periodSales, 'Efectivo') - advancePaymentTotal(periodAdvances, 'Efectivo') - expensePaymentTotal(periodExpenses, 'Efectivo'),
-    mp: paymentTotal(cuts, 'Mercado Pago') + salePaymentTotal(periodSales, 'Mercado Pago') - advancePaymentTotal(periodAdvances, 'Mercado Pago') - expensePaymentTotal(periodExpenses, 'Mercado Pago'),
-  };
-}
-
-function renderSummary() {
-  const period = document.getElementById('summaryPeriod').value;
-  const [from, to] = periodBounds(period, document.getElementById('summaryDate').value, document.getElementById('summaryWeek').value);
-  const inRange = (item) => item.date >= from && item.date <= to;
-  const periodCuts = entries.filter(inRange);
-  const periodSales = sales.filter(inRange);
-  const periodAdvances = advances.filter(inRange);
-  const periodExpenses = expenses.filter(inRange);
-  const total = summarize(periodCuts, periodSales, periodAdvances, periodExpenses);
-  const dateLabel = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  document.getElementById('summaryRange').textContent = `${dateLabel.format(new Date(`${from}T00:00:00`))} — ${dateLabel.format(new Date(`${to}T00:00:00`))}`;
-  document.getElementById('summaryCuts').textContent = total.cuts;
-  document.getElementById('summarySaleCount').textContent = total.saleCount;
-  ['Services', 'Sales', 'Invoiced', 'Tips', 'Advances', 'Expenses', 'Balance'].forEach((name) => { document.getElementById(`summary${name}`).textContent = money.format(total[name.toLowerCase()]); });
-
-  document.getElementById('cashSummaryRows').innerHTML = ['Efectivo', 'Mercado Pago'].map((type) => {
-    const suffix = type === 'Efectivo' ? 'Cash' : 'Mp';
-    const initial = Number(cashRegisters[from]?.[`initial${suffix}`] || 0);
-    const real = Number(cashRegisters[to]?.[`real${suffix}`] || 0);
-    const serviceEntries = cutValueByPayment(periodCuts, type, 'amount');
-    const tipsByType = cutValueByPayment(periodCuts, type, 'tip');
-    const entriesTotal = serviceEntries + salePaymentTotal(periodSales, type);
-    const advanceTotal = advancePaymentTotal(periodAdvances, type);
-    const expenseTotal = expensePaymentTotal(periodExpenses, type);
-    const theoretical = initial + entriesTotal + tipsByType - advanceTotal - expenseTotal;
-    return `<tr><td>${type}</td><td>${money.format(initial)}</td><td>${money.format(entriesTotal)}</td><td>${money.format(tipsByType)}</td><td>${money.format(advanceTotal)}</td><td>${money.format(expenseTotal)}</td><td>${money.format(theoretical)}</td><td>${money.format(real)}</td><td>${money.format(real - theoretical)}</td></tr>`;
-  }).join('');
-
-  const groupKey = (item) => period === 'year' ? item.date.slice(0, 7) : item.date;
-  const keys = [...new Set([...periodCuts, ...periodSales, ...periodAdvances, ...periodExpenses].map(groupKey))].sort();
-  const monthLabel = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' });
-  document.getElementById('summaryBreakdownTitle').textContent = period === 'year' ? 'Resumen por mes' : 'Resumen por día';
-  document.getElementById('summaryRows').innerHTML = keys.map((key) => {
-    const matches = (item) => groupKey(item) === key;
-    const row = summarize(periodCuts.filter(matches), periodSales.filter(matches), periodAdvances.filter(matches), periodExpenses.filter(matches));
-    const label = period === 'year' ? monthLabel.format(new Date(`${key}-01T00:00:00`)) : dateLabel.format(new Date(`${key}T00:00:00`));
-    return `<tr><td>${escapeHtml(label)}</td><td>${row.cuts}</td><td>${money.format(row.services)}</td><td>${money.format(row.sales)}</td><td>${money.format(row.tips)}</td><td>${money.format(row.advances)}</td><td>${money.format(row.expenses)}</td><td>${money.format(row.balance)}</td></tr>`;
-  }).join('');
-  document.getElementById('summaryEmpty').hidden = keys.length > 0;
-
-  const activeBarbers = barbers.filter((barber) => periodCuts.some((cut) => cut.barber === barber) || periodAdvances.some((advance) => advance.barber === barber));
-  document.getElementById('barberSummaryRows').innerHTML = activeBarbers.map((barber) => {
-    const barberCuts = periodCuts.filter((cut) => cut.barber === barber);
-    const row = summarize(barberCuts, [], periodAdvances.filter((advance) => advance.barber === barber));
-    const balance = barberCuts.reduce((sum, cut) => sum + Number(cut.commissionAmount || 0), 0) + row.tips - row.advances;
-    return `<tr><td>${escapeHtml(barber)}</td><td>${row.cuts}</td><td>${money.format(row.services)}</td><td>${money.format(row.tips)}</td><td>${money.format(row.advances)}</td><td>${money.format(balance)}</td></tr>`;
-  }).join('');
-  document.getElementById('barberSummaryEmpty').hidden = activeBarbers.length > 0;
-}
-
 function barberColumn(barber, list) {
   const cuts = list.filter((entry) => entry.barber === barber).sort((a, b) => a.time.localeCompare(b.time));
   const total = cuts.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0);
@@ -483,89 +305,6 @@ function openEditDialog(id) {
   dialog.showModal();
 }
 
-function updateSaleTotal() {
-  const quantity = Number(saleForm.elements.quantity.value || 0);
-  const unitPrice = parseAmount(saleForm.elements.unitPrice.value);
-  document.getElementById('saleTotalPreview').textContent = money.format(quantity * unitPrice);
-}
-
-function openSaleDialog(id = null) {
-  saleForm.reset();
-  editingSaleId = id;
-  const sale = sales.find((item) => item.id === id);
-  saleForm.elements.time.value = sale?.time || nowTime();
-  saleForm.elements.product.value = sale?.product || '';
-  saleForm.elements.quantity.value = sale?.quantity || 1;
-  saleForm.elements.unitPrice.value = sale ? formatAmount(sale.unitPrice) : '';
-  saleForm.elements.payment.value = sale?.payment || 'Efectivo';
-  saleForm.elements.notes.value = sale?.notes || '';
-  document.getElementById('saleFormMode').textContent = sale ? 'MODIFICAR VENTA' : 'NUEVA VENTA';
-  updateSaleTotal();
-  saleDetailDialog.close();
-  saleDialog.showModal();
-}
-
-function openSaleDetail(id) {
-  const sale = sales.find((item) => item.id === id);
-  if (!sale) return;
-  selectedSaleId = id;
-  document.getElementById('saleDetailTitle').textContent = sale.product;
-  document.getElementById('saleDetail').innerHTML = [
-    ['Hora', sale.time], ['Producto', sale.product], ['Cantidad', sale.quantity],
-    ['Precio unitario', money.format(sale.unitPrice)], ['Importe total', money.format(sale.total)],
-    ['Medio de pago', sale.payment], ['Notas', sale.notes || 'Sin notas'],
-  ].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
-  saleDetailDialog.showModal();
-}
-
-function openAdvanceDialog(id = null) {
-  advanceForm.reset();
-  editingAdvanceId = id;
-  const advance = advances.find((item) => item.id === id);
-  advanceForm.elements.time.value = advance?.time || nowTime();
-  advanceForm.elements.barber.value = advance?.barber || '';
-  advanceForm.elements.amount.value = advance ? formatAmount(advance.amount) : '';
-  advanceForm.elements.payment.value = advance?.payment || 'Efectivo';
-  advanceForm.elements.reason.value = advance?.reason || '';
-  document.getElementById('advanceFormMode').textContent = advance ? 'MODIFICAR ADELANTO' : 'NUEVO ADELANTO';
-  advanceDetailDialog.close();
-  advanceDialog.showModal();
-}
-
-function openAdvanceDetail(id) {
-  const advance = advances.find((item) => item.id === id);
-  if (!advance) return;
-  selectedAdvanceId = id;
-  document.getElementById('advanceDetailTitle').textContent = `Adelanto de ${advance.barber}`;
-  document.getElementById('advanceDetail').innerHTML = [
-    ['Hora', advance.time], ['Barbero', advance.barber], ['Importe', money.format(advance.amount)],
-    ['Medio de entrega', advance.payment], ['Motivo', advance.reason || 'Sin descripción'],
-  ].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
-  advanceDetailDialog.showModal();
-}
-
-function openExpenseDialog(id = null) {
-  expenseForm.reset();
-  editingExpenseId = id;
-  const expense = expenses.find((item) => item.id === id);
-  expenseForm.elements.time.value = expense?.time || nowTime();
-  expenseForm.elements.amount.value = expense ? formatAmount(expense.amount) : '';
-  expenseForm.elements.payment.value = expense?.payment || 'Efectivo';
-  expenseForm.elements.reason.value = expense?.reason || '';
-  document.getElementById('expenseFormMode').textContent = expense ? 'MODIFICAR SALIDA' : 'NUEVA SALIDA';
-  expenseDetailDialog.close();
-  expenseDialog.showModal();
-}
-
-function openExpenseDetail(id) {
-  const expense = expenses.find((item) => item.id === id);
-  if (!expense) return;
-  selectedExpenseId = id;
-  document.getElementById('expenseDetailTitle').textContent = expense.reason;
-  document.getElementById('expenseDetail').innerHTML = [['Hora', expense.time], ['Motivo', expense.reason], ['Importe', money.format(expense.amount)], ['Medio de salida', expense.payment]].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
-  expenseDetailDialog.showModal();
-}
-
 document.getElementById('barberColumns').addEventListener('click', (event) => {
   const cut = event.target.closest('[data-cut]');
   if (cut) return openDetail(cut.dataset.cut);
@@ -582,6 +321,11 @@ document.querySelector('.nav').addEventListener('click', (event) => {
   });
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === button.dataset.view));
   document.querySelector('h1').textContent = button.dataset.view === 'salesView' ? 'Caja y movimientos' : button.dataset.view === 'summaryView' ? 'Resúmenes' : button.dataset.view === 'configView' ? 'Configuración' : 'Panel diario';
+  if (button.dataset.view === 'summaryView') {
+    document.getElementById('summaryPeriod').value = 'week';
+    updateSummaryReference();
+    renderSummary();
+  }
 });
 
 document.getElementById('summaryPeriod').addEventListener('change', () => {
@@ -780,6 +524,18 @@ commissionForm.addEventListener('submit', (event) => {
   config.commission = Number(commissionForm.elements.commission.value);
   saveConfig();
 });
+document.getElementById('changeCommission').addEventListener('click', () => {
+  dailyCommissionForm.elements.commission.value = config.commission;
+  commissionDialog.showModal();
+});
+document.getElementById('closeCommissionDialog').addEventListener('click', () => commissionDialog.close());
+commissionDialog.addEventListener('click', (event) => { if (event.target === commissionDialog) commissionDialog.close(); });
+dailyCommissionForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  config.commission = Number(dailyCommissionForm.elements.commission.value);
+  commissionDialog.close();
+  saveConfig();
+});
 document.getElementById('configView').addEventListener('click', (event) => {
   const button = event.target.closest('[data-config-edit], [data-config-delete]');
   if (!button) return;
@@ -802,6 +558,8 @@ console.assert(paymentTotal([{ payment: 'Ambos', cashAmount: 500, mpAmount: 700 
 console.assert(salePaymentTotal([{ payment: 'Efectivo', total: 1500 }], 'Efectivo') === 1500);
 console.assert(advancePaymentTotal([{ payment: 'Efectivo', amount: 500 }], 'Efectivo') === 500);
 console.assert(expensePaymentTotal([{ payment: 'Mercado Pago', amount: 800 }], 'Mercado Pago') === 800);
+console.assert(barberBalance([{ amount: 90000 }], 4000, 5000) === 44000);
 console.assert(parseAmount('15.000') === 15000);
 console.assert(periodBounds('week', '2026-07', 1).join() === '2026-07-06,2026-07-12');
 console.assert(periodBounds('week', '2026-07', 4).join() === '2026-07-27,2026-08-02');
+console.assert(currentMonthWeek('2026-07-18') === 2);
