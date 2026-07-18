@@ -412,6 +412,48 @@ Para el período seleccionado, el sistema deberá mostrar como mínimo:
 - Totales por medio de pago.
 - Balance general del período.
 
+##### Resumen de facturación
+
+El resumen deberá mostrar:
+
+- Total facturado por servicios.
+- Total facturado por ventas de productos.
+- Total general facturado.
+- Total de propinas.
+- Cantidad de cortes realizados.
+- Cantidad de ventas registradas.
+
+##### Resumen de caja
+
+Para cada medio —Efectivo y Mercado Pago— la interfaz deberá mostrar:
+
+- Caja inicial del período.
+- Entradas generadas por servicios.
+- Entradas generadas por ventas.
+- Propinas ingresadas.
+- Adelantos entregados.
+- Salidas de caja por gastos.
+- Caja teórica resultante.
+- Caja real registrada.
+- Diferencia entre la caja teórica y la caja real.
+
+La caja teórica deberá calcularse sumando a la caja inicial todas las entradas y
+restando los adelantos y las salidas de caja. Los importes de Efectivo y Mercado
+Pago deberán calcularse y mostrarse por separado.
+
+##### Resumen de movimientos
+
+La interfaz deberá mostrar únicamente los siguientes totales consolidados:
+
+- Total de entradas de caja.
+- Total de adelantos.
+- Total de salidas de caja por gastos.
+- Balance neto del período.
+
+Las ventas y los servicios deberán contabilizarse como entradas. Los adelantos y
+las salidas de caja deberán contabilizarse como salidas, pero mantenerse
+separados dentro del resumen.
+
 La interfaz también deberá mostrar un resumen individual de cada barbero con
 actividad dentro del período seleccionado. Para cada barbero deberá informar:
 
@@ -651,10 +693,20 @@ sistema deberá determinar el rango de fechas correspondiente y calcular:
 - Cantidad de cortes realizados.
 - Ingresos por servicios.
 - Ingresos por ventas.
+- Total general facturado.
 - Propinas registradas.
 - Adelantos entregados.
+- Salidas de caja registradas.
+- Cajas iniciales de Efectivo y Mercado Pago.
+- Cajas teóricas de Efectivo y Mercado Pago.
+- Cajas reales de Efectivo y Mercado Pago.
+- Diferencias entre las cajas teóricas y las cajas reales.
 - Totales por medio de pago.
 - Balance general del período.
+
+El sistema deberá presentar los datos mediante totales consolidados y no deberá
+listar las ventas, los adelantos ni las salidas de caja individuales dentro del
+resumen general.
 
 La vista semanal deberá separar la información por día; la vista mensual deberá
 permitir consultar los resúmenes diarios del mes; y la vista anual deberá separar
