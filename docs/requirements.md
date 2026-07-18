@@ -56,6 +56,9 @@ barbería. No incluirá reservas de turnos para clientes ni comercio electrónic
 - **Usuario:** Persona autorizada para utilizar el sistema.
 - **Venta:** venta de un producto, separada de los servicios realizados.
 - **Adelanto de caja:** dinero retirado de la caja y entregado anticipadamente a un barbero, que luego deberá descontarse de su liquidación.
+- **Salida de caja:** Dinero retirado durante una jornada para afrontar gastos de
+  la barbería, como la compra de insumos. No se asocia a la liquidación de un
+  barbero y debe registrarse por separado de los adelantos.
 - **Comisión:** Porcentaje del precio de los servicios que corresponde al
   barbero que los realizó. El sistema utiliza un único porcentaje general para
   todos los barberos y no incluye propinas, ventas ni adelantos.
@@ -159,6 +162,18 @@ Cada columna debe tener un boton para poder adicionar un corte para cada barbero
 En una resolución de escritorio de 1366x768, la interfaz deberá mostrar
 simultáneamente al menos cinco barberos.
 
+La interfaz deberá mostrar de manera general un resumen de:
+
+- Total en la caja (efectivo).
+- Total en Mercado Pago.
+- Cantidad de cortes.
+
+A su vez deberá tener de manera fácilmente visible los siguientes campos editables:
+
+- Caja inicial.
+- Retiro.
+- Aclaraciones.
+
 Sin requerir que el usuario abra una vista individual, cada corte deberá mostrar:
 
 - Hora.
@@ -167,6 +182,13 @@ Sin requerir que el usuario abra una vista individual, cada corte deberá mostra
 - Medio de pago.
 - Propina, cuando corresponda.
 - Nota adicional, cuando corresponda.
+
+Debajo de cada columna se debe mostrar un resumen del barbero que incluya:
+- Cantidad de cortes.
+- Total facturado de .cortes (Sin contar comisión ni adelantos).
+- Total de propinas.
+- Total adelantado.
+- Total despues de comisión y adelantos.
 
 A su vez esta interfaz debe tener un boton para poder acceder a la interfaz IU-005.
 
@@ -197,11 +219,98 @@ completos y las acciones disponibles para su modificación o eliminación.
 La forma de presentación del detalle —ventana emergente, panel lateral u otro
 mecanismo— se encuentra pendiente de definición.
 
-#### IU-003 — Gestión de ventas y adelantos
+#### IU-003 — Gestión de ventas, adelantos y salidas de caja
 
-El sistema deberá proporcionar una interfaz única para consultar y gestionar las ventas y los adelantos correspondientes a la jornada seleccionada.
+El sistema deberá proporcionar una interfaz única para consultar y gestionar las
+ventas, los adelantos y las salidas de caja correspondientes a la jornada
+seleccionada.
 
-La interfaz deberá diferenciar visualmente ambos tipos de operación y permitir al usuario acceder a las funciones de registro, modificación y eliminación.
+La interfaz deberá diferenciar visualmente los tres tipos de operación y permitir
+al usuario acceder a las funciones de registro, modificación y eliminación.
+
+La interfaz deberá:
+
+- Presentar las ventas, los adelantos y las salidas de caja en tres secciones separadas dentro de una
+  misma vista.
+- Mostrar únicamente las operaciones de la jornada seleccionada.
+- Utilizar un listado tabular para cada tipo de operación.
+- Incluir una acción visible para agregar una venta y otra para agregar un
+  adelanto.
+- Incluir una acción visible para registrar una salida de caja.
+- Abrir los formularios de alta y modificación mediante diálogos, manteniendo
+  visible la interfaz de origen detrás de estos.
+- Mostrar el detalle completo al seleccionar una venta o un adelanto del listado.
+- Incluir dentro del detalle las acciones para modificar o eliminar la operación.
+- Solicitar confirmación antes de eliminar una venta o un adelanto.
+- Solicitar confirmación antes de eliminar una salida de caja.
+- Actualizar los listados y recalcular los totales después de registrar,
+  modificar o eliminar una operación, sin recargar la página.
+- Mostrar en cada sección un resumen de los importes correspondientes a Efectivo
+  y Mercado Pago para la jornada seleccionada.
+
+El listado de ventas deberá mostrar:
+
+- Hora.
+- Producto.
+- Cantidad.
+- Precio unitario.
+- Importe total.
+- Medio de pago.
+- Notas, cuando existan.
+
+El listado de adelantos deberá mostrar:
+
+- Hora.
+- Barbero destinatario.
+- Importe.
+- Medio utilizado para entregar el dinero.
+- Motivo o descripción, cuando corresponda.
+
+El listado de salidas de caja deberá mostrar:
+
+- Hora.
+- Motivo o descripción.
+- Importe.
+- Medio utilizado para retirar el dinero.
+
+##### Resumen de ventas
+
+La sección de ventas deberá mostrar un resumen de las entradas de caja generadas
+por las ventas de la jornada seleccionada. El resumen deberá incluir:
+
+- Total ingresado mediante Efectivo.
+- Total ingresado mediante Mercado Pago.
+- Total general ingresado por ventas.
+
+Cuando una venta utilice más de un medio de pago, cada importe deberá sumarse al
+medio correspondiente y el total general deberá representar la suma completa de
+la operación.
+
+##### Resumen de adelantos
+
+La sección de adelantos deberá mostrar un resumen de las salidas de caja generadas
+por los adelantos de la jornada seleccionada. El resumen deberá incluir:
+
+- Total retirado de Efectivo.
+- Total retirado mediante Mercado Pago.
+- Total general entregado como adelantos.
+
+Los importes del resumen de adelantos deberán identificarse visualmente como
+salidas de caja y descontarse del saldo del medio utilizado. No deberán
+contabilizarse como ingresos ni reducir el total bruto generado por las ventas.
+
+##### Resumen de salidas de caja
+
+La sección de salidas de caja deberá mostrar un resumen de los gastos registrados
+durante la jornada seleccionada. El resumen deberá incluir:
+
+- Total retirado de Efectivo.
+- Total retirado mediante Mercado Pago.
+- Total general correspondiente a salidas de caja.
+
+Las salidas deberán descontarse del saldo del medio utilizado y del balance de la
+jornada. No deberán contabilizarse como adelantos ni afectar la liquidación de
+ningún barbero.
 
 
 #### IU-003.1 — Formulario para registrar un adelanto
@@ -245,15 +354,36 @@ confirmar la operación. La interfaz deberá permitir guardar la venta o cancela
 la operación sin realizar cambios. Después de guardar, deberá mostrar la venta
 en la jornada seleccionada y actualizar los totales afectados.
 
+#### IU-003.3 — Formulario para registrar una salida de caja
+
+El sistema deberá mostrar un formulario para registrar una salida de caja durante
+la jornada seleccionada. El usuario deberá poder ingresar:
+
+- Hora de la salida.
+- Motivo o descripción.
+- Importe.
+- Medio utilizado para retirar el dinero.
+
+La hora, el motivo, el importe y el medio de salida deberán ser obligatorios. El
+importe deberá ser mayor que cero.
+
+La interfaz deberá indicar que la operación será registrada como un gasto de la
+jornada y que no corresponde a un adelanto para un barbero. El usuario deberá
+poder guardar la salida o cancelar la operación sin realizar cambios.
+
+Después de guardar, la salida deberá aparecer en la jornada seleccionada y el
+sistema deberá actualizar el saldo del medio utilizado y el balance general.
+
 ##### Comportamiento general
 
 La interfaz deberá:
 
 - Mantener visible la jornada actualmente seleccionada.
-- Diferenciar claramente las ventas de los adelantos.
+- Diferenciar claramente las ventas, los adelantos y las salidas de caja.
 - Mostrar mensajes cuando existan datos obligatorios faltantes o inválidos.
 - Permitir cancelar una carga o modificación sin guardar cambios.
-- Solicitar confirmación antes de eliminar una venta o un adelanto.
+- Solicitar confirmación antes de eliminar una venta, un adelanto o una salida de
+  caja.
 - Actualizar la información y los totales afectados después de cada operación.
 
 #### IU-004 — Resumen general de jornadas
@@ -278,8 +408,51 @@ Para el período seleccionado, el sistema deberá mostrar como mínimo:
 - Ingresos por ventas.
 - Propinas registradas.
 - Adelantos entregados.
+- Salidas de caja registradas.
 - Totales por medio de pago.
 - Balance general del período.
+
+##### Resumen de facturación
+
+El resumen deberá mostrar:
+
+- Total facturado por servicios.
+- Total facturado por ventas de productos.
+- Total general facturado.
+- Total de propinas.
+- Cantidad de cortes realizados.
+- Cantidad de ventas registradas.
+
+##### Resumen de caja
+
+Para cada medio —Efectivo y Mercado Pago— la interfaz deberá mostrar:
+
+- Caja inicial del período.
+- Entradas generadas por servicios.
+- Entradas generadas por ventas.
+- Propinas ingresadas.
+- Adelantos entregados.
+- Salidas de caja por gastos.
+- Caja teórica resultante.
+- Caja real registrada.
+- Diferencia entre la caja teórica y la caja real.
+
+La caja teórica deberá calcularse sumando a la caja inicial todas las entradas y
+restando los adelantos y las salidas de caja. Los importes de Efectivo y Mercado
+Pago deberán calcularse y mostrarse por separado.
+
+##### Resumen de movimientos
+
+La interfaz deberá mostrar únicamente los siguientes totales consolidados:
+
+- Total de entradas de caja.
+- Total de adelantos.
+- Total de salidas de caja por gastos.
+- Balance neto del período.
+
+Las ventas y los servicios deberán contabilizarse como entradas. Los adelantos y
+las salidas de caja deberán contabilizarse como salidas, pero mantenerse
+separados dentro del resumen.
 
 La interfaz también deberá mostrar un resumen individual de cada barbero con
 actividad dentro del período seleccionado. Para cada barbero deberá informar:
@@ -556,10 +729,20 @@ sistema deberá determinar el rango de fechas correspondiente y calcular:
 - Cantidad de cortes realizados.
 - Ingresos por servicios.
 - Ingresos por ventas.
+- Total general facturado.
 - Propinas registradas.
 - Adelantos entregados.
+- Salidas de caja registradas.
+- Cajas iniciales de Efectivo y Mercado Pago.
+- Cajas teóricas de Efectivo y Mercado Pago.
+- Cajas reales de Efectivo y Mercado Pago.
+- Diferencias entre las cajas teóricas y las cajas reales.
 - Totales por medio de pago.
 - Balance general del período.
+
+El sistema deberá presentar los datos mediante totales consolidados y no deberá
+listar las ventas, los adelantos ni las salidas de caja individuales dentro del
+resumen general.
 
 La vista semanal deberá separar la información por día; la vista mensual deberá
 permitir consultar los resúmenes diarios del mes; y la vista anual deberá separar
@@ -635,6 +818,43 @@ propinas, ventas ni adelantos.
 
 Cuando el porcentaje sea modificado, el nuevo valor deberá aplicarse a las
 operaciones posteriores sin alterar las comisiones previamente registradas.
+
+### RF-018 — Registrar una salida de caja
+
+- **Estado:** Pendiente
+- **Version de software:** -
+
+El sistema deberá permitir registrar una salida de caja asociada a la jornada
+seleccionada.
+
+Para cada salida deberá registrar la fecha, la hora, el motivo o descripción, el
+importe y el medio utilizado para retirar el dinero.
+
+Después de confirmar la operación, el sistema deberá descontar el importe del
+saldo del medio utilizado, incorporarlo al total de salidas de caja y actualizar
+el balance de la jornada.
+
+### RF-019 — Modificar una salida de caja
+
+- **Estado:** Pendiente
+- **Version de software:** -
+
+El sistema deberá permitir modificar una salida de caja previamente registrada.
+Antes de guardar, deberá validar los nuevos datos y el importe.
+
+Después de confirmar la modificación, el sistema deberá actualizar los saldos,
+el total de salidas y el balance de la jornada.
+
+### RF-020 — Eliminar una salida de caja
+
+- **Estado:** Pendiente
+- **Version de software:** -
+
+El sistema deberá permitir eliminar una salida de caja previamente registrada.
+Antes de eliminarla, deberá solicitar confirmación al usuario.
+
+Después de confirmar la eliminación, el sistema deberá recalcular los saldos, el
+total de salidas de caja y el balance de la jornada.
 
 ## 3.3 Requisitos de rendimiento
 
@@ -770,6 +990,20 @@ de modificación.
 
 Cada corte deberá conservar el porcentaje de comisión aplicado y el importe de
 comisión resultante para mantener la consistencia de los cálculos históricos.
+
+### RLD-010 — Información de las salidas de caja
+
+El sistema deberá conservar, como mínimo, la siguiente información de cada salida
+de caja:
+
+- Identificador único.
+- Fecha.
+- Hora.
+- Motivo o descripción.
+- Importe.
+- Medio utilizado para retirar el dinero.
+- Fecha y hora de creación.
+- Fecha y hora de última modificación.
 
 ## 3.5 Restricciones de diseño
 
