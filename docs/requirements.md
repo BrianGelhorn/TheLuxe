@@ -155,6 +155,9 @@ mecanismo— se encuentra pendiente de definición.
 
 ### RF-001 — Consultar el panel diario
 
+- **Estado:** Implementado
+- **Version de software:** v0.1.0
+
 El sistema deberá permitir al usuario consultar la actividad correspondiente
 a una jornada determinada desde un panel general.
 
@@ -162,6 +165,9 @@ El panel deberá incluir los barberos asociados a la jornada, sus cortes
 registrados, la cantidad de cortes y los totales correspondientes.
 
 ### RF-002 — Consultar los cortes agrupados por barbero
+
+- **Estado:** Implementado
+- **Version de software:** v0.1.0
 
 El sistema deberá agrupar los cortes de la jornada según el barbero que los
 realizó.
@@ -171,6 +177,9 @@ el precio, el medio de pago, la propina y las notas registradas.
 
 ### RF-003 — Registrar un corte para un barbero
 
+- **Estado:** Implementado
+- **Version de software:** v0.1.0
+
 El sistema deberá permitir registrar un nuevo corte desde el sector
 correspondiente a un barbero en el panel diario.
 
@@ -179,6 +188,9 @@ el cual se inició el registro, sin requerir que el usuario vuelva a seleccionar
 
 ### RF-004 — Modificar un corte
 
+- **Estado:** Implementado
+- **Version de software:** v0.1.0
+
 El sistema deberá permitir modificar los datos de un corte previamente
 registrado.
 
@@ -186,6 +198,9 @@ Después de confirmar la modificación, el sistema deberá actualizar el corte
 y recalcular los totales afectados.
 
 ### RF-005 — Eliminar un corte
+
+- **Estado:** Implementado
+- **Version de software:** v0.1.0
 
 El sistema deberá permitir eliminar un corte previamente registrado.
 
@@ -197,6 +212,9 @@ totales afectados.
 
 ### RNF-REN-001 — Tiempo de actualización del panel diario
 
+- **Estado:** Pendiente
+- **Version de software:** -
+
 Después de registrar, modificar o eliminar un corte, el sistema deberá
 actualizar la información del panel diario y sus totales dentro del tiempo
 máximo definido para el proyecto.
@@ -204,6 +222,9 @@ máximo definido para el proyecto.
 **Valor pendiente:** Tiempo máximo aceptable definido por el cliente.
 
 ### RNF-REN-002 — Capacidad de una jornada
+
+- **Estado:** Pendiente
+- **Version de software:** -
 
 El sistema deberá permitir consultar una jornada con al menos X
 cortes registrados sin superar el tiempo de respuesta establecido.
@@ -213,6 +234,9 @@ cortes registrados sin superar el tiempo de respuesta establecido.
 ## 3.4 Requisitos lógicos de la base de datos
 
 ### RLD-001 — Información de los cortes
+
+- **Estado:** Pendiente
+- **Version de software:** -
 
 El sistema deberá conservar, como mínimo, la siguiente información de cada
 corte:
@@ -231,11 +255,17 @@ corte:
 
 ### RLD-002 — Relación entre cortes y barberos
 
+- **Estado:** Pendiente
+- **Version de software:** -
+
 Cada corte deberá estar asociado a un único barbero.
 
 Un barbero podrá estar asociado a múltiples cortes.
 
 ### RLD-003 — Relación entre cortes y servicios
+
+- **Estado:** Pendiente
+- **Version de software:** -
 
 Cada corte deberá registrar un único tipo de servicio.
 
@@ -244,6 +274,9 @@ Un mismo tipo de servicio podrá aparecer en múltiples cortes.
 ## 3.5 Restricciones de diseño
 
 ### RD-001 — Tipo de aplicación
+
+- **Estado:** Implementado
+- **Version de software:** v0.1.0
 
 El sistema deberá proporcionar una interfaz web accesible mediante un
 navegador.
@@ -259,6 +292,9 @@ Los importes monetarios deberán presentarse en pesos argentinos.
 ## 3.6 Atributos del sistema
 
 ### RNF-SEG-001 — Confirmación de eliminación
+
+- **Estado:** Implementado
+- **Version de software:** v0.1.0
 
 El sistema deberá solicitar confirmación antes de eliminar un corte.
 
