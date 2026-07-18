@@ -51,25 +51,28 @@ textarea { resize: vertical; }
 .daily-sheet { margin-top: 14px; padding: 20px; overflow: hidden; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
 
-.barber-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 10px; overflow-x: auto; }
-.barber-column { min-width: 150px; border: 1px solid var(--line); border-radius: 12px; background: #111; overflow: hidden; }
+.barber-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 1fr); gap: 10px; overflow-x: auto; }
+.barber-column { min-width: 180px; border: 1px solid var(--line); border-radius: 12px; background: #111; overflow: hidden; }
 .barber-column-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 15px; border-bottom: 1px solid #6e5936; background: var(--gold-soft); }
 .barber-column-header strong { font-family: Manrope, sans-serif; }
 .barber-column-header span { display: block; margin-top: 3px; color: var(--gold); font-size: .78rem; }
 .add-cut { flex: 0 0 auto; width: 32px; height: 32px; border: 1px solid #6e5936; border-radius: 50%; background: var(--gold); color: #17120b; cursor: pointer; font-size: 1.2rem; font-weight: 800; line-height: 1; }
 .barber-services { display: grid; gap: 1px; min-height: 155px; background: var(--line); }
-.barber-service { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 5px; width: 100%; padding: 6px 9px; overflow: hidden; border: 0; background: var(--surface); color: inherit; text-align: left; cursor: pointer; }
+.barber-service { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 80px; align-content: start; gap: 1px 5px; width: 100%; height: 88px; padding: 6px 9px; overflow: hidden; border: 0; border-radius: 6px; background: var(--surface); color: inherit; text-align: left; cursor: pointer; }
 .barber-service:hover { background: var(--surface-2); }
-.barber-service strong { font-size: .82rem; }
+.barber-service strong { align-self: start; overflow: hidden; font-size: .82rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .barber-service small { color: var(--muted); font-size: .68rem; }
-.service-prices { display: grid; min-width: 0; max-width: 100%; justify-items: end; gap: 1px; white-space: nowrap; }
+.service-prices { position: absolute; top: 6px; right: 9px; display: grid; justify-items: end; gap: 1px; width: max-content; max-width: 100%; white-space: nowrap; }
+.service-prices > * { width: max-content; }
+.price-breakdown { display: grid; justify-items: end; gap: 1px; }
+.price-breakdown small { line-height: 1.1; }
 .service-prices b { color: var(--gold); font-size: .78rem; }
 .service-prices .cash-price { color: #62a976; }
 .service-prices .mp-price { color: #5599e8; }
 .service-prices .tip-price { color: var(--muted); }
-.payment-detail { grid-column: 1 / -1; min-width: 0; white-space: nowrap; }
+.payment-detail { grid-column: 1; min-width: 0; white-space: nowrap; }
 .service-note { grid-column: 1; align-self: end; overflow-wrap: anywhere; }
-.cut-time { grid-column: 2; width: max-content; align-self: end; justify-self: end; white-space: nowrap; }
+.cut-time { position: absolute; right: 9px; bottom: 6px; width: max-content; white-space: nowrap; }
 .barber-empty { padding: 28px 15px; background: var(--surface); color: var(--muted); text-align: center; font-size: .8rem; }
 .barber-column-total { display: flex; justify-content: space-between; padding: 14px 15px; border-top: 1px solid var(--line); font-size: .82rem; }
 .barber-column-total strong { color: var(--gold); }

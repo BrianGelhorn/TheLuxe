@@ -66,11 +66,13 @@ function barberColumn(barber, list) {
     <button class="barber-service" type="button" data-cut="${escapeHtml(entry.id)}">
       <strong class="service-name">${escapeHtml(entry.service)}</strong>
       <span class="service-prices">
-        <b>${money.format(Number(entry.amount))}</b>
-        ${entry.payment === 'Ambos' ? `
-          <small class="cash-price">${money.format(Number(entry.cashAmount))}</small>
-          <small class="mp-price">${money.format(Number(entry.mpAmount))}</small>` : ''}
-        ${Number(entry.tip) ? `<small class="tip-price">${money.format(Number(entry.tip))}</small>` : ''}
+        <b>${money.format(Number(entry.amount) + Number(entry.tip || 0))}</b>
+        <span class="price-breakdown">
+          ${entry.payment === 'Ambos' ? `
+            <small class="cash-price">${money.format(Number(entry.cashAmount))}</small>
+            <small class="mp-price">${money.format(Number(entry.mpAmount))}</small>` : ''}
+          ${Number(entry.tip) ? `<small class="tip-price">${money.format(Number(entry.tip))}</small>` : ''}
+        </span>
       </span>
       <small class="payment-detail">${entry.payment === 'Mercado Pago' ? 'MP' : escapeHtml(entry.payment)}</small>
       ${entry.notes ? `<small class="service-note">Nota: ${escapeHtml(entry.notes)}</small>` : ''}
