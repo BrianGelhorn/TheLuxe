@@ -63,6 +63,13 @@ textarea { resize: vertical; }
 .sales-table tbody tr:hover { background: var(--surface-2); }
 .sales-table td:nth-child(2), .sales-table td:last-child { white-space: normal; }
 .total-preview { min-height: 43px; padding: 12px 13px; border: 1px solid #6e5936; border-radius: 9px; background: var(--gold-soft); color: var(--gold); font-weight: 800; }
+.config-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.config-form { display: grid; grid-template-columns: 1fr 140px auto; gap: 10px; margin-top: 20px; }
+.config-list { display: grid; gap: 1px; margin-top: 18px; background: var(--line); }
+.config-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface-2); }
+.config-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.config-actions { display: flex; gap: 6px; }
+.config-actions button { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; }
 
 .barber-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 1fr); gap: 10px; overflow-x: auto; }
 .barber-column { min-width: 180px; border: 1px solid var(--line); border-radius: 12px; background: #111; overflow: hidden; }
@@ -128,6 +135,7 @@ textarea { resize: vertical; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
   .summary-controls { grid-template-columns: 1fr 1fr; }
   .summary-range { grid-column: 1 / -1; }
+  .config-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {
@@ -145,4 +153,5 @@ textarea { resize: vertical; }
   .full-width, .primary-btn { grid-column: 1; }
   .primary-btn { width: 100%; }
   .summary-controls { grid-template-columns: 1fr; }
+  .config-form { grid-template-columns: 1fr; }
 }

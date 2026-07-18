@@ -313,7 +313,7 @@ El sistema deberá proporcionar una interfaz de configuración para administrar
 los servicios, los productos destinados a la venta, los barberos y la comisión
 general aplicada al trabajo de los barberos.
 
-##### Configuración de servicios
+##### IU-005.1 — Configuración de servicios
 
 La interfaz deberá mostrar los servicios disponibles y permitir registrar,
 modificar o eliminar cada servicio con los siguientes datos:
@@ -321,11 +321,15 @@ modificar o eliminar cada servicio con los siguientes datos:
 - Nombre del servicio.
 - Precio.
 
+Las acciones de registrar y modificar deberán abrir un diálogo con el formulario
+correspondiente. El usuario deberá poder guardar los cambios o cerrar el diálogo
+sin modificar la configuración.
+
 El nombre deberá ser obligatorio y el precio deberá ser un importe mayor que
 cero. Los servicios configurados deberán estar disponibles al registrar o
 modificar un corte.
 
-##### Configuración de productos
+##### IU-005.2 — Configuración de productos
 
 La interfaz deberá mostrar los productos disponibles para la venta y permitir
 registrar, modificar o eliminar cada producto con los siguientes datos:
@@ -333,24 +337,35 @@ registrar, modificar o eliminar cada producto con los siguientes datos:
 - Nombre del producto.
 - Precio unitario de venta.
 
+Las acciones de registrar y modificar deberán abrir un diálogo con el formulario
+correspondiente. El usuario deberá poder guardar los cambios o cerrar el diálogo
+sin modificar la configuración.
+
 El nombre deberá ser obligatorio y el precio deberá ser un importe mayor que
 cero. Los productos configurados deberán estar disponibles al registrar o
 modificar una venta.
 
-##### Configuración de barberos
+##### IU-005.3 — Configuración de barberos
 
 La interfaz deberá mostrar los barberos registrados y permitir agregar,
 modificar o eliminar cada barbero. Para cada barbero se deberá registrar como
 mínimo su nombre.
 
+Las acciones de agregar y modificar deberán abrir un diálogo con el formulario
+correspondiente. El usuario deberá poder guardar los cambios o cerrar el diálogo
+sin modificar la configuración.
+
 Los barberos configurados deberán estar disponibles en el panel diario, en el
 registro de cortes, en el registro de adelantos y en los resúmenes por período.
 
-##### Configuración de comisión
+##### IU-005.4 — Configuración de comisión
 
 La interfaz deberá permitir establecer un único porcentaje de comisión general.
 Este porcentaje deberá aplicarse de igual manera a todos los barberos y no se
 configurará individualmente para cada uno.
+
+La comisión deberá editarse directamente dentro de la interfaz de configuración,
+sin abrir un diálogo adicional.
 
 La comisión deberá aceptar un valor entre 0 % y 100 %. Cuando el porcentaje sea
 modificado, el sistema deberá utilizar el nuevo valor en los cálculos posteriores
@@ -530,7 +545,7 @@ Una vez confirmada, el sistema deberá eliminar el adelanto y recalcular:
 ### RF-012 — Consultar resúmenes por período
 
 - **Estado:** Implementado
-- **Version de software:** v0.3.0
+- **Version de software:** v0.2.0
 
 El sistema deberá permitir consultar la información consolidada de las jornadas
 por período semanal, mensual o anual.
@@ -553,7 +568,7 @@ la información por mes.
 ### RF-013 — Consultar resúmenes por barbero
 
 - **Estado:** Implementado
-- **Version de software:** v0.3.0
+- **Version de software:** v0.2.0
 
 El sistema deberá mostrar, dentro del período seleccionado, un resumen para cada
 barbero que haya registrado actividad.
@@ -566,6 +581,9 @@ para calcular el resumen general del período.
 
 ### RF-014 — Administrar servicios
 
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
+
 El sistema deberá permitir registrar, modificar y eliminar servicios indicando
 su nombre y precio.
 
@@ -576,6 +594,9 @@ Un servicio asociado a cortes registrados no deberá eliminarse si la operación
 compromete la conservación del historial.
 
 ### RF-015 — Administrar productos
+
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
 
 El sistema deberá permitir registrar, modificar y eliminar productos indicando
 su nombre y precio unitario de venta.
@@ -588,6 +609,9 @@ compromete la conservación del historial.
 
 ### RF-016 — Administrar barberos
 
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
+
 El sistema deberá permitir registrar, modificar y eliminar barberos. El nombre
 del barbero deberá ser obligatorio.
 
@@ -598,6 +622,9 @@ Un barbero asociado a operaciones registradas no deberá eliminarse si la
 operación compromete la conservación del historial.
 
 ### RF-017 — Configurar la comisión general
+
+- **Estado:** Implementado
+- **Version de software:** v0.2.0
 
 El sistema deberá permitir establecer un único porcentaje de comisión general,
 aplicable por igual a todos los barberos.

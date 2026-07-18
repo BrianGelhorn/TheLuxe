@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
   <div class="app-shell">
@@ -20,6 +20,7 @@
         <button class="nav-item active" type="button" data-view="dailyView" aria-current="page"><span class="nav-icon">⌁</span> Panel diario</button>
         <button class="nav-item" type="button" data-view="salesView"><span class="nav-icon">$</span> Ventas y adelantos</button>
         <button class="nav-item" type="button" data-view="summaryView"><span class="nav-icon">Σ</span> Resúmenes</button>
+        <button class="nav-item" type="button" data-view="configView"><span class="nav-icon">⚙</span> Configuración</button>
       </nav>
       <div class="sidebar-note"><span class="status-dot"></span>Los datos se guardan en este dispositivo.</div>
     </aside>
@@ -112,6 +113,15 @@
         </article>
       </section>
 
+      <section id="configView" class="view">
+        <div class="config-grid">
+          <article class="card form-card"><div class="section-heading"><div><span class="step">SERVICIOS</span><h2>Servicios y precios</h2></div><button id="addServiceConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="serviceConfigList" class="config-list"></div></article>
+          <article class="card form-card"><div class="section-heading"><div><span class="step">PRODUCTOS</span><h2>Productos y precios</h2></div><button id="addProductConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="productConfigList" class="config-list"></div></article>
+          <article class="card form-card"><div class="section-heading"><div><span class="step">BARBEROS</span><h2>Equipo</h2></div><button id="addBarberConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="barberConfigList" class="config-list"></div></article>
+          <article class="card form-card"><span class="step">COMISIÓN GENERAL</span><h2>Porcentaje para todos</h2><form id="commissionForm" class="config-form"><label class="field"><span>Comisión (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn compact-btn" type="submit">Guardar</button></form></article>
+        </div>
+      </section>
+
       <dialog id="cutDialog" class="cut-dialog">
         <article class="form-card">
           <div class="card-heading">
@@ -198,7 +208,7 @@
           </div>
           <form id="saleForm" class="cut-form">
             <label class="field"><span>Hora</span><input name="time" type="time" required></label>
-            <label class="field"><span>Producto</span><input name="product" required></label>
+            <label class="field"><span>Producto</span><select id="saleProduct" name="product" required></select></label>
             <label class="field"><span>Cantidad</span><input name="quantity" type="number" min="1" value="1" required></label>
             <label class="field"><span>Precio unitario</span><div class="money-input"><b>$</b><input name="unitPrice" type="text" inputmode="numeric" required></div></label>
             <label class="field"><span>Medio de pago</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label>
@@ -253,8 +263,18 @@
           </div>
         </article>
       </dialog>
+
+      <dialog id="serviceConfigDialog" class="cut-dialog">
+        <article class="form-card"><div class="card-heading"><div><span id="serviceConfigMode" class="step">NUEVO SERVICIO</span><h2>Servicio</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="serviceConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Precio</span><div class="money-input"><b>$</b><input name="price" type="text" inputmode="numeric" required></div></label><button class="primary-btn" type="submit">Guardar servicio</button></form></article>
+      </dialog>
+      <dialog id="productConfigDialog" class="cut-dialog">
+        <article class="form-card"><div class="card-heading"><div><span id="productConfigMode" class="step">NUEVO PRODUCTO</span><h2>Producto</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="productConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Precio</span><div class="money-input"><b>$</b><input name="price" type="text" inputmode="numeric" required></div></label><button class="primary-btn" type="submit">Guardar producto</button></form></article>
+      </dialog>
+      <dialog id="barberConfigDialog" class="cut-dialog">
+        <article class="form-card"><div class="card-heading"><div><span id="barberConfigMode" class="step">NUEVO BARBERO</span><h2>Barbero</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="barberConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field full-width"><span>Nombre</span><input name="name" required></label><button class="primary-btn" type="submit">Guardar barbero</button></form></article>
+      </dialog>
     </main>
   </div>
-  <script src="script.js?v=10"></script>
+  <script src="script.js?v=12"></script>
 </body>
 </html>
