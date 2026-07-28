@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
   <div class="app-shell">
@@ -17,9 +17,11 @@
         <span><strong>The Luxe</strong><small>Barber studio</small></span>
       </a>
       <nav class="nav" aria-label="Secciones principales">
-        <button class="nav-item active" type="button" aria-current="page"><span class="nav-icon">⌁</span> Panel diario</button>
+        <button class="nav-item active" type="button" data-view="dailyView" aria-current="page"><span class="nav-icon">⌁</span> Panel diario</button>
+        <button class="nav-item" type="button" data-view="salesView"><span class="nav-icon">$</span> Caja y movimientos</button>
+        <button class="nav-item" type="button" data-view="summaryView"><span class="nav-icon">Σ</span> Resúmenes</button>
+        <button class="nav-item" type="button" data-view="configView"><span class="nav-icon">⚙</span> Configuración</button>
       </nav>
-      <div class="sidebar-note"><span class="status-dot"></span>Los datos se guardan en este dispositivo.</div>
     </aside>
 
     <main class="main">
@@ -34,12 +36,25 @@
         </label>
       </header>
 
-      <section class="view active">
+      <section id="dailyView" class="view active">
+        <article class="card daily-sheet opening-card">
+          <div class="section-heading"><div><span class="step">APERTURA DE JORNADA</span><h2>Cajas iniciales</h2></div><div class="heading-actions"><small id="openingStatus">Pendiente</small><button id="changeCommission" class="secondary-btn" type="button">Cambiar comisión</button></div></div>
+          <form id="openingCashForm" class="cash-register-form opening-form">
+            <label class="field"><span>Efectivo inicial</span><div class="money-input"><b>$</b><input name="initialCash" type="text" inputmode="numeric" required></div></label>
+            <label class="field"><span>Mercado Pago inicial</span><div class="money-input"><b>$</b><input name="initialMp" type="text" inputmode="numeric" required></div></label>
+            <button class="primary-btn compact-btn" type="submit">Iniciar jornada</button>
+          </form>
+          <div id="openingSaved" class="opening-saved" hidden>
+            <span>Efectivo inicial <strong id="openingCashValue">$ 0</strong></span>
+            <span>Mercado Pago inicial <strong id="openingMpValue">$ 0</strong></span>
+            <button id="editOpeningCash" class="secondary-btn" type="button">Editar caja inicial</button>
+          </div>
+        </article>
         <div class="metrics">
           <article class="metric featured"><span>Recaudado</span><strong id="dailyTotal">$ 0</strong><small id="dailyCount">0 cortes</small></article>
           <article class="metric"><span>Propinas</span><strong id="tipsTotal">$ 0</strong><small>Registradas</small></article>
-          <article class="metric"><span>Efectivo</span><strong id="cashTotal">$ 0</strong><small>Cobrado</small></article>
-          <article class="metric"><span>Mercado Pago</span><strong id="mpTotal">$ 0</strong><small>Cobrado</small></article>
+          <article class="metric"><span>Efectivo</span><strong id="cashTotal">$ 0</strong><small>Saldo</small></article>
+          <article class="metric"><span>Mercado Pago</span><strong id="mpTotal">$ 0</strong><small>Saldo</small></article>
         </div>
 
         <article class="card daily-sheet">
@@ -48,6 +63,94 @@
           </div>
           <div id="barberColumns" class="barber-columns"></div>
         </article>
+      </section>
+
+      <section id="salesView" class="view">
+        <article class="card daily-sheet">
+          <div class="section-heading">
+            <div><span class="step">VENTAS DEL DÍA</span><h2>Productos vendidos</h2></div>
+            <button id="addSale" class="primary-btn compact-btn" type="button">Agregar venta</button>
+          </div>
+          <div class="sales-table-wrap">
+            <table class="sales-table">
+              <thead><tr><th>Hora</th><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th><th>Medio de pago</th><th>Notas</th></tr></thead>
+              <tbody id="salesRows"></tbody>
+            </table>
+          </div>
+          <div id="salesEmpty" class="barber-empty">Sin ventas cargadas</div>
+          <div class="movement-summary"><span>Efectivo <strong id="salesCashTotal">$ 0</strong></span><span>Mercado Pago <strong id="salesMpTotal">$ 0</strong></span><span>Total <strong id="salesGrandTotal">$ 0</strong></span></div>
+        </article>
+        <article class="card daily-sheet">
+          <div class="section-heading">
+            <div><span class="step">ADELANTOS DEL DÍA</span><h2>Salidas para barberos</h2></div>
+            <button id="addAdvance" class="primary-btn compact-btn" type="button">Agregar adelanto</button>
+          </div>
+          <div class="sales-table-wrap">
+            <table class="sales-table">
+              <thead><tr><th>Hora</th><th>Barbero</th><th>Importe</th><th>Medio</th><th>Motivo</th></tr></thead>
+              <tbody id="advanceRows"></tbody>
+            </table>
+          </div>
+          <div id="advancesEmpty" class="barber-empty">Sin adelantos cargados</div>
+          <div class="movement-summary outgoing"><span>Efectivo <strong id="advancesCashTotal">$ 0</strong></span><span>Mercado Pago <strong id="advancesMpTotal">$ 0</strong></span><span>Total <strong id="advancesGrandTotal">$ 0</strong></span></div>
+        </article>
+        <article class="card daily-sheet">
+          <div class="section-heading"><div><span class="step">SALIDAS DE CAJA</span><h2>Gastos de la jornada</h2></div><button id="addExpense" class="primary-btn compact-btn" type="button">Agregar salida</button></div>
+          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Hora</th><th>Motivo</th><th>Importe</th><th>Medio</th></tr></thead><tbody id="expenseRows"></tbody></table></div>
+          <div id="expensesEmpty" class="barber-empty">Sin salidas de caja</div>
+          <div class="movement-summary outgoing"><span>Efectivo <strong id="expensesCashTotal">$ 0</strong></span><span>Mercado Pago <strong id="expensesMpTotal">$ 0</strong></span><span>Total <strong id="expensesGrandTotal">$ 0</strong></span></div>
+        </article>
+        <article class="card daily-sheet">
+          <div class="section-heading"><div><span class="step">CIERRE DE CAJA</span><h2>Cajas reales</h2></div></div>
+          <form id="cashRegisterForm" class="cash-register-form">
+            <label class="field"><span>Efectivo real</span><div class="money-input"><b>$</b><input name="realCash" type="text" inputmode="numeric"></div></label>
+            <label class="field"><span>MP real</span><div class="money-input"><b>$</b><input name="realMp" type="text" inputmode="numeric"></div></label>
+            <button class="primary-btn compact-btn" type="submit">Guardar cierre</button>
+          </form>
+        </article>
+      </section>
+
+      <section id="summaryView" class="view">
+        <article class="card daily-sheet">
+          <div class="summary-controls">
+            <label class="field"><span>Período</span><select id="summaryPeriod"><option value="week">Semanal</option><option value="month">Mensual</option><option value="year">Anual</option></select></label>
+            <label class="field"><span id="summaryDateLabel">Mes</span><input id="summaryDate" type="month"></label>
+            <label id="summaryWeekField" class="field"><span>Número de semana</span><select id="summaryWeek"></select></label>
+            <div class="summary-range"><span class="step">RANGO SELECCIONADO</span><h2 id="summaryRange"></h2></div>
+          </div>
+        </article>
+        <div class="metrics summary-metrics">
+          <article class="metric"><span>Cortes</span><strong id="summaryCuts">0</strong></article>
+          <article class="metric"><span>Ventas registradas</span><strong id="summarySaleCount">0</strong></article>
+          <article class="metric"><span>Servicios</span><strong id="summaryServices">$ 0</strong></article>
+          <article class="metric"><span>Ventas</span><strong id="summarySales">$ 0</strong></article>
+          <article class="metric featured"><span>Total facturado</span><strong id="summaryInvoiced">$ 0</strong></article>
+          <article class="metric"><span>Propinas</span><strong id="summaryTips">$ 0</strong></article>
+          <article class="metric"><span>Comisiones</span><strong id="summaryCommission">$ 0</strong></article>
+          <article class="metric"><span>Adelantos</span><strong id="summaryAdvances">$ 0</strong></article>
+          <article class="metric"><span>Salidas de caja</span><strong id="summaryExpenses">$ 0</strong></article>
+          <article class="metric featured"><span>Balance</span><strong id="summaryBalance">$ 0</strong></article>
+        </div>
+        <article class="card daily-sheet"><div class="section-heading"><div><span class="step">CAJAS</span><h2>Resumen por medio</h2></div></div><div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Medio</th><th>Inicial</th><th>Entradas</th><th>Propinas</th><th>Adelantos</th><th>Gastos</th><th>Teórica</th><th>Real</th><th>Diferencia</th></tr></thead><tbody id="cashSummaryRows"></tbody></table></div></article>
+        <article class="card daily-sheet">
+          <div class="section-heading"><div><span class="step">DESGLOSE</span><h2 id="summaryBreakdownTitle">Resumen por día</h2></div></div>
+          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Período</th><th>Cortes</th><th>Servicios</th><th>Ventas</th><th>Propinas</th><th>Comisiones</th><th>Adelantos</th><th>Gastos</th><th>Balance</th></tr></thead><tbody id="summaryRows"></tbody></table></div>
+          <div id="summaryEmpty" class="barber-empty">Sin movimientos en el período</div>
+        </article>
+        <article class="card daily-sheet">
+          <div class="section-heading"><div><span class="step">BARBEROS</span><h2>Resumen por barbero</h2></div></div>
+          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Barbero</th><th>Cortes</th><th>Servicios</th><th>Propinas</th><th>Adelantos</th><th>Balance</th></tr></thead><tbody id="barberSummaryRows"></tbody></table></div>
+          <div id="barberSummaryEmpty" class="barber-empty">Sin actividad de barberos</div>
+        </article>
+      </section>
+
+      <section id="configView" class="view">
+        <div class="config-grid">
+          <article class="card form-card"><div class="section-heading"><div><span class="step">SERVICIOS</span><h2>Servicios y precios</h2></div><button id="addServiceConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="serviceConfigList" class="config-list"></div></article>
+          <article class="card form-card"><div class="section-heading"><div><span class="step">PRODUCTOS</span><h2>Productos y precios</h2></div><button id="addProductConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="productConfigList" class="config-list"></div></article>
+          <article class="card form-card"><div class="section-heading"><div><span class="step">BARBEROS</span><h2>Equipo</h2></div><button id="addBarberConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="barberConfigList" class="config-list"></div></article>
+          <article class="card form-card"><span class="step">COMISIÓN GENERAL</span><h2>Porcentaje para todos</h2><form id="commissionForm" class="config-form"><label class="field"><span>Comisión (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn compact-btn" type="submit">Guardar</button></form></article>
+        </div>
       </section>
 
       <dialog id="cutDialog" class="cut-dialog">
@@ -78,11 +181,11 @@
             </label>
             <label class="field">
               <span>Precio</span>
-              <div class="money-input"><b>$</b><input id="amount" name="amount" type="number" min="0" required></div>
+              <div class="money-input"><b>$</b><input id="amount" name="amount" type="text" inputmode="numeric" required></div>
             </label>
             <label class="field">
               <span>Propina <small>(opcional)</small></span>
-              <div class="money-input"><b>$</b><input name="tip" type="number" min="0" placeholder="0"></div>
+              <div class="money-input"><b>$</b><input name="tip" type="text" inputmode="numeric" placeholder="0"></div>
             </label>
             <label class="field">
               <span>Medio de pago</span>
@@ -95,11 +198,11 @@
             <div id="splitPayment" class="split-payment full-width" hidden>
               <label class="field">
                 <span>Importe en efectivo</span>
-                <div class="money-input"><b>$</b><input id="cashAmount" name="cashAmount" type="number" min="0" step="500"></div>
+                <div class="money-input"><b>$</b><input id="cashAmount" name="cashAmount" type="text" inputmode="numeric"></div>
               </label>
               <label class="field">
                 <span>Importe en Mercado Pago</span>
-                <div class="money-input"><b>$</b><input id="mpAmount" name="mpAmount" type="number" min="0" step="500"></div>
+                <div class="money-input"><b>$</b><input id="mpAmount" name="mpAmount" type="text" inputmode="numeric"></div>
               </label>
             </div>
             <label class="field full-width">
@@ -127,8 +230,88 @@
           </div>
         </article>
       </dialog>
+
+      <dialog id="saleDialog" class="cut-dialog">
+        <article class="form-card">
+          <div class="card-heading">
+            <div><span id="saleFormMode" class="step">NUEVA VENTA</span><h2>Datos de la venta</h2></div>
+            <button id="closeSaleDialog" class="close-btn" type="button" aria-label="Cerrar">×</button>
+          </div>
+          <form id="saleForm" class="cut-form">
+            <label class="field"><span>Hora</span><input name="time" type="time" required></label>
+            <label class="field"><span>Producto</span><select id="saleProduct" name="product" required></select></label>
+            <label class="field"><span>Cantidad</span><input name="quantity" type="number" min="1" value="1" required></label>
+            <label class="field"><span>Precio unitario</span><div class="money-input"><b>$</b><input name="unitPrice" type="text" inputmode="numeric" required></div></label>
+            <label class="field"><span>Medio de pago</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label>
+            <label class="field"><span>Importe total</span><div id="saleTotalPreview" class="total-preview">$ 0</div></label>
+            <label class="field full-width"><span>Notas <small>(opcional)</small></span><textarea name="notes" rows="3"></textarea></label>
+            <button class="primary-btn" type="submit">Guardar venta <span>→</span></button>
+          </form>
+        </article>
+      </dialog>
+
+      <dialog id="saleDetailDialog" class="cut-dialog">
+        <article class="form-card">
+          <div class="card-heading">
+            <div><span class="step">DETALLE DE VENTA</span><h2 id="saleDetailTitle">Datos completos</h2></div>
+            <button id="closeSaleDetail" class="close-btn" type="button" aria-label="Cerrar">×</button>
+          </div>
+          <dl id="saleDetail" class="detail-list"></dl>
+          <div class="detail-actions">
+            <button id="editSale" class="secondary-btn" type="button">Modificar</button>
+            <button id="deleteSale" class="danger-btn" type="button">Eliminar</button>
+          </div>
+        </article>
+      </dialog>
+
+      <dialog id="advanceDialog" class="cut-dialog">
+        <article class="form-card">
+          <div class="card-heading">
+            <div><span id="advanceFormMode" class="step">NUEVO ADELANTO</span><h2>Datos del adelanto</h2></div>
+            <button id="closeAdvanceDialog" class="close-btn" type="button" aria-label="Cerrar">×</button>
+          </div>
+          <form id="advanceForm" class="cut-form">
+            <label class="field"><span>Hora</span><input name="time" type="time" required></label>
+            <label class="field"><span>Barbero</span><select name="barber" required></select></label>
+            <label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label>
+            <label class="field"><span>Medio de entrega</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label>
+            <label class="field full-width"><span>Motivo o descripción <small>(opcional)</small></span><textarea name="reason" rows="3"></textarea></label>
+            <button class="primary-btn" type="submit">Guardar adelanto <span>→</span></button>
+          </form>
+        </article>
+      </dialog>
+
+      <dialog id="advanceDetailDialog" class="cut-dialog">
+        <article class="form-card">
+          <div class="card-heading">
+            <div><span class="step">DETALLE DE ADELANTO</span><h2 id="advanceDetailTitle">Datos completos</h2></div>
+            <button id="closeAdvanceDetail" class="close-btn" type="button" aria-label="Cerrar">×</button>
+          </div>
+          <dl id="advanceDetail" class="detail-list"></dl>
+          <div class="detail-actions">
+            <button id="editAdvance" class="secondary-btn" type="button">Modificar</button>
+            <button id="deleteAdvance" class="danger-btn" type="button">Eliminar</button>
+          </div>
+        </article>
+      </dialog>
+
+      <dialog id="expenseDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span id="expenseFormMode" class="step">NUEVA SALIDA</span><h2>Salida de caja</h2></div><button id="closeExpenseDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="expenseForm" class="cut-form"><label class="field"><span>Hora</span><input name="time" type="time" required></label><label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label><label class="field"><span>Medio de salida</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label><label class="field full-width"><span>Motivo o descripción</span><textarea name="reason" rows="3" required></textarea></label><button class="primary-btn" type="submit">Guardar salida</button></form></article></dialog>
+      <dialog id="expenseDetailDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">DETALLE DE SALIDA</span><h2 id="expenseDetailTitle">Datos completos</h2></div><button id="closeExpenseDetail" class="close-btn" type="button" aria-label="Cerrar">×</button></div><dl id="expenseDetail" class="detail-list"></dl><div class="detail-actions"><button id="editExpense" class="secondary-btn" type="button">Modificar</button><button id="deleteExpense" class="danger-btn" type="button">Eliminar</button></div></article></dialog>
+      <dialog id="commissionDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">COMISIÓN GENERAL</span><h2>Cambiar comisión</h2></div><button id="closeCommissionDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="dailyCommissionForm" class="cut-form"><label class="field full-width"><span>Comisión para nuevos cortes (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn" type="submit">Guardar comisión</button></form></article></dialog>
+
+      <dialog id="serviceConfigDialog" class="cut-dialog">
+        <article class="form-card"><div class="card-heading"><div><span id="serviceConfigMode" class="step">NUEVO SERVICIO</span><h2>Servicio</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="serviceConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Precio</span><div class="money-input"><b>$</b><input name="price" type="text" inputmode="numeric" required></div></label><button class="primary-btn" type="submit">Guardar servicio</button></form></article>
+      </dialog>
+      <dialog id="productConfigDialog" class="cut-dialog">
+        <article class="form-card"><div class="card-heading"><div><span id="productConfigMode" class="step">NUEVO PRODUCTO</span><h2>Producto</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="productConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Precio</span><div class="money-input"><b>$</b><input name="price" type="text" inputmode="numeric" required></div></label><button class="primary-btn" type="submit">Guardar producto</button></form></article>
+      </dialog>
+      <dialog id="barberConfigDialog" class="cut-dialog">
+        <article class="form-card"><div class="card-heading"><div><span id="barberConfigMode" class="step">NUEVO BARBERO</span><h2>Barbero</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="barberConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field full-width"><span>Nombre</span><input name="name" required></label><button class="primary-btn" type="submit">Guardar barbero</button></form></article>
+      </dialog>
     </main>
   </div>
-  <script src="script.js?v=5"></script>
+  <script src="reports.js?v=1"></script>
+  <script src="dialogs.js?v=1"></script>
+  <script src="script.js?v=19"></script>
 </body>
 </html>
