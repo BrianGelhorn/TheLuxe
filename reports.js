@@ -45,6 +45,19 @@ function renderExpenses(list) {
   document.getElementById('expensesGrandTotal').textContent = money.format(list.reduce((sum, expense) => sum + expense.amount, 0));
 }
 
+function cashMovements(list, adjustments = []) {
+  return [
+    ...list.map((item) => ({ ...item, type: 'Transferencia', removable: true })),
+    ...adjustments.map((item) => ({ ...item, type: 'Ajuste inicial', from: `${item.medium}: ${money.format(item.previous)}`, to: `${item.medium}: ${money.format(item.current)}`, amount: item.current - item.previous })),
+  ].sort((a, b) => a.time.localeCompare(b.time));
+}
+
+function renderTransfers(list, adjustments = []) {
+  const movements = cashMovements(list, adjustments);
+  document.getElementById('transferRows').innerHTML = movements.map((item) => `<tr><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.from)}</td><td>${escapeHtml(item.to)}</td><td>${money.format(item.amount)}</td><td>${escapeHtml(item.description)}</td><td>${item.removable ? `<button class="delete-transfer" type="button" data-delete-transfer="${escapeHtml(item.id)}">Eliminar</button>` : '—'}</td></tr>`).join('');
+  document.getElementById('transfersEmpty').hidden = movements.length > 0;
+}
+
 function isoDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -112,71 +125,77 @@ function cutValueByPayment(cuts, type, field) {
   }, 0);
 }
 
-function summarize(cuts, periodSales, periodAdvances, periodExpenses = []) {
-  const services = cuts.reduce((sum, cut) => sum + Number(cut.amount), 0);
-  const tips = cuts.reduce((sum, cut) => sum + Number(cut.tip || 0), 0);
+function summarize(cuts, periodSales, periodAdvances, periodExpenses = [], payment = 'Ambas') {
+  const services = payment === 'Ambas' ? cuts.reduce((sum, cut) => sum + Number(cut.amount), 0) : cutValueByPayment(cuts, payment, 'amount');
+  const tips = payment === 'Ambas' ? cuts.reduce((sum, cut) => sum + Number(cut.tip || 0), 0) : cutValueByPayment(cuts, payment, 'tip');
   const salesTotal = periodSales.reduce((sum, sale) => sum + sale.total, 0);
   const advancesTotal = periodAdvances.reduce((sum, advance) => sum + advance.amount, 0);
   const expensesTotal = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const commission = cuts.reduce((sum, cut) => sum + Number(cut.commissionAmount ?? Number(cut.amount) * config.commission / 100), 0);
+  const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.commissionAmount ?? Number(cut.amount) * defaultCommission(cut.date) / 100) }));
+  const commission = payment === 'Ambas' ? commissionCuts.reduce((sum, cut) => sum + cut.commission, 0) : cutValueByPayment(commissionCuts, payment, 'commission');
+  const cutCount = payment === 'Ambas' ? cuts.length : cuts.filter((cut) => dominantPayment(cut) === payment).length;
   return {
-    cuts: cuts.length, saleCount: periodSales.length, services, sales: salesTotal, tips, commission, advances: advancesTotal, expenses: expensesTotal,
-    invoiced: services + salesTotal, balance: services + tips + salesTotal - advancesTotal - expensesTotal,
+    cuts: cutCount, saleCount: periodSales.length, services, sales: salesTotal, tips, commission, advances: advancesTotal, expenses: expensesTotal,
+    invoiced: services + salesTotal, balance: services + salesTotal - commission,
     cash: paymentTotal(cuts, 'Efectivo') + salePaymentTotal(periodSales, 'Efectivo') - advancePaymentTotal(periodAdvances, 'Efectivo') - expensePaymentTotal(periodExpenses, 'Efectivo'),
     mp: paymentTotal(cuts, 'Mercado Pago') + salePaymentTotal(periodSales, 'Mercado Pago') - advancePaymentTotal(periodAdvances, 'Mercado Pago') - expensePaymentTotal(periodExpenses, 'Mercado Pago'),
   };
-}
-
-function barberBalance(cuts, tips, advancesTotal) {
-  return cuts.reduce((sum, cut) => sum + Number(cut.commissionAmount ?? Number(cut.amount) * config.commission / 100), 0) + tips - advancesTotal;
 }
 
 function renderSummary() {
   const period = document.getElementById('summaryPeriod').value;
   const [from, to] = periodBounds(period, document.getElementById('summaryDate').value, document.getElementById('summaryWeek').value);
   const inRange = (item) => item.date >= from && item.date <= to;
-  const periodCuts = entries.filter(inRange);
-  const periodSales = sales.filter(inRange);
-  const periodAdvances = advances.filter(inRange);
-  const periodExpenses = expenses.filter(inRange);
-  const total = summarize(periodCuts, periodSales, periodAdvances, periodExpenses);
+  const selectedServices = [...document.querySelectorAll('#summaryServiceOptions input:checked')].map(({ value }) => value);
+  const selectedBarber = document.getElementById('summaryBarberFilter').value;
+  const payment = document.getElementById('summaryPaymentFilter').value;
+  const matchesPayment = (item) => payment === 'Ambas' || item.payment === payment;
+  const periodCuts = entries.filter((cut) => inRange(cut) && selectedServices.includes(cut.service) && (!selectedBarber || cut.barber === selectedBarber) && (payment === 'Ambas' || cut.payment === payment || cut.payment === 'Ambos'));
+  const periodSales = selectedBarber ? [] : sales.filter((sale) => inRange(sale) && matchesPayment(sale));
+  const periodAdvances = advances.filter((advance) => inRange(advance) && (!selectedBarber || advance.barber === selectedBarber) && matchesPayment(advance));
+  const periodExpenses = selectedBarber ? [] : expenses.filter((expense) => inRange(expense) && matchesPayment(expense));
+  const total = summarize(periodCuts, periodSales, periodAdvances, periodExpenses, payment);
   const dateLabel = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   document.getElementById('summaryRange').textContent = `${dateLabel.format(new Date(`${from}T00:00:00`))} — ${dateLabel.format(new Date(`${to}T00:00:00`))}`;
-  document.getElementById('summaryCuts').textContent = total.cuts;
-  document.getElementById('summarySaleCount').textContent = total.saleCount;
+  document.getElementById('summaryCuts').textContent = `${total.cuts} ${total.cuts === 1 ? 'corte' : 'cortes'}`;
+  document.getElementById('summarySaleCount').textContent = `${total.saleCount} ${total.saleCount === 1 ? 'venta' : 'ventas'}`;
+  const operationCount = total.cuts + total.saleCount;
+  document.getElementById('summaryOperationCount').textContent = `${operationCount} ${operationCount === 1 ? 'operación' : 'operaciones'}`;
+  document.getElementById('summaryAverageTicket').textContent = money.format(operationCount ? total.invoiced / operationCount : 0);
+  const servicesCash = payment === 'Mercado Pago' ? 0 : cutValueByPayment(periodCuts, 'Efectivo', 'amount');
+  const servicesMp = payment === 'Efectivo' ? 0 : cutValueByPayment(periodCuts, 'Mercado Pago', 'amount');
+  const salesCash = payment === 'Mercado Pago' ? 0 : salePaymentTotal(periodSales, 'Efectivo');
+  const salesMp = payment === 'Efectivo' ? 0 : salePaymentTotal(periodSales, 'Mercado Pago');
+  document.getElementById('summaryServicesCash').textContent = money.format(servicesCash);
+  document.getElementById('summaryServicesMp').textContent = money.format(servicesMp);
+  const summaryCashCuts = payment === 'Mercado Pago' ? 0 : periodCuts.filter((cut) => dominantPayment(cut) === 'Efectivo').length;
+  const summaryMpCuts = payment === 'Efectivo' ? 0 : periodCuts.filter((cut) => dominantPayment(cut) === 'Mercado Pago').length;
+  document.getElementById('summaryCashCuts').textContent = `${summaryCashCuts} ${summaryCashCuts === 1 ? 'corte' : 'cortes'}`;
+  document.getElementById('summaryMpCuts').textContent = `${summaryMpCuts} ${summaryMpCuts === 1 ? 'corte' : 'cortes'}`;
+  document.getElementById('summarySalesCash').textContent = money.format(salesCash);
+  document.getElementById('summarySalesMp').textContent = money.format(salesMp);
+  document.getElementById('summaryInvoicedCash').textContent = money.format(servicesCash + salesCash);
+  document.getElementById('summaryInvoicedMp').textContent = money.format(servicesMp + salesMp);
+  const withdrawals = selectedBarber || payment === 'Mercado Pago' ? 0 : Object.entries(cashRegisters).filter(([date]) => date >= from && date <= to).reduce((sum, [, register]) => sum + Number(register.withdrawal || 0), 0);
+  document.getElementById('summaryWithdrawals').textContent = money.format(withdrawals);
   ['Services', 'Sales', 'Invoiced', 'Tips', 'Commission', 'Advances', 'Expenses', 'Balance'].forEach((name) => { document.getElementById(`summary${name}`).textContent = money.format(total[name.toLowerCase()]); });
 
-  document.getElementById('cashSummaryRows').innerHTML = ['Efectivo', 'Mercado Pago'].map((type) => {
-    const suffix = type === 'Efectivo' ? 'Cash' : 'Mp';
-    const initial = Number(cashRegisters[from]?.[`initial${suffix}`] || 0);
-    const real = Number(cashRegisters[to]?.[`real${suffix}`] || 0);
-    const serviceEntries = cutValueByPayment(periodCuts, type, 'amount');
-    const tipsByType = cutValueByPayment(periodCuts, type, 'tip');
-    const entriesTotal = serviceEntries + salePaymentTotal(periodSales, type);
-    const advanceTotal = advancePaymentTotal(periodAdvances, type);
-    const expenseTotal = expensePaymentTotal(periodExpenses, type);
-    const theoretical = initial + entriesTotal + tipsByType - advanceTotal - expenseTotal;
-    return `<tr><td>${type}</td><td>${money.format(initial)}</td><td>${money.format(entriesTotal)}</td><td>${money.format(tipsByType)}</td><td>${money.format(advanceTotal)}</td><td>${money.format(expenseTotal)}</td><td>${money.format(theoretical)}</td><td>${money.format(real)}</td><td>${money.format(real - theoretical)}</td></tr>`;
-  }).join('');
-
   const groupKey = (item) => period === 'year' ? item.date.slice(0, 7) : item.date;
-  const keys = [...new Set([...periodCuts, ...periodSales, ...periodAdvances, ...periodExpenses].map(groupKey))].sort();
+  const withdrawalDays = selectedBarber || payment === 'Mercado Pago' ? [] : Object.entries(cashRegisters)
+    .filter(([date, register]) => date >= from && date <= to && Number(register.withdrawal || 0))
+    .map(([date]) => ({ date }));
+  const keys = [...new Set([...periodCuts, ...periodSales, ...periodAdvances, ...periodExpenses, ...withdrawalDays].map(groupKey))].sort();
   const monthLabel = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' });
   document.getElementById('summaryBreakdownTitle').textContent = period === 'year' ? 'Resumen por mes' : 'Resumen por día';
   document.getElementById('summaryRows').innerHTML = keys.map((key) => {
     const matches = (item) => groupKey(item) === key;
-    const row = summarize(periodCuts.filter(matches), periodSales.filter(matches), periodAdvances.filter(matches), periodExpenses.filter(matches));
+    const row = summarize(periodCuts.filter(matches), periodSales.filter(matches), periodAdvances.filter(matches), periodExpenses.filter(matches), payment);
+    const rowWithdrawal = selectedBarber || payment === 'Mercado Pago' ? 0 : Object.entries(cashRegisters)
+      .filter(([date]) => date >= from && date <= to && groupKey({ date }) === key)
+      .reduce((sum, [, register]) => sum + Number(register.withdrawal || 0), 0);
     const label = period === 'year' ? monthLabel.format(new Date(`${key}-01T00:00:00`)) : dateLabel.format(new Date(`${key}T00:00:00`));
-    return `<tr><td>${escapeHtml(label)}</td><td>${row.cuts}</td><td>${money.format(row.services)}</td><td>${money.format(row.sales)}</td><td>${money.format(row.tips)}</td><td>${money.format(row.commission)}</td><td>${money.format(row.advances)}</td><td>${money.format(row.expenses)}</td><td>${money.format(row.balance)}</td></tr>`;
+    return `<tr><td>${escapeHtml(label)}</td><td>${row.cuts}</td><td>${money.format(row.services)}</td><td>${money.format(row.sales)}</td><td>${money.format(row.tips)}</td><td>${money.format(row.commission)}</td><td>${money.format(row.advances)}</td><td>${money.format(row.expenses)}</td><td>${money.format(rowWithdrawal)}</td><td>${money.format(row.balance)}</td></tr>`;
   }).join('');
   document.getElementById('summaryEmpty').hidden = keys.length > 0;
 
-  const activeBarbers = barbers.filter((barber) => periodCuts.some((cut) => cut.barber === barber) || periodAdvances.some((advance) => advance.barber === barber));
-  document.getElementById('barberSummaryRows').innerHTML = activeBarbers.map((barber) => {
-    const barberCuts = periodCuts.filter((cut) => cut.barber === barber);
-    const row = summarize(barberCuts, [], periodAdvances.filter((advance) => advance.barber === barber));
-    const balance = barberBalance(barberCuts, row.tips, row.advances);
-    return `<tr><td>${escapeHtml(barber)}</td><td>${row.cuts}</td><td>${money.format(row.services)}</td><td>${money.format(row.tips)}</td><td>${money.format(row.advances)}</td><td>${money.format(balance)}</td></tr>`;
-  }).join('');
-  document.getElementById('barberSummaryEmpty').hidden = activeBarbers.length > 0;
 }

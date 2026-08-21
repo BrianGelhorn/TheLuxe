@@ -1,12 +1,13 @@
 const defaultConfig = {
   services: [{ id: 'corte', name: 'Corte clásico', price: 15000 }, { id: 'corte-barba', name: 'Corte + barba', price: 22000 }, { id: 'barba', name: 'Barba', price: 10000 }, { id: 'diseno', name: 'Diseño', price: 18000 }],
   products: [{ id: 'pomada', name: 'Pomada', price: 12000 }, { id: 'shampoo', name: 'Shampoo', price: 9000 }],
-  barbers: ['Mateo', 'Julián', 'Nicolás', 'Tomás', 'Franco', 'Agustín', 'Lucas', 'Bruno', 'Santino'].map((name) => ({ id: name, name })),
+  barbers: ['Mateo', 'Julián', 'Nicolás', 'Tomás', 'Franco', 'Agustín', 'Lucas', 'Bruno', 'Santino'].map((name) => ({ id: name, name, active: true })),
   commission: 50,
+  commissionHistory: [{ date: '0000-01-01', rate: 50 }],
 };
 try { Object.keys(localStorage).filter((key) => key.startsWith('theluxe-')).forEach((key) => localStorage.removeItem(key)); } catch {}
 let config = structuredClone(defaultConfig);
-let barbers = config.barbers.map(({ name }) => name);
+let barbers = config.barbers.filter(({ active }) => active !== false).map(({ name }) => name);
 let prices = Object.fromEntries(config.services.map(({ name, price }) => [name, price]));
 const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 const integer = new Intl.NumberFormat('es-AR');
@@ -15,6 +16,8 @@ const nowTime = () => new Date().toTimeString().slice(0, 5);
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const parseAmount = (value) => Number(String(value || '').replace(/\D/g, ''));
 const formatAmount = (value) => value === '' || value == null ? '' : integer.format(parseAmount(value));
+const searchText = (value) => String(value).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('es');
+const matchesSearch = (name, query) => searchText(name).startsWith(searchText(query));
 
 const form = document.getElementById('cutForm');
 const dialog = document.getElementById('cutDialog');
@@ -41,6 +44,7 @@ const expenseDialog = document.getElementById('expenseDialog');
 const expenseDetailDialog = document.getElementById('expenseDetailDialog');
 const openingCashForm = document.getElementById('openingCashForm');
 const cashRegisterForm = document.getElementById('cashRegisterForm');
+const transferForm = document.getElementById('transferForm');
 const commissionDialog = document.getElementById('commissionDialog');
 const dailyCommissionForm = document.getElementById('dailyCommissionForm');
 const serviceConfigForm = document.getElementById('serviceConfigForm');
@@ -48,11 +52,21 @@ const productConfigForm = document.getElementById('productConfigForm');
 const barberConfigForm = document.getElementById('barberConfigForm');
 const commissionForm = document.getElementById('commissionForm');
 const configDialogs = { services: document.getElementById('serviceConfigDialog'), products: document.getElementById('productConfigDialog'), barbers: document.getElementById('barberConfigDialog') };
-let entries = [];
+const demoCutCounts = [3, 2, 4, 1, 3, 2, 4, 2, 3];
+let entries = barbers.flatMap((barber, barberIndex) => Array.from({ length: demoCutCounts[barberIndex] }, (_, cutIndex) => {
+  const service = config.services[(barberIndex + cutIndex) % config.services.length];
+  const tip = (barberIndex + cutIndex) % 3 === 0 ? 2000 : 0;
+  const payment = (barberIndex + cutIndex) % 5 === 0 ? 'Ambos' : (barberIndex + cutIndex) % 2 ? 'Mercado Pago' : 'Efectivo';
+  const total = service.price + tip;
+  const cashAmount = payment === 'Ambos' ? Math.round(total * .4) : 0;
+  return { id: `demo-${barberIndex}-${cutIndex}`, date: today(), barber, time: `${String(10 + cutIndex).padStart(2, '0')}:${String(barberIndex * 5).padStart(2, '0')}`, service: service.name, amount: service.price, tip, payment, cashAmount, mpAmount: payment === 'Ambos' ? total - cashAmount : 0, notes: 'Dato de muestra', commissionRate: config.commission, commissionAmount: service.price * config.commission / 100 };
+}));
 let sales = [];
 let advances = [];
 let expenses = [];
-let cashRegisters = {};
+let transfers = [];
+let openingAdjustments = [];
+let cashRegisters = { [today()]: { initialCash: 50000, initialMp: 80000, opened: true } };
 let editingId = null;
 let selectedId = null;
 let editingSaleId = null;
@@ -62,6 +76,8 @@ let selectedAdvanceId = null;
 let editingExpenseId = null;
 let selectedExpenseId = null;
 let editingOpening = false;
+let reorderingBarbers = false;
+let pendingBarberOrder = [];
 
 workday.value = today();
 document.getElementById('summaryDate').value = today().slice(0, 7);
@@ -88,8 +104,14 @@ function saveExpenses() {
 function saveCashRegisters() {
 }
 
+function saveTransfers() {
+}
+
+function saveOpeningAdjustments() {
+}
+
 function saveConfig() {
-  barbers = config.barbers.map(({ name }) => name);
+  barbers = config.barbers.filter(({ active }) => active !== false).map(({ name }) => name);
   prices = Object.fromEntries(config.services.map(({ name, price }) => [name, price]));
   populateSelectors();
   renderConfig();
@@ -98,16 +120,24 @@ function saveConfig() {
 
 function populateSelectors() {
   serviceInput.innerHTML = '<option value="">Seleccionar servicio</option>' + config.services.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
+  document.getElementById('summaryServiceOptions').innerHTML = config.services.map(({ name }) => `<label><input type="checkbox" value="${escapeHtml(name)}" checked> ${escapeHtml(name)}</label>`).join('');
+  document.getElementById('summaryBarberFilter').innerHTML = '<option value="">Todos los barberos</option>' + config.barbers.map(({ name }) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
   document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + config.products.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
-  advanceForm.elements.barber.innerHTML = '<option value="">Seleccionar barbero</option>' + config.barbers.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
+  advanceForm.elements.barber.innerHTML = '<option value="">Seleccionar barbero</option>' + config.barbers.filter(({ active }) => active !== false).map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
 }
 
 function renderConfig() {
   const list = (type, price = false) => config[type].map((item) => `<div class="config-item"><span>${escapeHtml(item.name)}${price ? ` · ${money.format(item.price)}` : ''}</span><span class="config-actions"><button type="button" data-config-edit="${type}" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="${type}" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
   document.getElementById('serviceConfigList').innerHTML = list('services', true);
   document.getElementById('productConfigList').innerHTML = list('products', true);
-  document.getElementById('barberConfigList').innerHTML = list('barbers');
+  document.getElementById('barberConfigList').innerHTML = config.barbers.map((item) => `<div class="config-item" data-name="${escapeHtml(item.name)}"><span>${escapeHtml(item.name)}</span><span class="config-actions"><label class="config-active"><input type="checkbox" data-config-active="barbers" data-id="${escapeHtml(item.id)}" ${item.active !== false ? 'checked' : ''}> Activo</label><button type="button" data-config-edit="barbers" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="barbers" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
+  filterBarberConfig();
   commissionForm.elements.commission.value = config.commission;
+}
+
+function filterBarberConfig() {
+  const query = document.getElementById('barberConfigSearch').value;
+  document.querySelectorAll('#barberConfigList [data-name]').forEach((item) => { item.style.display = matchesSearch(item.dataset.name, query) ? '' : 'none'; });
 }
 
 function saveCatalog(type, formElement) {
@@ -116,7 +146,7 @@ function saveCatalog(type, formElement) {
   const duplicate = config[type].some((item) => item.id !== values.id && item.name.toLowerCase() === values.name.trim().toLowerCase());
   formElement.elements.name.setCustomValidity(duplicate ? 'Ya existe un elemento con ese nombre.' : '');
   if (!formElement.reportValidity()) return;
-  const item = { id: values.id || crypto.randomUUID(), name: values.name.trim(), ...(type !== 'barbers' ? { price: parseAmount(values.price) } : {}) };
+  const item = { id: values.id || crypto.randomUUID(), name: values.name.trim(), ...(type !== 'barbers' ? { price: parseAmount(values.price) } : { active: existing?.active !== false }) };
   if (type !== 'barbers' && item.price <= 0) {
     formElement.elements.price.setCustomValidity('El precio debe ser mayor que cero.');
     return formElement.reportValidity();
@@ -170,15 +200,86 @@ function selectedExpenses() {
   return expenses.filter((expense) => expense.date === workday.value);
 }
 
+function selectedTransfers() {
+  return transfers.filter((transfer) => transfer.date === workday.value);
+}
+
+function selectedOpeningAdjustments() {
+  return openingAdjustments.filter((adjustment) => adjustment.date === workday.value);
+}
+
 function isDayOpen(date) {
   const register = cashRegisters[date];
   return Boolean(register && (register.opened === true || 'initialCash' in register || 'initialMp' in register));
+}
+
+function previousClosedRegister(date) {
+  const previousDate = Object.keys(cashRegisters).filter((key) => key < date && 'realMp' in cashRegisters[key]).sort().at(-1);
+  return previousDate ? { date: previousDate, register: cashRegisters[previousDate] } : null;
+}
+
+function shiftDate(date, days) {
+  const value = new Date(`${date}T12:00:00`);
+  value.setDate(value.getDate() + days);
+  return isoDate(value);
+}
+
+function defaultCommission(date) {
+  return Number([...(config.commissionHistory || [])].filter((item) => item.date <= date).sort((a, b) => a.date.localeCompare(b.date)).at(-1)?.rate ?? config.commission);
+}
+
+function effectiveCommission(date) {
+  return Number(cashRegisters[date]?.commissionRate ?? defaultCommission(date));
+}
+
+function initializeOpening(date) {
+  if (isDayOpen(date)) return false;
+  const previous = previousClosedRegister(date);
+  if (!previous) return false;
+  cashRegisters[date] = {
+    initialCash: Math.max(0, Number(previous.register.realCash || 0) - Number(previous.register.withdrawal || 0)),
+    initialMp: Number(previous.register.realMp || 0), opened: true, autoOpened: true,
+    openedAt: new Date().toISOString(), inheritedFrom: previous.date,
+  };
+  saveCashRegisters();
+  return true;
 }
 
 function paymentTotal(list, type) {
   return list.reduce((sum, entry) => sum + (entry.payment === 'Ambos'
     ? Number(type === 'Efectivo' ? entry.cashAmount : entry.mpAmount)
     : entry.payment === type ? Number(entry.amount) + Number(entry.tip || 0) : 0), 0);
+}
+
+function transferTotal(list, type) {
+  return list.reduce((sum, transfer) => sum + (transfer.to === type ? transfer.amount : transfer.from === type ? -transfer.amount : 0), 0);
+}
+
+function dominantPayment(entry) {
+  if (entry.payment !== 'Ambos') return entry.payment;
+  return Number(entry.cashAmount) >= Number(entry.mpAmount) ? 'Efectivo' : 'Mercado Pago';
+}
+
+function dayBalance(type, list = selectedEntries(), daySales = selectedSales(), dayAdvances = selectedAdvances(), dayExpenses = selectedExpenses(), dayTransfers = selectedTransfers()) {
+  const register = cashRegisters[workday.value] || {};
+  const initial = Number(register[type === 'Efectivo' ? 'initialCash' : 'initialMp'] || 0);
+  return initial + paymentTotal(list, type) + salePaymentTotal(daySales, type) - advancePaymentTotal(dayAdvances, type) - expensePaymentTotal(dayExpenses, type) + transferTotal(dayTransfers, type);
+}
+
+function renderClosingDifferences(cashTheoretical = dayBalance('Efectivo'), mpTheoretical = dayBalance('Mercado Pago')) {
+  const register = cashRegisters[workday.value] || {};
+  const cashValue = cashRegisterForm.elements.realCash.value;
+  const mpValue = cashRegisterForm.elements.realMp.value;
+  const withdrawal = parseAmount(cashRegisterForm.elements.withdrawal.value);
+  document.getElementById('theoreticalCash').textContent = money.format(cashTheoretical);
+  document.getElementById('theoreticalMp').textContent = money.format(mpTheoretical);
+  document.getElementById('cashDifference').textContent = cashValue ? money.format(parseAmount(cashValue) - cashTheoretical) : '—';
+  document.getElementById('mpDifference').textContent = mpValue ? money.format(parseAmount(mpValue) - mpTheoretical) : '—';
+  const closed = 'realCash' in register && 'realMp' in register;
+  document.getElementById('closingStatus').textContent = closed ? 'Cierre guardado' : 'Pendiente';
+  document.getElementById('closingStatus').classList.toggle('closed', closed);
+  document.getElementById('nextOpeningCash').textContent = `${money.format(Math.max(0, parseAmount(cashValue) - withdrawal))} efectivo`;
+  document.getElementById('nextOpeningMp').textContent = `${money.format(parseAmount(mpValue))} MP`;
 }
 
 function toggleSplitPayment() {
@@ -190,25 +291,52 @@ function toggleSplitPayment() {
 }
 
 function render() {
+  initializeOpening(workday.value);
   const list = selectedEntries();
   const daySales = selectedSales();
   const dayAdvances = selectedAdvances();
   const dayExpenses = selectedExpenses();
+  const dayTransfers = selectedTransfers();
   const register = cashRegisters[workday.value] || {};
   const opened = isDayOpen(workday.value);
-  const total = list.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0)
-    + daySales.reduce((sum, sale) => sum + sale.total, 0);
-  document.getElementById('dailyTotal').textContent = money.format(total);
-  document.getElementById('dailyCount').textContent = `${list.length} ${list.length === 1 ? 'corte' : 'cortes'} · ${daySales.length} ${daySales.length === 1 ? 'venta' : 'ventas'}`;
-  document.getElementById('tipsTotal').textContent = money.format(list.reduce((sum, entry) => sum + Number(entry.tip || 0), 0));
-  document.getElementById('cashTotal').textContent = money.format(Number(register.initialCash || 0) + paymentTotal(list, 'Efectivo') + salePaymentTotal(daySales, 'Efectivo') - advancePaymentTotal(dayAdvances, 'Efectivo') - expensePaymentTotal(dayExpenses, 'Efectivo'));
-  document.getElementById('mpTotal').textContent = money.format(Number(register.initialMp || 0) + paymentTotal(list, 'Mercado Pago') + salePaymentTotal(daySales, 'Mercado Pago') - advancePaymentTotal(dayAdvances, 'Mercado Pago') - expensePaymentTotal(dayExpenses, 'Mercado Pago'));
-  document.getElementById('barberColumns').innerHTML = barbers.map((barber) => barberColumn(barber, list)).join('');
+  const servicesTotal = list.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0);
+  const servicesInvoiced = list.reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const salesTotal = daySales.reduce((sum, sale) => sum + sale.total, 0);
+  const operationCount = list.length + daySales.length;
+  document.getElementById('dailyServicesTotal').textContent = money.format(servicesTotal);
+  document.getElementById('dailySalesTotal').textContent = money.format(salesTotal);
+  document.getElementById('dailyServicesCash').textContent = money.format(paymentTotal(list, 'Efectivo'));
+  document.getElementById('dailyServicesMp').textContent = money.format(paymentTotal(list, 'Mercado Pago'));
+  const dailyCashCuts = list.filter((entry) => dominantPayment(entry) === 'Efectivo').length;
+  const dailyMpCuts = list.length - dailyCashCuts;
+  document.getElementById('dailyCashCuts').textContent = `${dailyCashCuts} ${dailyCashCuts === 1 ? 'corte' : 'cortes'}`;
+  document.getElementById('dailyMpCuts').textContent = `${dailyMpCuts} ${dailyMpCuts === 1 ? 'corte' : 'cortes'}`;
+  document.getElementById('dailySalesCash').textContent = money.format(salePaymentTotal(daySales, 'Efectivo'));
+  document.getElementById('dailySalesMp').textContent = money.format(salePaymentTotal(daySales, 'Mercado Pago'));
+  document.getElementById('dailyCount').textContent = `${list.length} ${list.length === 1 ? 'corte' : 'cortes'}`;
+  document.getElementById('dailySalesCount').textContent = `${daySales.length} ${daySales.length === 1 ? 'venta' : 'ventas'}`;
+  document.getElementById('dailyAverageTicket').textContent = money.format(operationCount ? (servicesInvoiced + salesTotal) / operationCount : 0);
+  const cashBalance = dayBalance('Efectivo', list, daySales, dayAdvances, dayExpenses, dayTransfers);
+  const mpBalance = dayBalance('Mercado Pago', list, daySales, dayAdvances, dayExpenses, dayTransfers);
+  document.getElementById('cashTotal').textContent = money.format(cashBalance);
+  document.getElementById('mpTotal').textContent = money.format(mpBalance);
+  document.getElementById('transferCashAvailable').textContent = money.format(cashBalance);
+  document.getElementById('transferMpAvailable').textContent = money.format(mpBalance);
+  const barberColumns = document.getElementById('barberColumns');
+  barberColumns.innerHTML = (reorderingBarbers ? pendingBarberOrder : barbers).map((barber) => barberColumn(barber, list)).join('');
+  barberColumns.classList.toggle('reordering', reorderingBarbers);
   renderSales(daySales);
   renderAdvances(dayAdvances);
   renderExpenses(dayExpenses);
-  ['initialCash', 'initialMp'].forEach((name) => { openingCashForm.elements[name].value = name in register ? formatAmount(register[name]) : ''; });
-  ['realCash', 'realMp'].forEach((name) => { cashRegisterForm.elements[name].value = name in register ? formatAmount(register[name]) : ''; });
+  renderTransfers(dayTransfers, selectedOpeningAdjustments());
+  const previousClosing = opened ? null : previousClosedRegister(workday.value);
+  openingCashForm.elements.initialCash.value = 'initialCash' in register ? formatAmount(register.initialCash) : '';
+  openingCashForm.elements.initialMp.value = 'initialMp' in register ? formatAmount(register.initialMp) : previousClosing ? formatAmount(previousClosing.register.realMp) : '';
+  const inheritedMpHint = document.getElementById('inheritedMpHint');
+  inheritedMpHint.hidden = !previousClosing;
+  inheritedMpHint.textContent = previousClosing ? `Tomado del cierre de la jornada ${previousClosing.date}` : '';
+  ['realCash', 'realMp', 'withdrawal'].forEach((name) => { cashRegisterForm.elements[name].value = name in register ? formatAmount(register[name]) : name === 'withdrawal' ? '0' : ''; });
+  renderClosingDifferences(cashBalance, mpBalance);
   const openingStatus = document.getElementById('openingStatus');
   openingStatus.textContent = opened ? 'Jornada iniciada' : 'Pendiente';
   openingStatus.classList.toggle('open', opened);
@@ -216,8 +344,12 @@ function render() {
   document.getElementById('openingSaved').hidden = !opened || editingOpening;
   document.getElementById('openingCashValue').textContent = money.format(Number(register.initialCash || 0));
   document.getElementById('openingMpValue').textContent = money.format(Number(register.initialMp || 0));
-  openingCashForm.querySelector('button').textContent = opened ? 'Guardar cambios' : 'Iniciar jornada';
+  openingCashForm.querySelector('button[type="submit"]').textContent = opened ? 'Guardar cambios' : 'Iniciar jornada';
+  document.getElementById('openingEditDescription').hidden = !opened || !editingOpening;
+  document.getElementById('cancelOpeningEdit').hidden = !opened || !editingOpening;
+  openingCashForm.elements.editDescription.required = opened && editingOpening;
   ['addSale', 'addAdvance', 'addExpense'].forEach((id) => { document.getElementById(id).disabled = !opened; });
+  transferForm.querySelector('button').disabled = !opened;
   cashRegisterForm.querySelector('button').disabled = !opened;
   renderSummary();
 }
@@ -242,13 +374,13 @@ function barberColumn(barber, list) {
       <small class="cut-time">${escapeHtml(entry.time)}</small>
     </button>`).join('') : '<div class="barber-empty">Sin cortes cargados</div>';
   return `
-    <section class="barber-column">
+    <section class="barber-column" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
       <header class="barber-column-header">
-        <div><strong>${escapeHtml(barber)}</strong><span>${cuts.length} ${cuts.length === 1 ? 'corte' : 'cortes'}</span></div>
+        <strong>${escapeHtml(barber)}</strong>
         <button class="add-cut" type="button" data-barber="${escapeHtml(barber)}" aria-label="Registrar corte para ${escapeHtml(barber)}" title="Agregar corte" ${isDayOpen(workday.value) ? '' : 'disabled'}>+</button>
       </header>
       <div class="barber-services">${rows}</div>
-      <footer class="barber-column-total"><span>Total</span><strong>${money.format(total)}</strong></footer>
+      <footer class="barber-column-total"><span>Total</span><span class="barber-total-value"><strong>${money.format(total)}</strong><small>${cuts.length} ${cuts.length === 1 ? 'corte' : 'cortes'}</small></span></footer>
     </section>`;
 }
 
@@ -306,16 +438,67 @@ function openEditDialog(id) {
 }
 
 document.getElementById('barberColumns').addEventListener('click', (event) => {
+  if (reorderingBarbers) return;
   const cut = event.target.closest('[data-cut]');
   if (cut) return openDetail(cut.dataset.cut);
   const button = event.target.closest('[data-barber]');
   if (button) openCutDialog(button.dataset.barber);
 });
 
-document.querySelector('.nav').addEventListener('click', (event) => {
+function setBarberOrderMode(enabled) {
+  reorderingBarbers = enabled;
+  if (enabled) pendingBarberOrder = [...barbers];
+  const action = document.getElementById('reorderBarbers');
+  action.textContent = enabled ? 'Aplicar orden' : 'Ordenar columnas';
+  action.classList.toggle('primary-btn', enabled);
+  action.classList.toggle('secondary-btn', !enabled);
+  document.getElementById('cancelBarberOrder').hidden = !enabled;
+  document.getElementById('barberOrderHint').hidden = !enabled;
+  render();
+}
+
+document.getElementById('reorderBarbers').addEventListener('click', () => {
+  if (!reorderingBarbers) return setBarberOrderMode(true);
+  const order = [...document.querySelectorAll('[data-barber-column]')].map((column) => column.dataset.barberColumn);
+  if (order.length !== barbers.length || order.some((barber) => !barbers.includes(barber))) return;
+  config.barbers = [...order.map((name) => config.barbers.find((barber) => barber.name === name)), ...config.barbers.filter(({ name }) => !order.includes(name))];
+  reorderingBarbers = false;
+  saveConfig();
+  setBarberOrderMode(false);
+});
+document.getElementById('cancelBarberOrder').addEventListener('click', () => setBarberOrderMode(false));
+
+document.getElementById('barberColumns').addEventListener('dragstart', (event) => {
+  if (!reorderingBarbers) return;
+  const column = event.target.closest('[data-barber-column]');
+  if (!column) return;
+  column.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+});
+document.getElementById('barberColumns').addEventListener('dragover', (event) => {
+  const container = event.currentTarget;
+  const dragging = container.querySelector('.dragging');
+  const target = event.target.closest('[data-barber-column]');
+  if (!dragging || !target || dragging === target) return;
+  event.preventDefault();
+  const after = event.clientX > target.getBoundingClientRect().left + target.offsetWidth / 2;
+  container.insertBefore(dragging, after ? target.nextSibling : target);
+});
+document.getElementById('barberColumns').addEventListener('dragend', (event) => {
+  event.target.closest('[data-barber-column]')?.classList.remove('dragging');
+  pendingBarberOrder = [...document.querySelectorAll('[data-barber-column]')].map((column) => column.dataset.barberColumn);
+});
+
+document.getElementById('sidebarToggle').addEventListener('click', (event) => {
+  const expanded = document.querySelector('.app-shell').classList.toggle('sidebar-open');
+  event.currentTarget.setAttribute('aria-expanded', expanded);
+  event.currentTarget.setAttribute('aria-label', `${expanded ? 'Cerrar' : 'Abrir'} menú lateral`);
+});
+
+document.querySelector('.app-shell').addEventListener('click', (event) => {
   const button = event.target.closest('[data-view]');
   if (!button) return;
-  document.querySelectorAll('.nav-item').forEach((item) => {
+  document.querySelectorAll('[data-view]').forEach((item) => {
     item.classList.toggle('active', item === button);
     item.toggleAttribute('aria-current', item === button);
   });
@@ -337,6 +520,14 @@ document.getElementById('summaryDate').addEventListener('change', () => {
   renderSummary();
 });
 document.getElementById('summaryWeek').addEventListener('change', renderSummary);
+document.getElementById('summaryServiceOptions').addEventListener('change', () => {
+  const checked = [...document.querySelectorAll('#summaryServiceOptions input:checked')];
+  const summary = document.querySelector('#summaryServiceFilter summary');
+  summary.textContent = checked.length === config.services.length ? 'Todos los servicios' : checked.length === 1 ? checked[0].value : `${checked.length} servicios seleccionados`;
+  renderSummary();
+});
+document.getElementById('summaryBarberFilter').addEventListener('change', renderSummary);
+document.getElementById('summaryPaymentFilter').addEventListener('change', renderSummary);
 
 document.getElementById('addSale').addEventListener('click', () => openSaleDialog());
 ['click', 'keydown'].forEach((type) => document.getElementById('salesRows').addEventListener(type, (event) => {
@@ -357,6 +548,36 @@ document.getElementById('addExpense').addEventListener('click', () => openExpens
   if (row) openExpenseDetail(row.dataset.expense);
 }));
 [saleForm.elements.quantity, saleForm.elements.unitPrice].forEach((input) => input.addEventListener('input', updateSaleTotal));
+
+function syncTransferDirection(changed) {
+  const other = changed === transferForm.elements.from ? transferForm.elements.to : transferForm.elements.from;
+  other.value = changed.value === 'Efectivo' ? 'Mercado Pago' : 'Efectivo';
+}
+
+transferForm.elements.from.addEventListener('change', (event) => syncTransferDirection(event.target));
+transferForm.elements.to.addEventListener('change', (event) => syncTransferDirection(event.target));
+transferForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(transferForm));
+  const amount = parseAmount(values.amount);
+  const available = dayBalance(values.from);
+  values.description = values.description.trim();
+  transferForm.elements.amount.setCustomValidity(amount <= 0 ? 'El importe debe ser mayor que cero.' : amount > available ? 'El saldo disponible es insuficiente.' : '');
+  transferForm.elements.description.setCustomValidity(values.description ? '' : 'Ingresá una descripción.');
+  if (!transferForm.reportValidity()) return;
+  transfers.push({ ...values, amount, time: nowTime(), date: workday.value, id: crypto.randomUUID() });
+  saveTransfers();
+  transferForm.elements.amount.value = '';
+  transferForm.elements.description.value = '';
+  render();
+});
+document.getElementById('transferRows').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-delete-transfer]');
+  if (!button || !confirm('¿Eliminar este movimiento entre medios?')) return;
+  transfers = transfers.filter((transfer) => transfer.id !== button.dataset.deleteTransfer);
+  saveTransfers();
+  render();
+});
 
 saleForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -403,19 +624,43 @@ openingCashForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(openingCashForm));
   const current = cashRegisters[workday.value] || {};
-  cashRegisters[workday.value] = { ...current, initialCash: parseAmount(values.initialCash), initialMp: parseAmount(values.initialMp), opened: true, openedAt: current.openedAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+  const initialCash = parseAmount(values.initialCash);
+  const initialMp = parseAmount(values.initialMp);
+  const changed = isDayOpen(workday.value) && (initialCash !== Number(current.initialCash) || initialMp !== Number(current.initialMp));
+  const description = values.editDescription.trim();
+  openingCashForm.elements.editDescription.setCustomValidity(changed && !description ? 'Ingresá el motivo de la modificación.' : '');
+  if (!openingCashForm.reportValidity()) return;
+  if (changed) {
+    [['Efectivo', 'initialCash', initialCash], ['Mercado Pago', 'initialMp', initialMp]].forEach(([medium, key, value]) => {
+      if (value !== Number(current[key])) openingAdjustments.push({ id: crypto.randomUUID(), date: workday.value, time: nowTime(), medium, previous: Number(current[key]), current: value, description });
+    });
+    saveOpeningAdjustments();
+  }
+  cashRegisters[workday.value] = { ...current, initialCash, initialMp, opened: true, autoOpened: changed ? false : current.autoOpened, openedAt: current.openedAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
   saveCashRegisters();
   editingOpening = false;
+  openingCashForm.elements.editDescription.value = '';
   render();
 });
 
 cashRegisterForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(cashRegisterForm));
-  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), realCash: parseAmount(values.realCash), realMp: parseAmount(values.realMp), updatedAt: new Date().toISOString() };
+  const realCash = parseAmount(values.realCash);
+  const withdrawal = parseAmount(values.withdrawal);
+  cashRegisterForm.elements.withdrawal.setCustomValidity(withdrawal > realCash ? 'El retiro no puede superar el efectivo real.' : '');
+  if (!cashRegisterForm.reportValidity()) return;
+  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), realCash, realMp: parseAmount(values.realMp), withdrawal, closedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   saveCashRegisters();
+  const nextDate = shiftDate(workday.value, 1);
+  const nextRegister = cashRegisters[nextDate];
+  if (nextRegister?.autoOpened && nextRegister.inheritedFrom === workday.value) {
+    cashRegisters[nextDate] = { ...nextRegister, initialCash: Math.max(0, realCash - withdrawal), initialMp: parseAmount(values.realMp), updatedAt: new Date().toISOString() };
+    saveCashRegisters();
+  } else initializeOpening(nextDate);
   render();
 });
+[cashRegisterForm.elements.realCash, cashRegisterForm.elements.realMp, cashRegisterForm.elements.withdrawal].forEach((input) => input.addEventListener('input', () => renderClosingDifferences()));
 
 serviceInput.addEventListener('change', (event) => {
   amountInput.value = prices[event.target.value] ? formatAmount(prices[event.target.value]) : '';
@@ -438,7 +683,7 @@ form.addEventListener('submit', (event) => {
     return form.reportValidity();
   }
   const previous = entries.find((cut) => cut.id === editingId);
-  const commissionRate = previous?.commissionRate ?? config.commission;
+  const commissionRate = previous?.commissionRate ?? effectiveCommission(workday.value);
   const amount = parseAmount(values.amount);
   const entry = { ...values, date: workday.value, amount, tip: parseAmount(values.tip), cashAmount: parseAmount(values.cashAmount), mpAmount: parseAmount(values.mpAmount), commissionRate, commissionAmount: amount * commissionRate / 100, id: editingId || crypto.randomUUID() };
   entries = editingId ? entries.map((cut) => cut.id === editingId ? entry : cut) : [...entries, entry];
@@ -450,6 +695,13 @@ form.addEventListener('submit', (event) => {
 
 document.getElementById('editOpeningCash').addEventListener('click', () => {
   editingOpening = true;
+  openingCashForm.elements.editDescription.value = '';
+  render();
+});
+document.getElementById('cancelOpeningEdit').addEventListener('click', () => {
+  editingOpening = false;
+  openingCashForm.elements.editDescription.value = '';
+  openingCashForm.elements.editDescription.setCustomValidity('');
   render();
 });
 workday.addEventListener('change', () => {
@@ -515,33 +767,41 @@ barberConfigForm.addEventListener('submit', (event) => { event.preventDefault();
 document.getElementById('addServiceConfig').addEventListener('click', () => openConfigDialog('services'));
 document.getElementById('addProductConfig').addEventListener('click', () => openConfigDialog('products'));
 document.getElementById('addBarberConfig').addEventListener('click', () => openConfigDialog('barbers'));
+document.getElementById('barberConfigSearch').addEventListener('input', filterBarberConfig);
 Object.values(configDialogs).forEach((configDialog) => {
   configDialog.querySelector('.config-close').addEventListener('click', () => configDialog.close());
   configDialog.addEventListener('click', (event) => { if (event.target === configDialog) configDialog.close(); });
 });
 commissionForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  const history = config.commissionHistory?.length ? config.commissionHistory : [{ date: '0000-01-01', rate: config.commission }];
   config.commission = Number(commissionForm.elements.commission.value);
+  config.commissionHistory = [...history.filter(({ date }) => date !== today()), { date: today(), rate: config.commission }];
   saveConfig();
 });
 document.getElementById('changeCommission').addEventListener('click', () => {
-  dailyCommissionForm.elements.commission.value = config.commission;
+  dailyCommissionForm.elements.commission.value = effectiveCommission(workday.value);
   commissionDialog.showModal();
 });
 document.getElementById('closeCommissionDialog').addEventListener('click', () => commissionDialog.close());
 commissionDialog.addEventListener('click', (event) => { if (event.target === commissionDialog) commissionDialog.close(); });
 dailyCommissionForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  config.commission = Number(dailyCommissionForm.elements.commission.value);
+  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), commissionRate: Number(dailyCommissionForm.elements.commission.value) };
   commissionDialog.close();
-  saveConfig();
+  saveCashRegisters();
+  render();
 });
 document.getElementById('configView').addEventListener('click', (event) => {
-  const button = event.target.closest('[data-config-edit], [data-config-delete]');
+  const button = event.target.closest('[data-config-edit], [data-config-delete], [data-config-active]');
   if (!button) return;
-  const type = button.dataset.configEdit || button.dataset.configDelete;
+  const type = button.dataset.configEdit || button.dataset.configDelete || button.dataset.configActive;
   const item = config[type].find((current) => current.id === button.dataset.id);
   if (!item) return;
+  if (button.dataset.configActive) {
+    item.active = button.checked;
+    return saveConfig();
+  }
   if (button.dataset.configDelete) {
     if (configInUse(type, item.name)) return alert('No se puede eliminar porque tiene operaciones asociadas.');
     if (!confirm(`¿Eliminar ${item.name}?`)) return;
@@ -558,8 +818,20 @@ console.assert(paymentTotal([{ payment: 'Ambos', cashAmount: 500, mpAmount: 700 
 console.assert(salePaymentTotal([{ payment: 'Efectivo', total: 1500 }], 'Efectivo') === 1500);
 console.assert(advancePaymentTotal([{ payment: 'Efectivo', amount: 500 }], 'Efectivo') === 500);
 console.assert(expensePaymentTotal([{ payment: 'Mercado Pago', amount: 800 }], 'Mercado Pago') === 800);
-console.assert(barberBalance([{ amount: 90000 }], 4000, 5000) === 44000);
 console.assert(parseAmount('15.000') === 15000);
 console.assert(periodBounds('week', '2026-07', 1).join() === '2026-07-06,2026-07-12');
 console.assert(periodBounds('week', '2026-07', 4).join() === '2026-07-27,2026-08-02');
 console.assert(currentMonthWeek('2026-07-18') === 2);
+console.assert(new Set(barbers).size === barbers.length);
+console.assert(searchText('Julián') === 'julian');
+console.assert(matchesSearch('Julián', 'juli') && !matchesSearch('Julián', 'lian'));
+console.assert(defaultCommission('1900-01-01') === 50);
+console.assert(cashMovements([], [{ time: '10:00', medium: 'Efectivo', previous: 100, current: 150, description: 'Ajuste' }])[0].amount === 50);
+console.assert(transferTotal([{ from: 'Efectivo', to: 'Mercado Pago', amount: 1000 }], 'Efectivo') === -1000);
+console.assert(transferTotal([{ from: 'Efectivo', to: 'Mercado Pago', amount: 1000 }], 'Mercado Pago') === 1000);
+console.assert(previousClosedRegister('1900-01-01') === null);
+console.assert(dominantPayment({ payment: 'Ambos', cashAmount: 400, mpAmount: 600 }) === 'Mercado Pago');
+console.assert(dominantPayment({ payment: 'Ambos', cashAmount: 500, mpAmount: 500 }) === 'Efectivo');
+console.assert(shiftDate('2026-12-31', 1) === '2027-01-01');
+console.assert(summarize([{ amount: 1000, commissionAmount: 500 }], [{ total: 400 }], [], []).balance === 900);
+console.assert(summarize([{ amount: 900, tip: 100, payment: 'Ambos', cashAmount: 600, mpAmount: 400, commissionAmount: 450 }], [], [], [], 'Efectivo').services === 540);
