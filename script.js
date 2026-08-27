@@ -14,7 +14,6 @@ const integer = new Intl.NumberFormat('es-AR');
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
-const parseAmount = (value) => Number(String(value || '').replace(/\D/g, ''));
 const formatAmount = (value) => value === '' || value == null ? '' : integer.format(parseAmount(value));
 const searchText = (value) => String(value).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('es');
 const matchesSearch = (name, query) => searchText(name).startsWith(searchText(query));
@@ -245,25 +244,10 @@ function initializeOpening(date) {
   return true;
 }
 
-function paymentTotal(list, type) {
-  return list.reduce((sum, entry) => sum + (entry.payment === 'Ambos'
-    ? Number(type === 'Efectivo' ? entry.cashAmount : entry.mpAmount)
-    : entry.payment === type ? Number(entry.amount) + Number(entry.tip || 0) : 0), 0);
-}
-
-function transferTotal(list, type) {
-  return list.reduce((sum, transfer) => sum + (transfer.to === type ? transfer.amount : transfer.from === type ? -transfer.amount : 0), 0);
-}
-
-function dominantPayment(entry) {
-  if (entry.payment !== 'Ambos') return entry.payment;
-  return Number(entry.cashAmount) >= Number(entry.mpAmount) ? 'Efectivo' : 'Mercado Pago';
-}
-
 function dayBalance(type, list = selectedEntries(), daySales = selectedSales(), dayAdvances = selectedAdvances(), dayExpenses = selectedExpenses(), dayTransfers = selectedTransfers()) {
   const register = cashRegisters[workday.value] || {};
   const initial = Number(register[type === 'Efectivo' ? 'initialCash' : 'initialMp'] || 0);
-  return initial + paymentTotal(list, type) + salePaymentTotal(daySales, type) - advancePaymentTotal(dayAdvances, type) - expensePaymentTotal(dayExpenses, type) + transferTotal(dayTransfers, type);
+  return balance(type, initial, list, daySales, dayAdvances, dayExpenses, dayTransfers);
 }
 
 function renderClosingDifferences(cashTheoretical = dayBalance('Efectivo'), mpTheoretical = dayBalance('Mercado Pago')) {
@@ -813,25 +797,3 @@ document.getElementById('configView').addEventListener('click', (event) => {
 
 renderConfig();
 render();
-console.assert(paymentTotal([{ payment: 'Efectivo', amount: 1000, tip: 200 }], 'Efectivo') === 1200);
-console.assert(paymentTotal([{ payment: 'Ambos', cashAmount: 500, mpAmount: 700 }], 'Mercado Pago') === 700);
-console.assert(salePaymentTotal([{ payment: 'Efectivo', total: 1500 }], 'Efectivo') === 1500);
-console.assert(advancePaymentTotal([{ payment: 'Efectivo', amount: 500 }], 'Efectivo') === 500);
-console.assert(expensePaymentTotal([{ payment: 'Mercado Pago', amount: 800 }], 'Mercado Pago') === 800);
-console.assert(parseAmount('15.000') === 15000);
-console.assert(periodBounds('week', '2026-07', 1).join() === '2026-07-06,2026-07-12');
-console.assert(periodBounds('week', '2026-07', 4).join() === '2026-07-27,2026-08-02');
-console.assert(currentMonthWeek('2026-07-18') === 2);
-console.assert(new Set(barbers).size === barbers.length);
-console.assert(searchText('Julián') === 'julian');
-console.assert(matchesSearch('Julián', 'juli') && !matchesSearch('Julián', 'lian'));
-console.assert(defaultCommission('1900-01-01') === 50);
-console.assert(cashMovements([], [{ time: '10:00', medium: 'Efectivo', previous: 100, current: 150, description: 'Ajuste' }])[0].amount === 50);
-console.assert(transferTotal([{ from: 'Efectivo', to: 'Mercado Pago', amount: 1000 }], 'Efectivo') === -1000);
-console.assert(transferTotal([{ from: 'Efectivo', to: 'Mercado Pago', amount: 1000 }], 'Mercado Pago') === 1000);
-console.assert(previousClosedRegister('1900-01-01') === null);
-console.assert(dominantPayment({ payment: 'Ambos', cashAmount: 400, mpAmount: 600 }) === 'Mercado Pago');
-console.assert(dominantPayment({ payment: 'Ambos', cashAmount: 500, mpAmount: 500 }) === 'Efectivo');
-console.assert(shiftDate('2026-12-31', 1) === '2027-01-01');
-console.assert(summarize([{ amount: 1000, commissionAmount: 500 }], [{ total: 400 }], [], []).balance === 900);
-console.assert(summarize([{ amount: 900, tip: 100, payment: 'Ambos', cashAmount: 600, mpAmount: 400, commissionAmount: 450 }], [], [], [], 'Efectivo').services === 540);

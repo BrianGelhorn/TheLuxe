@@ -1,15 +1,3 @@
-function salePaymentTotal(list, type) {
-  return list.reduce((sum, sale) => sum + (sale.payment === type ? sale.total : 0), 0);
-}
-
-function advancePaymentTotal(list, type) {
-  return list.reduce((sum, advance) => sum + (advance.payment === type ? advance.amount : 0), 0);
-}
-
-function expensePaymentTotal(list, type) {
-  return list.reduce((sum, expense) => sum + (expense.payment === type ? expense.amount : 0), 0);
-}
-
 function renderSales(list) {
   document.getElementById('salesRows').innerHTML = list.sort((a, b) => a.time.localeCompare(b.time)).map((sale) => `
     <tr data-sale="${escapeHtml(sale.id)}" tabindex="0">
@@ -58,45 +46,6 @@ function renderTransfers(list, adjustments = []) {
   document.getElementById('transfersEmpty').hidden = movements.length > 0;
 }
 
-function isoDate(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function monthWeeks(value) {
-  const [year, month] = value.split('-').map(Number);
-  const firstMonday = new Date(year, month - 1, 1);
-  firstMonday.setDate(firstMonday.getDate() + ((8 - firstMonday.getDay()) % 7));
-  const lastDay = new Date(year, month, 0);
-  return Math.ceil((lastDay - firstMonday + 86400000) / 604800000);
-}
-
-function currentMonthWeek(value) {
-  const date = new Date(`${value}T00:00:00`);
-  const firstMonday = new Date(date.getFullYear(), date.getMonth(), 1);
-  firstMonday.setDate(firstMonday.getDate() + ((8 - firstMonday.getDay()) % 7));
-  return Math.max(1, Math.min(monthWeeks(value.slice(0, 7)), Math.floor((date - firstMonday) / 604800000) + 1));
-}
-
-function periodBounds(period, value, week = 1) {
-  let start;
-  let end;
-  if (period === 'week') {
-    const [year, month] = value.split('-').map(Number);
-    start = new Date(year, month - 1, 1);
-    start.setDate(start.getDate() + ((8 - start.getDay()) % 7) + (Number(week) - 1) * 7);
-    end = new Date(start);
-    end.setDate(start.getDate() + 6);
-  } else if (period === 'month') {
-    const [year, month] = value.split('-').map(Number);
-    start = new Date(year, month - 1, 1);
-    end = new Date(year, month, 0);
-  } else {
-    start = new Date(Number(value), 0, 1);
-    end = new Date(Number(value), 11, 31);
-  }
-  return [isoDate(start), isoDate(end)];
-}
-
 function updateSummaryReference() {
   const period = document.getElementById('summaryPeriod').value;
   const input = document.getElementById('summaryDate');
@@ -116,32 +65,6 @@ function updateWeekOptions() {
   select.innerHTML = Array.from({ length: count }, (_, index) => `<option value="${index + 1}">Semana ${index + 1}</option>`).join('');
 }
 
-function cutValueByPayment(cuts, type, field) {
-  return cuts.reduce((sum, cut) => {
-    if (cut.payment !== 'Ambos') return sum + (cut.payment === type ? Number(cut[field] || 0) : 0);
-    const total = Number(cut.amount) + Number(cut.tip || 0);
-    const paid = Number(type === 'Efectivo' ? cut.cashAmount : cut.mpAmount);
-    return sum + (total ? paid * Number(cut[field] || 0) / total : 0);
-  }, 0);
-}
-
-function summarize(cuts, periodSales, periodAdvances, periodExpenses = [], payment = 'Ambas') {
-  const services = payment === 'Ambas' ? cuts.reduce((sum, cut) => sum + Number(cut.amount), 0) : cutValueByPayment(cuts, payment, 'amount');
-  const tips = payment === 'Ambas' ? cuts.reduce((sum, cut) => sum + Number(cut.tip || 0), 0) : cutValueByPayment(cuts, payment, 'tip');
-  const salesTotal = periodSales.reduce((sum, sale) => sum + sale.total, 0);
-  const advancesTotal = periodAdvances.reduce((sum, advance) => sum + advance.amount, 0);
-  const expensesTotal = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.commissionAmount ?? Number(cut.amount) * defaultCommission(cut.date) / 100) }));
-  const commission = payment === 'Ambas' ? commissionCuts.reduce((sum, cut) => sum + cut.commission, 0) : cutValueByPayment(commissionCuts, payment, 'commission');
-  const cutCount = payment === 'Ambas' ? cuts.length : cuts.filter((cut) => dominantPayment(cut) === payment).length;
-  return {
-    cuts: cutCount, saleCount: periodSales.length, services, sales: salesTotal, tips, commission, advances: advancesTotal, expenses: expensesTotal,
-    invoiced: services + salesTotal, balance: services + salesTotal - commission,
-    cash: paymentTotal(cuts, 'Efectivo') + salePaymentTotal(periodSales, 'Efectivo') - advancePaymentTotal(periodAdvances, 'Efectivo') - expensePaymentTotal(periodExpenses, 'Efectivo'),
-    mp: paymentTotal(cuts, 'Mercado Pago') + salePaymentTotal(periodSales, 'Mercado Pago') - advancePaymentTotal(periodAdvances, 'Mercado Pago') - expensePaymentTotal(periodExpenses, 'Mercado Pago'),
-  };
-}
-
 function renderSummary() {
   const period = document.getElementById('summaryPeriod').value;
   const [from, to] = periodBounds(period, document.getElementById('summaryDate').value, document.getElementById('summaryWeek').value);
@@ -154,7 +77,7 @@ function renderSummary() {
   const periodSales = selectedBarber ? [] : sales.filter((sale) => inRange(sale) && matchesPayment(sale));
   const periodAdvances = advances.filter((advance) => inRange(advance) && (!selectedBarber || advance.barber === selectedBarber) && matchesPayment(advance));
   const periodExpenses = selectedBarber ? [] : expenses.filter((expense) => inRange(expense) && matchesPayment(expense));
-  const total = summarize(periodCuts, periodSales, periodAdvances, periodExpenses, payment);
+  const total = summarize(periodCuts, periodSales, periodAdvances, periodExpenses, payment, defaultCommission);
   const dateLabel = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   document.getElementById('summaryRange').textContent = `${dateLabel.format(new Date(`${from}T00:00:00`))} — ${dateLabel.format(new Date(`${to}T00:00:00`))}`;
   document.getElementById('summaryCuts').textContent = `${total.cuts} ${total.cuts === 1 ? 'corte' : 'cortes'}`;
@@ -189,7 +112,7 @@ function renderSummary() {
   document.getElementById('summaryBreakdownTitle').textContent = period === 'year' ? 'Resumen por mes' : 'Resumen por día';
   document.getElementById('summaryRows').innerHTML = keys.map((key) => {
     const matches = (item) => groupKey(item) === key;
-    const row = summarize(periodCuts.filter(matches), periodSales.filter(matches), periodAdvances.filter(matches), periodExpenses.filter(matches), payment);
+    const row = summarize(periodCuts.filter(matches), periodSales.filter(matches), periodAdvances.filter(matches), periodExpenses.filter(matches), payment, defaultCommission);
     const rowWithdrawal = selectedBarber || payment === 'Mercado Pago' ? 0 : Object.entries(cashRegisters)
       .filter(([date]) => date >= from && date <= to && groupKey({ date }) === key)
       .reduce((sum, [, register]) => sum + Number(register.withdrawal || 0), 0);

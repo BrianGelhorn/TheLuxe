@@ -1,6 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "prebuild": "npm test",
+    "build": "node build.mjs",
+    "test": "node test/page.test.mjs"
   }
 }
