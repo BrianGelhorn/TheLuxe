@@ -160,7 +160,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .config-active { display: flex; align-items: center; gap: 5px; padding: 0 5px; color: var(--muted); font-size: .76rem; cursor: pointer; }
 .config-active input { width: auto; accent-color: var(--gold); }
 
-.barber-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(165px, 1fr); align-items: stretch; gap: 8px; overflow-x: auto; }
+.barber-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(165px, calc((100% - 48px) / 7)); align-items: stretch; gap: 8px; overflow-x: auto; }
 .barber-column { min-width: 165px; border: 1px solid var(--line); border-radius: 12px; background: #111; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; }
 .barber-columns.reordering .barber-column { cursor: grab; outline: 1px dashed var(--gold); outline-offset: -3px; }
 .barber-columns.reordering .barber-column:active { cursor: grabbing; }
