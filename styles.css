@@ -97,6 +97,9 @@ textarea { resize: vertical; }
 .info-tip { position: relative; flex: 0 0 auto; width: 18px; height: 18px; padding: 0; border: 1px solid #6e5936; border-radius: 50%; background: transparent; color: var(--gold); cursor: help; font-size: .68rem; font-weight: 800; line-height: 16px; }
 .info-tip::after { content: attr(data-tip); position: absolute; z-index: 100; left: 50%; bottom: calc(100% + 8px); width: max-content; max-width: 250px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: #242424; color: var(--text); box-shadow: 0 10px 28px #000b; opacity: 0; pointer-events: none; transform: translate(-50%, 4px); transition: opacity .15s ease, transform .15s ease; white-space: normal; font-size: .72rem; font-weight: 500; line-height: 1.35; }
 .info-tip:hover::after, .info-tip:focus::after { opacity: 1; transform: translate(-50%, 0); }
+.card-sheet-title { display: flex; align-items: center; gap: 8px; }
+.card-structure-help::after { left: auto; right: 0; top: calc(100% + 8px); bottom: auto; width: 250px; max-width: calc(100vw - 40px); text-align: left; white-space: pre-line; transform: translateY(4px); }
+.card-structure-help:hover::after, .card-structure-help:focus::after { transform: translateY(0); }
 .summary-secondary { grid-column: span 3; display: grid; gap: 5px; min-width: 0; padding: 12px 14px; }
 .summary-secondary > span { min-width: 0; }
 .summary-secondary strong { margin: 0; min-width: 0; overflow: hidden; font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -160,8 +163,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .config-active { display: flex; align-items: center; gap: 5px; padding: 0 5px; color: var(--muted); font-size: .76rem; cursor: pointer; }
 .config-active input { width: auto; accent-color: var(--gold); }
 
-.barber-columns { display: grid; grid-template-rows: auto 1fr auto; grid-auto-flow: column; grid-auto-columns: minmax(165px, calc((100% - 48px) / 7)); align-items: stretch; column-gap: 8px; row-gap: 0; overflow-x: auto; }
-.barber-column { min-width: 165px; border: 1px solid var(--line); border-radius: 12px; background: #111; overflow: hidden; display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; }
+.barber-columns { display: grid; grid-template-rows: auto 1fr auto; grid-auto-flow: column; grid-auto-columns: minmax(230px, calc((100% - 48px) / 7)); align-items: stretch; column-gap: 8px; row-gap: 0; overflow-x: auto; }
+.barber-column { min-width: 230px; border: 1px solid var(--line); border-radius: 12px; background: #111; overflow: hidden; display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; }
 .barber-column.is-paid { border-color: #43624f; background: #141c17; }
 .barber-column.is-paid .barber-column-header { border-bottom-color: #36483b; background: #1b2820; }
 .barber-column.is-paid .barber-services { background: #1e2922; }
@@ -177,21 +180,21 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .barber-column-header span { display: block; margin-top: 3px; color: var(--gold); font-size: .78rem; }
 .add-cut { flex: 0 0 auto; width: 28px; height: 28px; border: 1px solid #6e5936; border-radius: 50%; background: var(--gold); color: #17120b; cursor: pointer; font-size: 1.1rem; font-weight: 800; line-height: 1; }
 .barber-services { display: grid; align-content: start; gap: 1px; min-height: 72px; background: var(--line); }
-.barber-service { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 80px; align-content: start; gap: 1px 5px; width: 100%; height: 72px; padding: 5px 8px; overflow: hidden; border: 0; border-radius: 6px; background: var(--surface); color: inherit; text-align: left; cursor: pointer; }
+.barber-service { display: grid; grid-template-columns: minmax(0, 1fr) minmax(76px, .8fr); grid-template-areas: "summary prices" "note note"; align-content: start; align-items: start; gap: 6px 10px; width: 100%; min-height: 60px; padding: 7px 10px; border: 0; border-radius: 6px; background: var(--surface); color: inherit; text-align: left; cursor: pointer; }
 .barber-service:hover { background: var(--surface-2); }
-.barber-service strong { align-self: start; overflow: hidden; font-size: .82rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.cut-summary { grid-area: summary; display: grid; align-content: start; gap: 3px; min-width: 0; }
+.barber-service strong { min-width: 0; font-size: .82rem; line-height: 1.3; overflow-wrap: anywhere; }
 .barber-service small { color: var(--muted); font-size: .68rem; }
-.service-prices { position: absolute; top: 5px; right: 8px; display: grid; justify-items: end; gap: 1px; width: max-content; max-width: 100%; white-space: nowrap; }
-.service-prices > * { width: max-content; }
-.price-breakdown { display: grid; justify-items: end; gap: 1px; }
-.price-breakdown small { line-height: 1.1; }
+.service-prices { grid-area: prices; display: grid; justify-items: end; gap: 2px; min-width: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.service-prices > * { min-width: 0; max-width: 100%; }
+.price-breakdown { display: grid; justify-items: end; gap: 2px; }
+.price-breakdown small { max-width: 100%; line-height: 1.25; }
 .service-prices b { color: var(--gold); font-size: .78rem; }
 .service-prices .cash-price { color: #62a976; }
 .service-prices .mp-price { color: #5599e8; }
 .service-prices .tip-price { color: var(--muted); }
-.payment-detail { grid-column: 1; min-width: 0; white-space: nowrap; }
-.service-note { grid-column: 1; align-self: end; overflow-wrap: anywhere; }
-.cut-time { position: absolute; right: 8px; bottom: 5px; width: max-content; white-space: nowrap; }
+.service-note { grid-area: note; min-width: 0; padding-top: 4px; border-top: 1px solid var(--line); line-height: 1.35; overflow-wrap: anywhere; }
+.cut-time { line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .barber-empty { padding: 20px 12px; background: var(--surface); color: var(--muted); text-align: center; font-size: .8rem; }
 .barber-column-footer { border-top: 1px solid var(--line); }
 .barber-column-total { display: flex; justify-content: space-between; padding: 10px 12px; font-size: .82rem; }

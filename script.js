@@ -375,19 +375,20 @@ function barberColumn(barber, list) {
   const paymentMethods = ['No pago', 'Efectivo', 'Mercado Pago', 'Mixto'].map((method) => `<button type="button" class="payment-method-option" data-barber-payment-method="${method}" aria-pressed="${method === paymentStatus}" aria-label="${method} para ${escapeHtml(barber)}" title="${method}" ${reorderingBarbers ? 'disabled' : ''}>${method === 'Mercado Pago' ? 'MP' : method}</button>`).join('');
   const rows = cuts.length ? cuts.map((entry) => `
     <button class="barber-service" type="button" data-cut="${escapeHtml(entry.id)}">
-      <strong class="service-name">${escapeHtml(entry.service)}</strong>
+      <span class="cut-summary">
+        <strong class="service-name">${escapeHtml(entry.service)}</strong>
+        <small class="cut-time">${escapeHtml(entry.time)}</small>
+      </span>
       <span class="service-prices">
-        <b>${money.format(Number(entry.amount) + Number(entry.tip || 0))}</b>
+        <b class="${entry.payment === 'Efectivo' ? 'cash-price' : entry.payment === 'Mercado Pago' ? 'mp-price' : ''}">${money.format(Number(entry.amount) + Number(entry.tip || 0))}</b>
         <span class="price-breakdown">
           ${entry.payment === 'Ambos' ? `
-            <small class="cash-price">${money.format(Number(entry.cashAmount))}</small>
-            <small class="mp-price">${money.format(Number(entry.mpAmount))}</small>` : ''}
-          ${Number(entry.tip) ? `<small class="tip-price">${money.format(Number(entry.tip))}</small>` : ''}
+            <small class="cash-price" aria-label="Efectivo: ${money.format(Number(entry.cashAmount))}">${money.format(Number(entry.cashAmount))}</small>
+            <small class="mp-price" aria-label="Mercado Pago: ${money.format(Number(entry.mpAmount))}">${money.format(Number(entry.mpAmount))}</small>` : ''}
+          ${Number(entry.tip) ? `<small class="tip-price" aria-label="Propina: ${money.format(Number(entry.tip))}">${money.format(Number(entry.tip))}</small>` : ''}
         </span>
       </span>
-      <small class="payment-detail">${entry.payment === 'Mercado Pago' ? 'MP' : escapeHtml(entry.payment)}</small>
       ${entry.notes ? `<small class="service-note">Nota: ${escapeHtml(entry.notes)}</small>` : ''}
-      <small class="cut-time">${escapeHtml(entry.time)}</small>
     </button>`).join('') : '<div class="barber-empty">Sin cortes cargados</div>';
   return `
     <section class="barber-column${paymentState.isPaid ? ' is-paid' : paymentState.mixed ? ' is-payment-incomplete' : ''}" data-payment-due="${payout.total}" data-payment-status="${escapeHtml(paymentStatus)}" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
