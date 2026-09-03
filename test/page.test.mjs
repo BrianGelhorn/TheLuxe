@@ -53,6 +53,66 @@ test('calcula los saldos diarios completos', () => {
   assert.equal(logic.balance('Mercado Pago', 2000, cuts, sales, advances, expenses, transfers), 4900);
 });
 
+test('el pago del barbero suma comisión de cortes y todas las propinas', () => {
+  const payout = logic.barberPayout(cuts, () => 80);
+  assert.equal(payout.tips, 300);
+  assert.equal(payout.commission, 1950, 'respeta la comisión guardada aunque cambie el porcentaje del día');
+  assert.equal(payout.total, 2250);
+  assert.equal(logic.barberPayout([], () => 50).total, 0);
+});
+
+test('la comisión respeta el valor guardado, luego el porcentaje del corte y finalmente el de la fecha', () => {
+  const payout = logic.barberPayout([
+    { date: '2026-09-01', amount: 1000, tip: 100, commissionAmount: 0, commissionRate: 50 },
+    { date: '2026-09-01', amount: 1000, tip: 200, commissionRate: 40 },
+    { date: '2026-09-02', amount: 1000, tip: 300 },
+    { date: '2026-09-01', amount: 1000, commissionRate: 0 },
+  ], (date) => date === '2026-09-02' ? 60 : 50);
+  assert.equal(payout.commission, 1000);
+  assert.equal(payout.tips, 600, 'las propinas no llevan descuento de comisión');
+  assert.equal(payout.total, 1600);
+  const fractional = logic.barberPayout([{ amount: 101, commissionRate: 50 }, { amount: 101, commissionRate: 50 }]);
+  assert.equal(fractional.total, 101, 'redondea al final, no por cada corte');
+  assert.equal(logic.barberPayout([{ amount: 101, commissionRate: 50 }]).total, 51);
+});
+
+test('mixto solo queda completo cuando cubre el total a pagar', () => {
+  const state = (cashAmount, mpAmount, total = 25500) => logic.barberPaymentState({ status: 'Mixto', cashAmount, mpAmount }, total);
+  const empty = state('', '');
+  assert.equal(empty.isPaid, false);
+  assert.equal(empty.label, 'Mixto · Incompleto');
+  assert.equal(empty.remaining, 25500);
+  const partial = state(12000, 13000);
+  assert.equal(partial.paidAmount, 25000);
+  assert.equal(partial.isPaid, false);
+  assert.equal(partial.remaining, 500);
+  const complete = state(12000, 13500);
+  assert.equal(complete.isPaid, true);
+  assert.equal(complete.label, 'Mixto · Completo');
+  assert.equal(complete.remaining, 0);
+  assert.equal(complete.excess, 0);
+  const extra = state(12000, 14000);
+  assert.equal(extra.isPaid, true);
+  assert.equal(extra.excess, 500);
+  assert.equal(extra.remaining, 0);
+  assert.equal(state(12000, 13500, 26000).isPaid, false, 'un corte nuevo puede dejar el pago incompleto');
+  assert.equal(state(12000, '', 25500).isPaid, false, 'vaciar un monto vuelve a calcular el estado');
+  assert.equal(state(0, 25500).isPaid, true);
+  assert.equal(state('', '', 0).isPaid, true, 'sin importe pendiente no falta pagar');
+});
+
+test('los pagos simples siguen siendo de un clic e ignoran los importes mixtos retenidos', () => {
+  for (const status of ['Efectivo', 'Mercado Pago']) {
+    const state = logic.barberPaymentState({ status, cashAmount: '', mpAmount: '' }, 25500);
+    assert.equal(state.mixed, false);
+    assert.equal(state.isPaid, true);
+    assert.equal(state.label, status === 'Mercado Pago' ? 'Pagado · MP' : 'Pagado · Efectivo');
+  }
+  const unpaid = logic.barberPaymentState({ status: 'No pago', cashAmount: 12000, mpAmount: 13500 }, 25500);
+  assert.equal(unpaid.isPaid, false);
+  assert.equal(unpaid.label, 'No pago');
+});
+
 test('resume facturación, comisiones y filtros por medio de pago', () => {
   const total = logic.summarize(cuts, sales, advances, expenses, 'Ambas', () => 50);
   assert.deepEqual(JSON.parse(JSON.stringify(total)), {

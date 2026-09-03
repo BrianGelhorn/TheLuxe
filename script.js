@@ -66,6 +66,7 @@ let expenses = [];
 let transfers = [];
 let openingAdjustments = [];
 let cashRegisters = { [today()]: { initialCash: 50000, initialMp: 80000, opened: true } };
+let barberPayments = {};
 let editingId = null;
 let selectedId = null;
 let editingSaleId = null;
@@ -156,6 +157,7 @@ function saveCatalog(type, formElement) {
     if (type === 'barbers') {
       entries = entries.map((entry) => entry.barber === existing?.name ? { ...entry, barber: item.name } : entry);
       advances = advances.map((advance) => advance.barber === existing?.name ? { ...advance, barber: item.name } : advance);
+      barberPayments = Object.fromEntries(Object.entries(barberPayments).map(([date, payments]) => [date, Object.fromEntries(Object.entries(payments).map(([barber, payment]) => [barber === existing.name ? item.name : barber, payment]))]));
     }
     save(); saveSales(); saveAdvances();
   }
@@ -205,6 +207,31 @@ function selectedTransfers() {
 
 function selectedOpeningAdjustments() {
   return openingAdjustments.filter((adjustment) => adjustment.date === workday.value);
+}
+
+function barberPaymentRecord(barber, date = workday.value) {
+  const record = barberPayments[date]?.[barber];
+  if (!record) return { status: 'No pago', cashAmount: '', mpAmount: '' };
+  if (typeof record === 'string') return { status: record, cashAmount: '', mpAmount: '' };
+  return { status: record.status || 'No pago', cashAmount: record.cashAmount ?? '', mpAmount: record.mpAmount ?? '' };
+}
+
+function updateBarberPaymentColumn(column, payment) {
+  const state = barberPaymentState(payment, Number(column.dataset.paymentDue));
+  const mixed = state.mixed;
+  column.classList.toggle('is-paid', state.isPaid);
+  column.classList.toggle('is-payment-incomplete', mixed && !state.isPaid);
+  column.dataset.paymentStatus = payment.status;
+  column.querySelector('[data-payment-label]').textContent = state.label;
+  column.querySelector('.payment-disclosure').title = `Pago del día: ${state.label}`;
+  column.querySelectorAll('[data-barber-payment-method]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.barberPaymentMethod === payment.status));
+  });
+  column.querySelector('.payment-inline-split').hidden = !mixed;
+  column.querySelectorAll('[data-payment-amount]').forEach((input) => { input.disabled = !mixed || reorderingBarbers; });
+  column.querySelector('[data-payment-sum]').textContent = money.format(state.paidAmount);
+  column.querySelector('[data-payment-balance-label]').textContent = state.excess ? 'De más' : 'Falta pagar';
+  column.querySelector('[data-payment-balance]').textContent = money.format(state.excess || state.remaining);
 }
 
 function isDayOpen(date) {
@@ -341,6 +368,11 @@ function render() {
 function barberColumn(barber, list) {
   const cuts = list.filter((entry) => entry.barber === barber).sort((a, b) => a.time.localeCompare(b.time));
   const total = cuts.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0);
+  const payment = barberPaymentRecord(barber);
+  const paymentStatus = payment.status;
+  const payout = barberPayout(cuts, effectiveCommission);
+  const paymentState = barberPaymentState(payment, payout.total);
+  const paymentMethods = ['No pago', 'Efectivo', 'Mercado Pago', 'Mixto'].map((method) => `<button type="button" class="payment-method-option" data-barber-payment-method="${method}" aria-pressed="${method === paymentStatus}" aria-label="${method} para ${escapeHtml(barber)}" title="${method}" ${reorderingBarbers ? 'disabled' : ''}>${method === 'Mercado Pago' ? 'MP' : method}</button>`).join('');
   const rows = cuts.length ? cuts.map((entry) => `
     <button class="barber-service" type="button" data-cut="${escapeHtml(entry.id)}">
       <strong class="service-name">${escapeHtml(entry.service)}</strong>
@@ -358,13 +390,36 @@ function barberColumn(barber, list) {
       <small class="cut-time">${escapeHtml(entry.time)}</small>
     </button>`).join('') : '<div class="barber-empty">Sin cortes cargados</div>';
   return `
-    <section class="barber-column" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
+    <section class="barber-column${paymentState.isPaid ? ' is-paid' : paymentState.mixed ? ' is-payment-incomplete' : ''}" data-payment-due="${payout.total}" data-payment-status="${escapeHtml(paymentStatus)}" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
       <header class="barber-column-header">
         <strong>${escapeHtml(barber)}</strong>
         <button class="add-cut" type="button" data-barber="${escapeHtml(barber)}" aria-label="Registrar corte para ${escapeHtml(barber)}" title="Agregar corte" ${isDayOpen(workday.value) ? '' : 'disabled'}>+</button>
       </header>
       <div class="barber-services">${rows}</div>
-      <footer class="barber-column-total"><span>Total</span><span class="barber-total-value"><strong>${money.format(total)}</strong><small>${cuts.length} ${cuts.length === 1 ? 'corte' : 'cortes'}</small></span></footer>
+      <footer class="barber-column-footer">
+        <div class="barber-column-total"><span>Total</span><span class="barber-total-value"><strong>${money.format(total)}</strong><small>${cuts.length} ${cuts.length === 1 ? 'corte' : 'cortes'}</small></span></div>
+        <dl class="payment-breakdown">
+          <div><dt>Propinas</dt><dd>${money.format(payout.tips)}</dd></div>
+          <div title="Suma de los cortes con su comisión aplicada, sin propinas"><dt>Comisión</dt><dd>${money.format(payout.commission)}</dd></div>
+          <div class="payment-amount-due" title="Comisión de los cortes más propinas; no descuenta adelantos"><dt>Total a pagar</dt><dd>${money.format(payout.total)}</dd></div>
+        </dl>
+        <details class="barber-payment-control">
+          <summary class="payment-disclosure" title="Pago del día: ${escapeHtml(paymentState.label)}" ${reorderingBarbers ? 'aria-disabled="true"' : ''}>
+            <span class="payment-disclosure-mark" aria-hidden="true"></span>
+            <span data-payment-label aria-live="polite">${paymentState.label}</span>
+            <span class="payment-disclosure-chevron" aria-hidden="true"></span>
+          </summary>
+          <div class="payment-dropdown-content">
+          <div class="payment-method-options" role="group" aria-label="Pago del día de ${escapeHtml(barber)}">${paymentMethods}</div>
+          <div class="payment-inline-split" ${paymentStatus === 'Mixto' ? '' : 'hidden'}>
+            <label><span>Efectivo</span><span class="payment-inline-money"><span aria-hidden="true">$</span><input type="text" inputmode="numeric" autocomplete="off" placeholder="0" data-payment-amount="cashAmount" aria-label="Efectivo del pago de ${escapeHtml(barber)}" value="${escapeHtml(formatAmount(payment.cashAmount))}" ${paymentStatus !== 'Mixto' || reorderingBarbers ? 'disabled' : ''}></span></label>
+            <label><span title="Mercado Pago">MP</span><span class="payment-inline-money"><span aria-hidden="true">$</span><input type="text" inputmode="numeric" autocomplete="off" placeholder="0" data-payment-amount="mpAmount" aria-label="Mercado Pago del pago de ${escapeHtml(barber)}" value="${escapeHtml(formatAmount(payment.mpAmount))}" ${paymentStatus !== 'Mixto' || reorderingBarbers ? 'disabled' : ''}></span></label>
+            <div class="payment-inline-total"><span>Total pagado</span><strong data-payment-sum>${money.format(paymentState.paidAmount)}</strong></div>
+            <div class="payment-inline-total payment-balance"><span data-payment-balance-label>${paymentState.excess ? 'De más' : 'Falta pagar'}</span><strong data-payment-balance aria-live="polite">${money.format(paymentState.excess || paymentState.remaining)}</strong></div>
+          </div>
+          </div>
+        </details>
+      </footer>
     </section>`;
 }
 
@@ -422,11 +477,44 @@ function openEditDialog(id) {
 }
 
 document.getElementById('barberColumns').addEventListener('click', (event) => {
-  if (reorderingBarbers) return;
+  if (reorderingBarbers) {
+    if (event.target.closest('.barber-payment-control')) event.preventDefault();
+    return;
+  }
+  const paymentMethod = event.target.closest('[data-barber-payment-method]');
+  if (paymentMethod) {
+    const column = paymentMethod.closest('[data-barber-column]');
+    const barber = column.dataset.barberColumn;
+    const payment = { ...barberPaymentRecord(barber), status: paymentMethod.dataset.barberPaymentMethod };
+    barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: payment };
+    updateBarberPaymentColumn(column, payment);
+    if (payment.status === 'Mixto') column.querySelector('[data-payment-amount]').focus({ preventScroll: true });
+    return;
+  }
   const cut = event.target.closest('[data-cut]');
   if (cut) return openDetail(cut.dataset.cut);
   const button = event.target.closest('[data-barber]');
   if (button) openCutDialog(button.dataset.barber);
+});
+
+document.getElementById('barberColumns').addEventListener('input', (event) => {
+  const input = event.target.closest('[data-payment-amount]');
+  if (!input || reorderingBarbers) return;
+  const column = input.closest('[data-barber-column]');
+  const barber = column.dataset.barberColumn;
+  const payment = barberPaymentRecord(barber);
+  if (payment.status !== 'Mixto') return;
+  const field = input.dataset.paymentAmount;
+  if (!['cashAmount', 'mpAmount'].includes(field)) return;
+  const digitsBeforeCaret = input.value.slice(0, input.selectionStart ?? input.value.length).replace(/\D/g, '').length;
+  input.value = formatAmount(input.value);
+  let caret = 0;
+  let digits = 0;
+  while (caret < input.value.length && digits < digitsBeforeCaret) { if (/\d/.test(input.value[caret])) digits++; caret++; }
+  input.setSelectionRange(caret, caret);
+  const updated = { ...payment, [field]: input.value === '' ? '' : parseAmount(input.value) };
+  barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: updated };
+  updateBarberPaymentColumn(column, updated);
 });
 
 function setBarberOrderMode(enabled) {

@@ -32,6 +32,23 @@
     return Number(initial || 0) + paymentTotal(cuts, type) + salePaymentTotal(sales, type) - advancePaymentTotal(advances, type) - expensePaymentTotal(expenses, type) + transferTotal(transfers, type);
   }
 
+  function barberPayout(cuts, commissionAt = () => 0) {
+    const tips = cuts.reduce((sum, cut) => sum + Number(cut.tip || 0), 0);
+    const earnedCommission = cuts.reduce((sum, cut) => sum + Number(cut.commissionAmount ?? Number(cut.amount) * (cut.commissionRate ?? commissionAt(cut.date)) / 100), 0);
+    // The daily payment fields and currency display use whole pesos; round once after summing.
+    const commission = Math.round(earnedCommission);
+    return { tips, commission, total: commission + tips };
+  }
+
+  function barberPaymentState(payment, totalDue) {
+    const mixed = payment.status === 'Mixto';
+    const paidAmount = Number(payment.cashAmount || 0) + Number(payment.mpAmount || 0);
+    const isPaid = mixed ? paidAmount >= totalDue : ['Efectivo', 'Mercado Pago'].includes(payment.status);
+    const label = mixed ? `Mixto · ${isPaid ? 'Completo' : 'Incompleto'}`
+      : isPaid ? `Pagado · ${payment.status === 'Mercado Pago' ? 'MP' : payment.status}` : 'No pago';
+    return { mixed, paidAmount, isPaid, label, remaining: Math.max(0, totalDue - paidAmount), excess: Math.max(0, paidAmount - totalDue) };
+  }
+
   function isoDate(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
@@ -101,6 +118,6 @@
     };
   }
 
-  root.TheLuxeLogic = Object.freeze({ parseAmount, salePaymentTotal, advancePaymentTotal, expensePaymentTotal, paymentTotal, transferTotal, dominantPayment, balance, isoDate, monthWeeks, currentMonthWeek, periodBounds, cutValueByPayment, summarize });
+  root.TheLuxeLogic = Object.freeze({ parseAmount, salePaymentTotal, advancePaymentTotal, expensePaymentTotal, paymentTotal, transferTotal, dominantPayment, balance, barberPayout, barberPaymentState, isoDate, monthWeeks, currentMonthWeek, periodBounds, cutValueByPayment, summarize });
   Object.assign(root, root.TheLuxeLogic);
 }(globalThis));
