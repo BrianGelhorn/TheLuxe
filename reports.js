@@ -42,7 +42,8 @@ function cashMovements(list, adjustments = []) {
 
 function renderTransfers(list, adjustments = []) {
   const movements = cashMovements(list, adjustments);
-  document.getElementById('transferRows').innerHTML = movements.map((item) => `<tr><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.from)}</td><td>${escapeHtml(item.to)}</td><td>${money.format(item.amount)}</td><td>${escapeHtml(item.description)}</td><td>${item.removable ? `<button class="delete-transfer" type="button" data-delete-transfer="${escapeHtml(item.id)}">Eliminar</button>` : '—'}</td></tr>`).join('');
+  document.getElementById('transferRows').innerHTML = movements.map((item) => `<tr><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.from)} → ${escapeHtml(item.to)}${item.removable ? '' : `<small>${escapeHtml(item.type)}</small>`}</td><td>${money.format(item.amount)}</td><td>${escapeHtml(item.description)}</td><td>${item.removable ? `<button class="delete-transfer" type="button" data-delete-transfer="${escapeHtml(item.id)}">Eliminar</button>` : '—'}</td></tr>`).join('');
+  document.getElementById('transferCount').textContent = String(movements.length);
   document.getElementById('transfersEmpty').hidden = movements.length > 0;
 }
 

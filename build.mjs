@@ -4,6 +4,7 @@ const types = {
   'index.html': 'text/html; charset=utf-8',
   'styles.css': 'text/css; charset=utf-8',
   'logic.js': 'text/javascript; charset=utf-8',
+  'inventory.js': 'text/javascript; charset=utf-8',
   'script.js': 'text/javascript; charset=utf-8',
   'reports.js': 'text/javascript; charset=utf-8',
   'dialogs.js': 'text/javascript; charset=utf-8',

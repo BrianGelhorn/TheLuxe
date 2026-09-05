@@ -28,6 +28,11 @@
     return Number(entry.cashAmount) >= Number(entry.mpAmount) ? 'Efectivo' : 'Mercado Pago';
   }
 
+  function mixedTipError(entry) {
+    if (entry.payment !== 'Ambos' || Number(entry.tip || 0) <= Math.max(Number(entry.cashAmount || 0), Number(entry.mpAmount || 0))) return '';
+    return 'La propina no puede superar el importe del medio que más aportó.';
+  }
+
   function balance(type, initial, cuts = [], sales = [], advances = [], expenses = [], transfers = []) {
     return Number(initial || 0) + paymentTotal(cuts, type) + salePaymentTotal(sales, type) - advancePaymentTotal(advances, type) - expensePaymentTotal(expenses, type) + transferTotal(transfers, type);
   }
@@ -91,9 +96,12 @@
   function cutValueByPayment(cuts, type, field) {
     return cuts.reduce((sum, cut) => {
       if (cut.payment !== 'Ambos') return sum + (cut.payment === type ? Number(cut[field] || 0) : 0);
-      const total = Number(cut.amount) + Number(cut.tip || 0);
       const paid = Number(type === 'Efectivo' ? cut.cashAmount : cut.mpAmount);
-      return sum + (total ? paid * Number(cut[field] || 0) / total : 0);
+      const tip = dominantPayment(cut) === type ? Number(cut.tip || 0) : 0;
+      const service = paid - tip;
+      if (field === 'tip') return sum + tip;
+      if (field === 'amount') return sum + service;
+      return sum + (cut.amount ? service * Number(cut[field] || 0) / Number(cut.amount) : 0);
     }, 0);
   }
 
@@ -107,7 +115,7 @@
     const salesTotal = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
     const advancesTotal = advances.reduce((sum, advance) => sum + Number(advance.amount), 0);
     const expensesTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
-    const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.commissionAmount ?? Number(cut.amount) * commissionAt(cut.date) / 100) }));
+    const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.commissionAmount ?? Number(cut.amount) * (cut.commissionRate ?? commissionAt(cut.date)) / 100) }));
     const commission = payment === 'Ambas' ? commissionCuts.reduce((sum, cut) => sum + cut.commission, 0) : cutValueByPayment(commissionCuts, payment, 'commission');
     const cutCount = payment === 'Ambas' ? cuts.length : cuts.filter((cut) => dominantPayment(cut) === payment).length;
     return {
@@ -118,6 +126,66 @@
     };
   }
 
-  root.TheLuxeLogic = Object.freeze({ parseAmount, salePaymentTotal, advancePaymentTotal, expensePaymentTotal, paymentTotal, transferTotal, dominantPayment, balance, barberPayout, barberPaymentState, isoDate, monthWeeks, currentMonthWeek, periodBounds, cutValueByPayment, summarize });
+  function dailyRevenue(cuts, sales, commissionAt = () => 0) {
+    const total = summarize(cuts, sales, [], [], 'Ambas', commissionAt);
+    const cash = summarize(cuts, sales, [], [], 'Efectivo', commissionAt);
+    // Match the whole-peso display and assign the remainder to MP so both methods add up.
+    const commission = Math.round(total.commission);
+    const cashInvoiced = Math.round(cash.invoiced);
+    const cashServices = cashInvoiced - cash.sales;
+    const cashTips = cash.cash - cashInvoiced;
+    const cashNet = cashInvoiced - Math.round(cash.commission);
+    const net = total.invoiced - commission;
+    return {
+      collected: total.invoiced + total.tips, tips: total.tips, invoiced: total.invoiced, commission, net,
+      services: total.services + total.tips, sales: total.sales,
+      cashServices, mpServices: total.services - cashServices, cashTips, mpTips: total.tips - cashTips,
+      cashInvoiced, mpInvoiced: total.invoiced - cashInvoiced, cashNet, mpNet: net - cashNet,
+    };
+  }
+
+  function inventorySummary(product, movements, date) {
+    const rows = movements.filter((row) => row.productId === product.id && !row.cancelled && row.date <= date);
+    const incoming = rows.filter((row) => row.date === date && row.type === 'entrada').reduce((sum, row) => sum + row.quantity, 0);
+    const consumed = rows.filter((row) => row.date === date && row.type === 'consumo').reduce((sum, row) => sum + row.quantity, 0);
+    const stock = (product.startDate <= date ? product.initialStock : 0) + rows.reduce((sum, row) => sum + (row.type === 'entrada' ? row.quantity : -row.quantity), 0);
+    return { stock, incoming, consumed };
+  }
+
+  function inventoryError(state) {
+    const validText = (value, max) => typeof value === 'string' && value.trim().length > 0 && value.length <= max;
+    const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+    const validQuantity = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1000000000;
+    if (!state || state.version !== 1 || !Array.isArray(state.products) || !Array.isArray(state.movements)) return 'El inventario guardado no tiene un formato válido.';
+    const products = new Map();
+    const names = new Set();
+    for (const item of state.products) {
+      if (!item || !validText(item.id, 80) || products.has(item.id) || !validText(item.name, 80) || !['unidades', 'ml', 'g'].includes(item.unit) || !validQuantity(item.initialStock) || !validDate(item.startDate) || typeof item.active !== 'boolean') return 'Revisá el nombre, la unidad y el stock inicial del producto.';
+      const name = item.name.trim().normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('es');
+      if (names.has(name)) return 'Ya existe un producto con ese nombre, incluso entre los archivados.';
+      names.add(name);
+      products.set(item.id, item);
+    }
+    const ids = new Set();
+    const changes = new Map([...products.keys()].map((id) => [id, new Map()]));
+    for (const row of state.movements) {
+      const product = products.get(row?.productId);
+      if (!row || !product || !validText(row.id, 80) || ids.has(row.id) || !validDate(row.date) || row.date < product.startDate || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.time) || !['entrada', 'consumo'].includes(row.type) || !validQuantity(row.quantity) || row.quantity === 0 || typeof row.cancelled !== 'boolean' || typeof row.notes !== 'string' || row.notes.length > 120) return 'Revisá el producto, la fecha y la cantidad del movimiento.';
+      ids.add(row.id);
+      if (row.cancelled) continue;
+      const days = changes.get(row.productId);
+      days.set(row.date, (days.get(row.date) || 0) + (row.type === 'entrada' ? row.quantity : -row.quantity));
+    }
+    for (const product of products.values()) {
+      let stock = product.initialStock;
+      for (const [date, change] of [...changes.get(product.id)].sort(([a], [b]) => a.localeCompare(b))) {
+        stock += change;
+        if (!Number.isSafeInteger(stock) || stock < 0) return `Stock insuficiente de ${product.name} en la jornada ${date}. Revisá también los movimientos posteriores.`;
+      }
+    }
+    return '';
+  }
+
+  root.TheLuxeLogic = Object.freeze({ parseAmount, salePaymentTotal, advancePaymentTotal, expensePaymentTotal, paymentTotal, transferTotal, dominantPayment, mixedTipError, balance, barberPayout, barberPaymentState, isoDate, monthWeeks, currentMonthWeek, periodBounds, cutValueByPayment, summarize, dailyRevenue, inventorySummary, inventoryError });
   Object.assign(root, root.TheLuxeLogic);
 }(globalThis));

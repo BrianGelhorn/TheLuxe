@@ -5,7 +5,7 @@ const defaultConfig = {
   commission: 50,
   commissionHistory: [{ date: '0000-01-01', rate: 50 }],
 };
-try { Object.keys(localStorage).filter((key) => key.startsWith('theluxe-')).forEach((key) => localStorage.removeItem(key)); } catch {}
+try { Object.keys(localStorage).filter((key) => key.startsWith('theluxe-') && key !== inventoryStorageKey).forEach((key) => localStorage.removeItem(key)); } catch {}
 let config = structuredClone(defaultConfig);
 let barbers = config.barbers.filter(({ active }) => active !== false).map(({ name }) => name);
 let prices = Object.fromEntries(config.services.map(({ name, price }) => [name, price]));
@@ -310,23 +310,31 @@ function render() {
   const dayTransfers = selectedTransfers();
   const register = cashRegisters[workday.value] || {};
   const opened = isDayOpen(workday.value);
-  const servicesTotal = list.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0);
-  const servicesInvoiced = list.reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const salesTotal = daySales.reduce((sum, sale) => sum + sale.total, 0);
+  const revenue = dailyRevenue(list, daySales, effectiveCommission);
   const operationCount = list.length + daySales.length;
-  document.getElementById('dailyServicesTotal').textContent = money.format(servicesTotal);
-  document.getElementById('dailySalesTotal').textContent = money.format(salesTotal);
-  document.getElementById('dailyServicesCash').textContent = money.format(paymentTotal(list, 'Efectivo'));
-  document.getElementById('dailyServicesMp').textContent = money.format(paymentTotal(list, 'Mercado Pago'));
-  const dailyCashCuts = list.filter((entry) => dominantPayment(entry) === 'Efectivo').length;
-  const dailyMpCuts = list.length - dailyCashCuts;
-  document.getElementById('dailyCashCuts').textContent = `${dailyCashCuts} ${dailyCashCuts === 1 ? 'corte' : 'cortes'}`;
-  document.getElementById('dailyMpCuts').textContent = `${dailyMpCuts} ${dailyMpCuts === 1 ? 'corte' : 'cortes'}`;
+  document.getElementById('dailyCollected').textContent = money.format(revenue.collected);
+  document.getElementById('dailyServicesOnly').textContent = money.format(revenue.services - revenue.tips);
+  document.getElementById('dailyTips').textContent = money.format(revenue.tips);
+  document.getElementById('dailyServicesCash').textContent = money.format(revenue.cashServices);
+  document.getElementById('dailyServicesMp').textContent = money.format(revenue.mpServices);
+  document.getElementById('dailyTipsCash').textContent = money.format(revenue.cashTips);
+  document.getElementById('dailyTipsMp').textContent = money.format(revenue.mpTips);
+  document.getElementById('dailyInvoiced').textContent = money.format(revenue.invoiced);
+  document.getElementById('dailyInvoicedCash').textContent = money.format(revenue.cashInvoiced);
+  document.getElementById('dailyInvoicedMp').textContent = money.format(revenue.mpInvoiced);
+  document.getElementById('dailyCommission').textContent = money.format(revenue.commission);
+  document.getElementById('dailyNet').textContent = money.format(revenue.net);
+  document.getElementById('dailyNetCash').textContent = money.format(revenue.cashNet);
+  document.getElementById('dailyNetMp').textContent = money.format(revenue.mpNet);
+  document.getElementById('dailyServicesTotal').textContent = money.format(revenue.services);
+  document.getElementById('dailyServicesTotalCash').textContent = money.format(revenue.cashServices + revenue.cashTips);
+  document.getElementById('dailyServicesTotalMp').textContent = money.format(revenue.mpServices + revenue.mpTips);
+  document.getElementById('dailySalesTotal').textContent = money.format(revenue.sales);
   document.getElementById('dailySalesCash').textContent = money.format(salePaymentTotal(daySales, 'Efectivo'));
   document.getElementById('dailySalesMp').textContent = money.format(salePaymentTotal(daySales, 'Mercado Pago'));
   document.getElementById('dailyCount').textContent = `${list.length} ${list.length === 1 ? 'corte' : 'cortes'}`;
   document.getElementById('dailySalesCount').textContent = `${daySales.length} ${daySales.length === 1 ? 'venta' : 'ventas'}`;
-  document.getElementById('dailyAverageTicket').textContent = money.format(operationCount ? (servicesInvoiced + salesTotal) / operationCount : 0);
+  document.getElementById('dailyAverageTicket').textContent = money.format(operationCount ? revenue.invoiced / operationCount : 0);
   const cashBalance = dayBalance('Efectivo', list, daySales, dayAdvances, dayExpenses, dayTransfers);
   const mpBalance = dayBalance('Mercado Pago', list, daySales, dayAdvances, dayExpenses, dayTransfers);
   document.getElementById('cashTotal').textContent = money.format(cashBalance);
@@ -340,6 +348,7 @@ function render() {
   renderAdvances(dayAdvances);
   renderExpenses(dayExpenses);
   renderTransfers(dayTransfers, selectedOpeningAdjustments());
+  renderInventory();
   const previousClosing = opened ? null : previousClosedRegister(workday.value);
   openingCashForm.elements.initialCash.value = 'initialCash' in register ? formatAmount(register.initialCash) : '';
   openingCashForm.elements.initialMp.value = 'initialMp' in register ? formatAmount(register.initialMp) : previousClosing ? formatAmount(previousClosing.register.realMp) : '';
@@ -572,8 +581,8 @@ document.querySelector('.app-shell').addEventListener('click', (event) => {
   const button = event.target.closest('[data-view]');
   if (!button) return;
   document.querySelectorAll('[data-view]').forEach((item) => {
-    item.classList.toggle('active', item === button);
-    item.toggleAttribute('aria-current', item === button);
+    item.classList.toggle('active', item.dataset.view === button.dataset.view);
+    item.toggleAttribute('aria-current', item.dataset.view === button.dataset.view);
   });
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === button.dataset.view));
   document.querySelector('h1').textContent = button.dataset.view === 'salesView' ? 'Caja y movimientos' : button.dataset.view === 'summaryView' ? 'Resúmenes' : button.dataset.view === 'configView' ? 'Configuración' : 'Panel diario';
@@ -622,21 +631,16 @@ document.getElementById('addExpense').addEventListener('click', () => openExpens
 }));
 [saleForm.elements.quantity, saleForm.elements.unitPrice].forEach((input) => input.addEventListener('input', updateSaleTotal));
 
-function syncTransferDirection(changed) {
-  const other = changed === transferForm.elements.from ? transferForm.elements.to : transferForm.elements.from;
-  other.value = changed.value === 'Efectivo' ? 'Mercado Pago' : 'Efectivo';
-}
-
-transferForm.elements.from.addEventListener('change', (event) => syncTransferDirection(event.target));
-transferForm.elements.to.addEventListener('change', (event) => syncTransferDirection(event.target));
+transferForm.elements.from.addEventListener('change', () => transferForm.elements.amount.setCustomValidity(''));
 transferForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(transferForm));
+  if (!isDayOpen(workday.value) || !['Efectivo', 'Mercado Pago'].includes(values.from)) return;
+  values.to = values.from === 'Efectivo' ? 'Mercado Pago' : 'Efectivo';
   const amount = parseAmount(values.amount);
   const available = dayBalance(values.from);
-  values.description = values.description.trim();
-  transferForm.elements.amount.setCustomValidity(amount <= 0 ? 'El importe debe ser mayor que cero.' : amount > available ? 'El saldo disponible es insuficiente.' : '');
-  transferForm.elements.description.setCustomValidity(values.description ? '' : 'Ingresá una descripción.');
+  values.description = values.description.trim() || 'Transferencia entre medios';
+  transferForm.elements.amount.setCustomValidity(!Number.isSafeInteger(amount) || amount <= 0 ? 'Ingresá un importe válido mayor que cero.' : amount > available ? 'El saldo disponible es insuficiente.' : '');
   if (!transferForm.reportValidity()) return;
   transfers.push({ ...values, amount, time: nowTime(), date: workday.value, id: crypto.randomUUID() });
   saveTransfers();
@@ -749,16 +753,21 @@ paymentInput.addEventListener('change', toggleSplitPayment);
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form));
-  amountInput.setCustomValidity(parseAmount(values.amount) > 0 ? '' : 'El precio debe ser mayor que cero.');
-  if (!form.reportValidity()) return;
-  if (values.payment === 'Ambos' && parseAmount(values.cashAmount) + parseAmount(values.mpAmount) !== parseAmount(values.amount) + parseAmount(values.tip)) {
-    cashAmountInput.setCustomValidity('La suma debe coincidir con el precio del corte más la propina.');
-    return form.reportValidity();
+  const amount = parseAmount(values.amount);
+  const tip = parseAmount(values.tip);
+  const cashAmount = parseAmount(values.cashAmount);
+  const mpAmount = parseAmount(values.mpAmount);
+  amountInput.setCustomValidity(amount > 0 ? '' : 'El precio debe ser mayor que cero.');
+  cashAmountInput.setCustomValidity('');
+  if (values.payment === 'Ambos') {
+    cashAmountInput.setCustomValidity(cashAmount + mpAmount === amount + tip
+      ? mixedTipError({ payment: values.payment, tip, cashAmount, mpAmount })
+      : 'La suma debe coincidir con el precio del corte más la propina.');
   }
+  if (!form.reportValidity()) return;
   const previous = entries.find((cut) => cut.id === editingId);
   const commissionRate = previous?.commissionRate ?? effectiveCommission(workday.value);
-  const amount = parseAmount(values.amount);
-  const entry = { ...values, date: workday.value, amount, tip: parseAmount(values.tip), cashAmount: parseAmount(values.cashAmount), mpAmount: parseAmount(values.mpAmount), commissionRate, commissionAmount: amount * commissionRate / 100, id: editingId || crypto.randomUUID() };
+  const entry = { ...values, date: workday.value, amount, tip, cashAmount, mpAmount, commissionRate, commissionAmount: amount * commissionRate / 100, id: editingId || crypto.randomUUID() };
   entries = editingId ? entries.map((cut) => cut.id === editingId ? entry : cut) : [...entries, entry];
   save();
   editingId = null;
@@ -884,5 +893,6 @@ document.getElementById('configView').addEventListener('click', (event) => {
   openConfigDialog(type, item);
 });
 
+initInventory();
 renderConfig();
 render();
