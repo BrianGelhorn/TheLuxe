@@ -115,7 +115,7 @@
     const salesTotal = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
     const advancesTotal = advances.reduce((sum, advance) => sum + Number(advance.amount), 0);
     const expensesTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
-    const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.commissionAmount ?? Number(cut.amount) * (cut.commissionRate ?? commissionAt(cut.date)) / 100) }));
+    const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.commissionAmount ?? Number(cut.amount) * (commissionAt(cut.date) ?? cut.commissionRate) / 100) }));
     const commission = payment === 'Ambas' ? commissionCuts.reduce((sum, cut) => sum + cut.commission, 0) : cutValueByPayment(commissionCuts, payment, 'commission');
     const cutCount = payment === 'Ambas' ? cuts.length : cuts.filter((cut) => dominantPayment(cut) === payment).length;
     return {
