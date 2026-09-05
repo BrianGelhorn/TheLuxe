@@ -864,7 +864,7 @@ document.getElementById('changeCommission').addEventListener('click', () => {
   commissionDialog.showModal();
 });
 document.getElementById('closeCommissionDialog').addEventListener('click', () => commissionDialog.close());
-commissionDialog.addEventListener('click', (event) => { if (event.target === commissionDialog) commissionDialog.close(); });
+commissionDialog.addEventListener('mousedown', (event) => { if (event.target === commissionDialog) commissionDialog.close(); });
 dailyCommissionForm.addEventListener('submit', (event) => {
   event.preventDefault();
   cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), commissionRate: Number(dailyCommissionForm.elements.commission.value) };
