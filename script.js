@@ -313,15 +313,10 @@ function render() {
   const revenue = dailyRevenue(list, daySales, effectiveCommission);
   const operationCount = list.length + daySales.length;
   document.getElementById('dailyCollected').textContent = money.format(revenue.collected);
-  document.getElementById('dailyServicesOnly').textContent = money.format(revenue.services - revenue.tips);
   document.getElementById('dailyTips').textContent = money.format(revenue.tips);
-  document.getElementById('dailyServicesCash').textContent = money.format(revenue.cashServices);
-  document.getElementById('dailyServicesMp').textContent = money.format(revenue.mpServices);
   document.getElementById('dailyTipsCash').textContent = money.format(revenue.cashTips);
   document.getElementById('dailyTipsMp').textContent = money.format(revenue.mpTips);
   document.getElementById('dailyInvoiced').textContent = money.format(revenue.invoiced);
-  document.getElementById('dailyInvoicedCash').textContent = money.format(revenue.cashInvoiced);
-  document.getElementById('dailyInvoicedMp').textContent = money.format(revenue.mpInvoiced);
   document.getElementById('dailyCommission').textContent = money.format(revenue.commission);
   document.getElementById('dailyNet').textContent = money.format(revenue.net);
   document.getElementById('dailyNetCash').textContent = money.format(revenue.cashNet);
@@ -329,6 +324,9 @@ function render() {
   document.getElementById('dailyServicesTotal').textContent = money.format(revenue.services);
   document.getElementById('dailyServicesTotalCash').textContent = money.format(revenue.cashServices + revenue.cashTips);
   document.getElementById('dailyServicesTotalMp').textContent = money.format(revenue.mpServices + revenue.mpTips);
+  document.getElementById('dailyServices').textContent = money.format(revenue.services - revenue.tips);
+  document.getElementById('dailyServicesCash').textContent = money.format(revenue.cashServices);
+  document.getElementById('dailyServicesMp').textContent = money.format(revenue.mpServices);
   document.getElementById('dailySalesTotal').textContent = money.format(revenue.sales);
   document.getElementById('dailySalesCash').textContent = money.format(salePaymentTotal(daySales, 'Efectivo'));
   document.getElementById('dailySalesMp').textContent = money.format(salePaymentTotal(daySales, 'Mercado Pago'));

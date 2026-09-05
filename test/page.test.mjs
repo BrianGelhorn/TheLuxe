@@ -28,7 +28,9 @@ test('la interfaz mantiene IDs, campos y archivos requeridos', () => {
     .map((match) => match[1]).filter((path) => !path.includes('://'));
   assert.deepEqual(localAssets.filter((path) => !existsSync(new URL(`../${path}`, import.meta.url))), [], 'faltan recursos locales');
   assert.deepEqual([...html.matchAll(/<script src="([^"?]+)/g)].map((match) => match[1]), scripts, 'los scripts cargan fuera de orden');
-  assert.match(html, /<tr class="collection-subtotal">[^\n]*id="dailyServicesTotal"[^\n]*id="dailyServicesTotalCash"[^\n]*id="dailyServicesTotalMp"[^\n]*<\/tr>\s*<tr><th scope="row">Servicios<\/th>/, 'servicios + propinas encabeza el desglose con ambos medios de cobro');
+  assert.match(html, /<tr><th scope="row">Servicios<\/th>[^\n]*id="dailyServices"[^\n]*<\/tr>\s*<tr><th scope="row">Propinas<\/th>[^\n]*<\/tr>\s*<tr class="collection-subtotal">[^\n]*id="dailyServicesTotal"[^\n]*id="dailyServicesTotalCash"[^\n]*id="dailyServicesTotalMp"[^\n]*<\/tr>/, 'Servicios y Propinas van arriba del subtotal de servicios + propinas');
+  assert.match(html, /accounting-note">Facturado<strong id="dailyInvoiced">/, 'el facturado se integra al total final');
+  assert.match(html, /saldos-metric[\s\S]*?id="cashTotal"[\s\S]*?id="mpTotal"/, 'los saldos se muestran juntos en una sola tarjeta');
   const cashView = html.match(/<section id="salesView"[\s\S]*?<\/section>/)[0];
   assert.ok(cashView.indexOf('transfer-card') > cashView.indexOf('inventory-card'), 'transferir queda al final de caja y movimientos');
   assert.doesNotMatch(cashView, /name="to"/, 'la transferencia usa una sola dirección');

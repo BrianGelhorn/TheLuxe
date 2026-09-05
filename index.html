@@ -6,8 +6,8 @@
   <title>The Luxe — Panel diario</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=101">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=137">
 </head>
 <body>
   <div class="app-shell">
@@ -55,7 +55,7 @@
         </article>
         <article class="card daily-sheet">
           <div class="section-heading">
-            <div><span class="step">PLANILLA DEL DÍA</span><h2 class="card-sheet-title">Servicios por barbero <button class="info-tip card-structure-help" type="button" aria-label="Cómo leer las tarjetas de servicios" data-tip="Servicio y hora a la izquierda; total a la derecha. Verde: efectivo. Azul: MP. Dorado: mixto. La propina está incluida y la nota aparece al pie.">?</button></h2></div>
+            <div><span class="step">PLANILLA DEL DÍA</span><h2 class="card-sheet-title">Servicios por barbero <button class="info-tip card-structure-help" type="button" aria-label="Cómo leer las tarjetas de servicios" data-tip="Verde: efectivo. Azul: MP. Dorado: total. Gris: propina.">?</button></h2></div>
             <div class="heading-actions barber-order-actions">
               <small id="barberOrderHint" hidden>Arrastrá las columnas para ordenarlas</small>
               <button id="cancelBarberOrder" class="secondary-btn" type="button" hidden>Cancelar</button>
@@ -65,22 +65,25 @@
           <div id="barberColumns" class="barber-columns"></div>
         </article>
 
+        <div class="day-overview">
         <div class="metrics daily-metrics daily-totals">
           <article class="metric featured collection-metric">
-            <div class="collection-header">
-              <div>
-                <span class="metric-label">Total cobrado <button class="info-tip" type="button" aria-label="Cómo se calcula el total cobrado" data-tip="Ingreso bruto del día. Se calcula: servicios + propinas + ventas.">?</button></span>
-                <small><span id="dailyCount">0 cortes</span> · <span id="dailySalesCount">0 ventas</span></small>
+            <div class="collection-head">
+              <div class="metric-title">
+                <svg class="micon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.2" cy="9.2" r="5.4"/><circle cx="14.8" cy="14.8" r="5.4" opacity=".4"/></svg>
+                <span>Total cobrado</span>
+                <button class="info-tip" type="button" aria-label="Cómo se calcula el total cobrado" data-tip="Ingreso bruto del día. Se calcula: servicios + propinas + ventas.">?</button>
               </div>
-              <strong id="dailyCollected">$ 0</strong>
+              <small class="metric-sub"><span id="dailyCount">0 cortes</span> · <span id="dailySalesCount">0 ventas</span></small>
+              <strong class="metric-value" id="dailyCollected">$ 0</strong>
             </div>
             <div class="collection-table-wrap">
               <table class="collection-table" aria-label="Desglose diario por concepto y medio de cobro">
                 <thead><tr><th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Efectivo</th><th scope="col" aria-label="Mercado Pago">MP</th></tr></thead>
                 <tbody class="collection-services" aria-label="Servicios y propinas">
-                  <tr class="collection-subtotal"><th scope="row">Servicios + propinas</th><td id="dailyServicesTotal">$ 0</td><td id="dailyServicesTotalCash">$ 0</td><td id="dailyServicesTotalMp">$ 0</td></tr>
-                  <tr><th scope="row">Servicios</th><td id="dailyServicesOnly">$ 0</td><td id="dailyServicesCash">$ 0</td><td id="dailyServicesMp">$ 0</td></tr>
+                  <tr><th scope="row">Servicios</th><td id="dailyServices">$ 0</td><td id="dailyServicesCash">$ 0</td><td id="dailyServicesMp">$ 0</td></tr>
                   <tr><th scope="row">Propinas</th><td id="dailyTips">$ 0</td><td id="dailyTipsCash">$ 0</td><td id="dailyTipsMp">$ 0</td></tr>
+                  <tr class="collection-subtotal"><th scope="row">Servicios + propinas</th><td id="dailyServicesTotal">$ 0</td><td id="dailyServicesTotalCash">$ 0</td><td id="dailyServicesTotalMp">$ 0</td></tr>
                 </tbody>
                 <tbody class="collection-sales" aria-label="Ventas de productos">
                   <tr><th scope="row">Ventas</th><td id="dailySalesTotal">$ 0</td><td id="dailySalesCash">$ 0</td><td id="dailySalesMp">$ 0</td></tr>
@@ -88,23 +91,47 @@
               </table>
             </div>
           </article>
-          <article class="metric accounting-metric">
-            <div class="accounting-head"><span class="metric-label">Facturado sin propinas <button class="info-tip" type="button" aria-label="Cómo se calcula lo facturado sin propinas" data-tip="Ingresos sin propinas. Se calcula: servicios + ventas. En mixtos, la propina va al medio que aportó más.">?</button></span><strong id="dailyInvoiced">$ 0</strong></div>
-            <div class="accounting-detail">
-              <small class="accounting-note"><strong>Servicios + ventas</strong></small>
-              <div class="metric-breakdown"><span>Efectivo <b id="dailyInvoicedCash">$ 0</b></span><span>MP <b id="dailyInvoicedMp">$ 0</b></span></div>
-            </div>
-          </article>
+
           <article class="metric featured accounting-metric">
-            <div class="accounting-head"><span class="metric-label">Total final <button class="info-tip" type="button" aria-label="Cómo se calcula el total final" data-tip="Facturación luego de comisiones. Se calcula: servicios + ventas − comisiones.">?</button></span><strong id="dailyNet">$ 0</strong></div>
+            <div class="accounting-head">
+              <div class="metric-title">
+                <svg class="micon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h7.2L18 7.8V20.5H6.5z"/><path d="M13.6 3.5v4.4h4.3"/><path d="M9.5 12.8h4.8M9.5 15.7h4.8"/></svg>
+                <span>Total final</span>
+                <button class="info-tip" type="button" aria-label="Cómo se calcula el total final" data-tip="Facturación luego de comisiones. Se calcula: servicios + ventas − comisiones.">?</button>
+              </div>
+              <strong class="metric-value" id="dailyNet">$ 0</strong>
+            </div>
             <div class="accounting-detail">
+              <small class="accounting-note">Facturado<strong id="dailyInvoiced">$ 0</strong></small>
               <small class="accounting-note">Comisión<strong id="dailyCommission">$ 0</strong></small>
-              <div class="metric-breakdown"><span>Efectivo <b id="dailyNetCash">$ 0</b></span><span>MP <b id="dailyNetMp">$ 0</b></span></div>
+              <div class="metric-breakdown">
+                <span><small class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.2"/><path d="M6.5 12h.01M17.5 12h.01"/></svg>Efectivo</small><b id="dailyNetCash">$ 0</b></span>
+                <span><small class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 10.5h19"/></svg>MP</small><b id="dailyNetMp">$ 0</b></span>
+              </div>
             </div>
           </article>
-          <article class="metric quick-metric balance-cash"><span class="metric-label">Saldo efectivo <button class="info-tip" type="button" aria-label="Cómo se calcula el saldo en efectivo" data-tip="Efectivo disponible estimado. Se calcula: apertura + cobros − adelantos − gastos ± transferencias.">?</button></span><strong id="cashTotal">$ 0</strong></article>
-          <article class="metric quick-metric balance-mp"><span class="metric-label">Saldo MP <button class="info-tip" type="button" aria-label="Cómo se calcula el saldo en Mercado Pago" data-tip="Saldo disponible estimado en MP. Se calcula: apertura + cobros − adelantos − gastos ± transferencias.">?</button></span><strong id="mpTotal">$ 0</strong></article>
-          <article class="metric quick-metric ticket-metric"><span class="metric-label">Ticket promedio <button class="info-tip" type="button" aria-label="Cómo se calcula el ticket promedio" data-tip="Promedio por operación. Se calcula: (servicios + ventas) ÷ (cortes + ventas).">?</button></span><strong id="dailyAverageTicket">$ 0</strong></article>
+
+          <article class="metric saldos-metric">
+            <div class="metric-title">
+              <svg class="micon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5a2 2 0 0 1 2-2h12.5"/><path d="M3.5 8.5v9a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H8.8"/><path d="M16.5 13.5h.01"/></svg>
+              <span>Saldos disponibles</span>
+              <button class="info-tip" type="button" aria-label="Cómo se calculan los saldos" data-tip="Saldos estimados por medio. En cada uno: apertura + cobros − adelantos − gastos ± transferencias.">?</button>
+            </div>
+            <div class="saldos-boxes">
+              <div class="saldo-box ticket">
+                <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/></svg><b class="saldo-label">Ticket promedio</b></span>
+                <strong class="saldo-value" id="dailyAverageTicket">$ 0</strong>
+              </div>
+              <div class="saldo-box cash">
+                <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.2"/><path d="M6.5 12h.01M17.5 12h.01"/></svg><b class="saldo-label">Efectivo</b></span>
+                <strong class="saldo-value" id="cashTotal">$ 0</strong>
+              </div>
+              <div class="saldo-box mp">
+                <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 10.5h19"/></svg><b class="saldo-label">Mercado Pago</b></span>
+                <strong class="saldo-value" id="mpTotal">$ 0</strong>
+              </div>
+            </div>
+          </article>
         </div>
 
         <article class="card daily-sheet closing-card">
@@ -123,6 +150,7 @@
           </form>
           <p class="next-opening">Caja inicial calculada para el día siguiente: <strong id="nextOpeningCash">$ 0 efectivo</strong> · <strong id="nextOpeningMp">$ 0 MP</strong></p>
         </article>
+        </div>
       </section>
 
       <section id="salesView" class="view">
@@ -412,6 +440,6 @@
   <script src="reports.js?v=19"></script>
   <script src="dialogs.js?v=1"></script>
   <script src="inventory.js?v=1"></script>
-  <script src="script.js?v=67"></script>
+  <script src="script.js?v=68"></script>
 </body>
 </html>
