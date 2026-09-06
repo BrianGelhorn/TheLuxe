@@ -111,7 +111,7 @@
             <div class="metric-title">
               <svg class="micon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5a2 2 0 0 1 2-2h12.5"/><path d="M3.5 8.5v9a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H8.8"/><path d="M16.5 13.5h.01"/></svg>
               <span>Saldos disponibles</span>
-              <button class="info-tip" type="button" aria-label="Cómo se calculan los saldos" data-tip="Saldos estimados por medio. En cada uno: apertura + cobros − adelantos − gastos ± transferencias.">?</button>
+              <button class="info-tip" type="button" aria-label="Cómo se calculan los saldos" data-tip="Por medio: apertura + cobros − pagos a barberos − adelantos − gastos ± transferencias.">?</button>
             </div>
             <div class="saldos-boxes">
               <div class="saldo-box ticket">
@@ -419,7 +419,7 @@
 
       <dialog id="expenseDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span id="expenseFormMode" class="step">NUEVA SALIDA</span><h2>Salida de caja</h2></div><button id="closeExpenseDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="expenseForm" class="cut-form"><label class="field"><span>Hora</span><input name="time" type="time" required></label><label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label><label class="field"><span>Medio de salida</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label><label class="field full-width"><span>Motivo o descripción</span><textarea name="reason" rows="3" required></textarea></label><button class="primary-btn" type="submit">Guardar salida</button></form></article></dialog>
       <dialog id="expenseDetailDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">DETALLE DE SALIDA</span><h2 id="expenseDetailTitle">Datos completos</h2></div><button id="closeExpenseDetail" class="close-btn" type="button" aria-label="Cerrar">×</button></div><dl id="expenseDetail" class="detail-list"></dl><div class="detail-actions"><button id="editExpense" class="secondary-btn" type="button">Modificar</button><button id="deleteExpense" class="danger-btn" type="button">Eliminar</button></div></article></dialog>
-      <dialog id="commissionDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">COMISIÓN DE LA JORNADA</span><h2>Cambiar solo este día</h2></div><button id="closeCommissionDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="dailyCommissionForm" class="cut-form"><label class="field full-width"><span>Comisión para nuevos cortes (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn" type="submit">Guardar comisión</button></form></article></dialog>
+      <dialog id="commissionDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">COMISIÓN DE LA JORNADA</span><h2>Cambiar solo este día</h2></div><button id="closeCommissionDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="dailyCommissionForm" class="cut-form"><label class="field full-width"><span>Comisión para todos los cortes del día (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn" type="submit">Guardar comisión</button></form></article></dialog>
 
       <dialog id="serviceConfigDialog" class="cut-dialog">
         <article class="form-card"><div class="card-heading"><div><span id="serviceConfigMode" class="step">NUEVO SERVICIO</span><h2>Servicio</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="serviceConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Precio</span><div class="money-input"><b>$</b><input name="price" type="text" inputmode="numeric" required></div></label><button class="primary-btn" type="submit">Guardar servicio</button></form></article>
@@ -432,10 +432,10 @@
       </dialog>
     </main>
   </div>
-  <script src="logic.js?v=6"></script>
+  <script src="logic.js?v=7"></script>
   <script src="reports.js?v=19"></script>
   <script src="dialogs.js?v=1"></script>
-  <script src="inventory.js?v=1"></script>
-  <script src="script.js?v=69"></script>
+  <script src="inventory.js?v=2"></script>
+  <script src="script.js?v=70"></script>
 </body>
 </html>

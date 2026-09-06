@@ -2,6 +2,7 @@ const inventoryStorageKey = 'theluxe-inventory-v1';
 let inventory = { version: 1, products: [], movements: [] };
 let inventorySnapshot = null;
 let inventoryReadError = false;
+let stockEditingSnapshot = null;
 const stockProductForm = document.getElementById('stockProductForm');
 const stockMovementForm = document.getElementById('stockMovementForm');
 
@@ -52,6 +53,7 @@ function saveInventory(next) {
 }
 
 function resetStockProductForm() {
+  stockEditingSnapshot = null;
   stockProductForm.reset();
   stockProductForm.elements.stockId.value = '';
   stockProductForm.elements.initialStock.disabled = false;
@@ -96,6 +98,7 @@ function initInventory() {
     const existing = inventory.products.find((product) => product.id === fields.stockId.value);
     if (!existing && (!workday.value || workday.value > today())) return stockMessage('Elegí una jornada de hoy o anterior para registrar el stock inicial.', true);
     if (fields.stockId.value && !existing) return stockMessage('El producto ya no está disponible. Cancelá la edición y revisá el listado.', true);
+    if (existing && stockEditingSnapshot && JSON.stringify(existing) !== stockEditingSnapshot) return stockMessage('El producto cambió en otra pestaña. Cancelá la edición y volvé a abrirlo antes de guardar.', true);
     const product = {
       id: existing?.id || crypto.randomUUID(), name: fields.stockName.value.trim(),
       unit: existing?.unit || fields.stockUnit.value,
@@ -122,6 +125,7 @@ function initInventory() {
       return stockMessage(product.active ? 'Producto archivado. El stock y su historial se conservaron.' : 'Producto activado.');
     }
     stockProductForm.elements.stockId.value = product.id;
+    stockEditingSnapshot = JSON.stringify(product);
     stockProductForm.elements.stockName.value = product.name;
     stockProductForm.elements.stockUnit.value = product.unit;
     stockProductForm.elements.stockUnit.disabled = true;

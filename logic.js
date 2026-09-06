@@ -20,7 +20,7 @@
   }
 
   function transferTotal(list, type) {
-    return list.reduce((sum, transfer) => sum + (transfer.to === type ? Number(transfer.amount) : transfer.from === type ? -Number(transfer.amount) : 0), 0);
+    return list.reduce((sum, transfer) => sum + (transfer.to === type ? Number(transfer.amount) : 0) - (transfer.from === type ? Number(transfer.amount) : 0), 0);
   }
 
   function dominantPayment(entry) {
@@ -63,14 +63,14 @@
     const firstMonday = new Date(year, month - 1, 1);
     firstMonday.setDate(firstMonday.getDate() + ((8 - firstMonday.getDay()) % 7));
     const lastDay = new Date(year, month, 0);
-    return Math.ceil((lastDay - firstMonday + 86400000) / 604800000);
+    return Math.floor((lastDay.getDate() - firstMonday.getDate()) / 7) + 1;
   }
 
   function currentMonthWeek(value) {
     const date = new Date(`${value}T00:00:00`);
     const firstMonday = new Date(date.getFullYear(), date.getMonth(), 1);
     firstMonday.setDate(firstMonday.getDate() + ((8 - firstMonday.getDay()) % 7));
-    return Math.max(1, Math.min(monthWeeks(value.slice(0, 7)), Math.floor((date - firstMonday) / 604800000) + 1));
+    return Math.max(1, Math.min(monthWeeks(value.slice(0, 7)), Math.floor((date.getDate() - firstMonday.getDate()) / 7) + 1));
   }
 
   function periodBounds(period, value, week = 1) {
@@ -101,7 +101,7 @@
       const service = paid - tip;
       if (field === 'tip') return sum + tip;
       if (field === 'amount') return sum + service;
-      return sum + (cut.amount ? service * Number(cut[field] || 0) / Number(cut.amount) : 0);
+      return sum + (Number(cut.amount) ? service * Number(cut[field] || 0) / Number(cut.amount) : 0);
     }, 0);
   }
 
@@ -115,7 +115,7 @@
     const salesTotal = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
     const advancesTotal = advances.reduce((sum, advance) => sum + Number(advance.amount), 0);
     const expensesTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
-    const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.amount) * (commissionAt(cut.date) ?? cut.commissionRate) / 100 }));
+    const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.commissionAmount ?? Number(cut.amount) * (cut.commissionRate ?? commissionAt(cut.date)) / 100) }));
     const commission = payment === 'Ambas' ? commissionCuts.reduce((sum, cut) => sum + cut.commission, 0) : cutValueByPayment(commissionCuts, payment, 'commission');
     const cutCount = payment === 'Ambas' ? cuts.length : cuts.filter((cut) => dominantPayment(cut) === payment).length;
     return {
@@ -170,7 +170,7 @@
     const changes = new Map([...products.keys()].map((id) => [id, new Map()]));
     for (const row of state.movements) {
       const product = products.get(row?.productId);
-      if (!row || !product || !validText(row.id, 80) || ids.has(row.id) || !validDate(row.date) || row.date < product.startDate || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.time) || !['entrada', 'consumo'].includes(row.type) || !validQuantity(row.quantity) || row.quantity === 0 || typeof row.cancelled !== 'boolean' || typeof row.notes !== 'string' || row.notes.length > 120) return 'Revisá el producto, la fecha y la cantidad del movimiento.';
+      if (!row || !product || !validText(row.id, 80) || ids.has(row.id) || !validDate(row.date) || row.date < product.startDate || typeof row.time !== 'string' || row.time.length !== 5 || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.time) || !['entrada', 'consumo'].includes(row.type) || !validQuantity(row.quantity) || row.quantity === 0 || typeof row.cancelled !== 'boolean' || typeof row.notes !== 'string' || row.notes.length > 120) return 'Revisá el producto, la fecha y la cantidad del movimiento.';
       ids.add(row.id);
       if (row.cancelled) continue;
       const days = changes.get(row.productId);

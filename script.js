@@ -263,6 +263,7 @@ function initializeOpening(date) {
   const previous = previousClosedRegister(date);
   if (!previous) return false;
   cashRegisters[date] = {
+    ...(cashRegisters[date] || {}),
     initialCash: Math.max(0, Number(previous.register.realCash || 0) - Number(previous.register.withdrawal || 0)),
     initialMp: Number(previous.register.realMp || 0), opened: true, autoOpened: true,
     openedAt: new Date().toISOString(), inheritedFrom: previous.date,
@@ -274,7 +275,23 @@ function initializeOpening(date) {
 function dayBalance(type, list = selectedEntries(), daySales = selectedSales(), dayAdvances = selectedAdvances(), dayExpenses = selectedExpenses(), dayTransfers = selectedTransfers()) {
   const register = cashRegisters[workday.value] || {};
   const initial = Number(register[type === 'Efectivo' ? 'initialCash' : 'initialMp'] || 0);
-  return balance(type, initial, list, daySales, dayAdvances, dayExpenses, dayTransfers);
+  const paid = Object.keys(barberPayments[workday.value] || {}).reduce((sum, barber) => {
+    const payment = barberPaymentRecord(barber);
+    if (payment.status === 'Mixto') return sum + Number(payment[type === 'Efectivo' ? 'cashAmount' : 'mpAmount'] || 0);
+    if (payment.status !== type) return sum;
+    return sum + barberPayout(list.filter((entry) => entry.barber === barber), effectiveCommission).total;
+  }, 0);
+  return balance(type, initial, list, daySales, dayAdvances, dayExpenses, dayTransfers) - paid;
+}
+
+function renderAvailableBalances() {
+  const cash = dayBalance('Efectivo');
+  const mp = dayBalance('Mercado Pago');
+  document.getElementById('cashTotal').textContent = money.format(cash);
+  document.getElementById('mpTotal').textContent = money.format(mp);
+  document.getElementById('transferCashAvailable').textContent = money.format(cash);
+  document.getElementById('transferMpAvailable').textContent = money.format(mp);
+  renderClosingDifferences(cash, mp);
 }
 
 function renderClosingDifferences(cashTheoretical = dayBalance('Efectivo'), mpTheoretical = dayBalance('Mercado Pago')) {
@@ -494,6 +511,7 @@ document.getElementById('barberColumns').addEventListener('click', (event) => {
     const payment = { ...barberPaymentRecord(barber), status: paymentMethod.dataset.barberPaymentMethod };
     barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: payment };
     updateBarberPaymentColumn(column, payment);
+    renderAvailableBalances();
     if (payment.status === 'Mixto') column.querySelector('[data-payment-amount]').focus({ preventScroll: true });
     return;
   }
@@ -521,6 +539,7 @@ document.getElementById('barberColumns').addEventListener('input', (event) => {
   const updated = { ...payment, [field]: input.value === '' ? '' : parseAmount(input.value) };
   barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: updated };
   updateBarberPaymentColumn(column, updated);
+  renderAvailableBalances();
 });
 
 function setBarberOrderMode(enabled) {
@@ -726,11 +745,13 @@ cashRegisterForm.addEventListener('submit', (event) => {
   cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), realCash, realMp: parseAmount(values.realMp), withdrawal, closedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   saveCashRegisters();
   const nextDate = shiftDate(workday.value, 1);
-  const nextRegister = cashRegisters[nextDate];
-  if (nextRegister?.autoOpened && nextRegister.inheritedFrom === workday.value) {
-    cashRegisters[nextDate] = { ...nextRegister, initialCash: Math.max(0, realCash - withdrawal), initialMp: parseAmount(values.realMp), updatedAt: new Date().toISOString() };
-    saveCashRegisters();
-  } else initializeOpening(nextDate);
+  for (const [date, register] of Object.entries(cashRegisters)) {
+    if (register.autoOpened && register.inheritedFrom === workday.value) {
+      cashRegisters[date] = { ...register, initialCash: Math.max(0, realCash - withdrawal), initialMp: parseAmount(values.realMp), updatedAt: new Date().toISOString() };
+    }
+  }
+  saveCashRegisters();
+  initializeOpening(nextDate);
   render();
 });
 [cashRegisterForm.elements.realCash, cashRegisterForm.elements.realMp, cashRegisterForm.elements.withdrawal].forEach((input) => input.addEventListener('input', () => renderClosingDifferences()));
@@ -865,7 +886,13 @@ document.getElementById('closeCommissionDialog').addEventListener('click', () =>
 commissionDialog.addEventListener('mousedown', (event) => { if (event.target === commissionDialog) commissionDialog.close(); });
 dailyCommissionForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), commissionRate: Number(dailyCommissionForm.elements.commission.value) };
+  if (!dailyCommissionForm.reportValidity()) return;
+  const commissionRate = Number(dailyCommissionForm.elements.commission.value);
+  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), commissionRate };
+  // An explicit daily override replaces that day's snapshots; changing the
+  // default configuration still preserves commissions recorded on other days.
+  entries = entries.map((cut) => cut.date === workday.value ? { ...cut, commissionRate, commissionAmount: Number(cut.amount) * commissionRate / 100 } : cut);
+  save();
   commissionDialog.close();
   saveCashRegisters();
   render();
