@@ -319,8 +319,6 @@ function render() {
   document.getElementById('dailyInvoiced').textContent = money.format(revenue.invoiced);
   document.getElementById('dailyCommission').textContent = money.format(revenue.commission);
   document.getElementById('dailyNet').textContent = money.format(revenue.net);
-  document.getElementById('dailyNetCash').textContent = money.format(revenue.cashNet);
-  document.getElementById('dailyNetMp').textContent = money.format(revenue.mpNet);
   document.getElementById('dailyServicesTotal').textContent = money.format(revenue.services);
   document.getElementById('dailyServicesTotalCash').textContent = money.format(revenue.cashServices + revenue.cashTips);
   document.getElementById('dailyServicesTotalMp').textContent = money.format(revenue.mpServices + revenue.mpTips);
