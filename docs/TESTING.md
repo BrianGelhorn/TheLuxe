@@ -80,10 +80,13 @@ Servicios = 1.000 + 2.000 + 900 = 3.900
 Propinas = 200 + 0 + 100 = 300
 Ventas = 500 + 700 = 1.200
 Cobrado = 3.900 + 300 + 1.200 = 5.400
-Facturado = 3.900 + 1.200 = 5.100
+Facturado comercial (logica de caja/historico) = 3.900 + 1.200 = 5.100
+Facturado total de Resumenes (bruto con propinas, sin ventas) = 3.900 + 300 = 4.200
 Comision al 50% = 500 + 1.000 + 450 = 1.950
-Total luego de comisiones = 5.100 - 1.950 = 3.150
-Ticket promedio = 5.100 / (3 cortes + 2 ventas) = 1.020
+Comision (ingreso neto del barbero) = 1.950 + 300 = 2.250
+Balance historico = facturado comercial 5.100 - comision 1.950 = 3.150
+Ticket promedio bruto = 4.200 / 3 servicios = 1.400
+Ticket promedio neto = 2.250 / 3 servicios = 750
 
 Efectivo = 1.000 apertura + 1.800 cobros + 500 ventas
            - 300 adelantos - 50 gastos - 100 transferidos = 2.850
@@ -95,7 +98,10 @@ MP = 2.000 apertura + 2.400 cobros + 700 ventas
 
 - El override diario actualiza importe y tasa de todos los cortes de esa fecha, incluidos los anteriores. Los nuevos usan esa tasa. La fecha siguiente usa el default.
 - Cambiar el default no recalcula snapshots historicos; el override diario explicito si lo hace.
-- Las propinas no generan comision ni forman parte de lo facturado. Las ventas no generan comision de cortes.
+- Las propinas no generan comision, pero si forman parte del facturado total (bruto) del resumen. Las ventas no generan comision de cortes.
+- En Resumenes, ventas no integran el bruto ni el denominador de ninguno de los tickets, con todos los barberos o uno seleccionado. Sin servicios ambos tickets son cero, incluso si hay ventas.
+- El desglose del facturado solo muestra Servicios y Propinas. No hay tarjetas independientes de Recaudado por servicios, Recaudado por ventas, Propinas ni Balance; se conservan Adelantos, Salidas de caja y Retiros totales.
+- La tabla historica diaria/mensual conserva ventas, propinas, comisiones sin propinas y balance comercial. Las pruebas verifican esos importes por fila y la ausencia de los elementos eliminados.
 - El redondeo de comision se hace despues de sumar, no corte por corte. Cada pago de barbero se redondea por barbero; no se supone que sumar esos redondeos sea igual a redondear una suma global.
 - Mixto descuenta exactamente los importes ingresados, aun parciales o excedidos. No pago ignora los importes retenidos.
 - Efectivo/MP de un clic representan el total actualmente mostrado para ese barbero; no son una fotografia inmutable de una transferencia bancaria.

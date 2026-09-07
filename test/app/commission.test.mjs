@@ -105,8 +105,9 @@ test('COM-009 - El reporte mensual y el pago coinciden con la comision diaria mo
   change(app, 60);
   app.element('summaryPeriod').value = 'month';
   app.emit('#summaryPeriod', 'change');
-  assert.equal(app.element('summaryCommission').textContent, app.money(2340));
-  assert.equal(app.element('summaryBalance').textContent, app.money(2760));
+  assert.equal(app.element('summaryCommission').textContent, app.money(2640));
+  assert.equal(app.element('summaryCommissionAmount').textContent, app.money(2340));
+  assert.equal(app.element('summaryRows').rows[0].cells[9].textContent, app.money(2760));
   assert.equal(app.element('summaryRows').rows[0].cells[5].textContent, app.money(2340));
 });
 

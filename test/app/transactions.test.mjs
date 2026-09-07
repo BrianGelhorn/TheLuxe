@@ -91,9 +91,10 @@ test('TXN-006 - El empate mixto cuenta el corte y la propina una sola vez', (t) 
   balances(app, 500, 500);
   assert.equal(app.element('dailyServicesCash').textContent, app.money(300));
   assert.equal(app.element('dailyServicesMp').textContent, app.money(500));
-  assert.equal(app.element('summaryCashCuts').textContent, '1 corte');
-  assert.equal(app.element('summaryMpCuts').textContent, '0 cortes');
-  assert.equal(app.element('summaryTips').textContent, app.money(200));
+  assert.equal(app.element('summaryOperationCount').textContent, '1 servicio');
+  assert.equal(app.element('summaryInvoicedTipsCash').textContent, app.money(200));
+  assert.equal(app.element('summaryInvoicedTipsMp').textContent, app.money(0));
+  assert.equal(app.element('summaryInvoicedTips').textContent, app.money(200));
 });
 
 test('TXN-007 - El corte mixto permite cero explicito en un medio', (t) => {

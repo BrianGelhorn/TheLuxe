@@ -234,17 +234,41 @@
             <div class="summary-range"><span class="step">RANGO SELECCIONADO</span><h2 id="summaryRange"></h2></div>
           </div>
         </article>
+        <div class="metrics daily-totals summary-highlights">
+          <article class="metric featured collection-metric">
+            <div class="collection-head">
+              <div class="metric-title"><span>Facturado total</span><button class="info-tip" type="button" aria-label="Cómo se calcula el facturado total" data-tip="Ingreso bruto: servicios + propinas. Excluye ventas y no descuenta comisiones.">?</button></div>
+              <small class="metric-sub">Bruto con propinas · <span id="summaryOperationCount">0 servicios</span></small>
+              <strong class="metric-value" id="summaryInvoiced">$ 0</strong>
+            </div>
+            <div class="collection-table-wrap" tabindex="0" role="region" aria-label="Desglose del facturado por medio de cobro">
+              <table class="collection-table" aria-label="Facturado por concepto y medio de cobro">
+                <thead><tr><th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Efectivo</th><th scope="col" aria-label="Mercado Pago">MP</th></tr></thead>
+                <tbody class="collection-services">
+                  <tr><th scope="row">Servicios</th><td id="summaryInvoicedCuts">$ 0</td><td id="summaryInvoicedCutsCash">$ 0</td><td id="summaryInvoicedCutsMp">$ 0</td></tr>
+                  <tr><th scope="row">Propinas</th><td id="summaryInvoicedTips">$ 0</td><td id="summaryInvoicedTipsCash">$ 0</td><td id="summaryInvoicedTipsMp">$ 0</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+          <article class="metric featured accounting-metric">
+            <div class="accounting-head"><div class="metric-title"><span>Comisión</span><button class="info-tip" type="button" aria-label="Cómo se calcula la comisión" data-tip="Ingreso neto del barbero: comisión de los cortes + propinas. No resta adelantos ni pagos realizados; no es el saldo pendiente de pago.">?</button></div><small class="metric-sub">Ingreso neto del barbero</small></div>
+            <div class="accounting-detail">
+              <small class="accounting-note">Comisión de cortes<strong id="summaryCommissionAmount">$ 0</strong></small>
+              <small class="accounting-note">Propinas<strong id="summaryCommissionTips">$ 0</strong></small>
+            </div>
+            <div class="net-card"><span class="net-card-label">Ingreso neto</span><strong class="metric-value" id="summaryCommission">$ 0</strong></div>
+          </article>
+          <article class="metric accounting-metric">
+            <div class="accounting-head"><div class="metric-title"><span>Ticket promedio</span><button class="info-tip" type="button" aria-label="Cómo se calcula el ticket promedio" data-tip="Promedio por servicio. Bruto = (servicios + propinas) ÷ cantidad de servicios. Neto = (comisión de servicios + propinas) ÷ cantidad de servicios. Excluye ventas.">?</button></div><small class="metric-sub">Por servicio del período</small></div>
+            <div class="accounting-detail"><small class="accounting-note">Bruto<strong id="summaryAverageTicket">$ 0</strong></small></div>
+            <div class="net-card"><span class="net-card-label">Neto</span><strong class="metric-value" id="summaryAverageTicketNeto">$ 0</strong></div>
+          </article>
+        </div>
         <div class="metrics summary-metrics">
-          <article class="metric summary-primary"><span class="metric-label">Recaudado por servicios <button class="info-tip" type="button" aria-label="Cómo se calcula lo recaudado por servicios" data-tip="Ingreso por cortes. Se calcula sumando sus precios; excluye propinas y ventas.">?</button></span><strong id="summaryServices">$ 0</strong><small id="summaryCuts">0 cortes</small><div class="metric-breakdown"><span>Efectivo <b id="summaryServicesCash">$ 0</b><small id="summaryCashCuts">0 cortes</small></span><span>Mercado Pago <b id="summaryServicesMp">$ 0</b><small id="summaryMpCuts">0 cortes</small></span></div></article>
-          <article class="metric summary-primary"><span class="metric-label">Recaudado por ventas <button class="info-tip" type="button" aria-label="Cómo se calcula lo recaudado por ventas" data-tip="Ingreso por productos. Se calcula sumando el total de cada venta.">?</button></span><strong id="summarySales">$ 0</strong><small id="summarySaleCount">0 ventas</small><div class="metric-breakdown"><span>Efectivo <b id="summarySalesCash">$ 0</b></span><span>Mercado Pago <b id="summarySalesMp">$ 0</b></span></div></article>
-          <article class="metric featured summary-primary"><span class="metric-label">Total facturado <button class="info-tip" type="button" aria-label="Cómo se calcula el total facturado" data-tip="Ingreso sin propinas. Se calcula: servicios + ventas; todavía no descuenta comisiones.">?</button></span><strong id="summaryInvoiced">$ 0</strong><small id="summaryOperationCount">0 operaciones</small><div class="metric-breakdown"><span>Efectivo <b id="summaryInvoicedCash">$ 0</b></span><span>Mercado Pago <b id="summaryInvoicedMp">$ 0</b></span></div></article>
-          <article class="metric summary-secondary"><span>Propinas</span><strong id="summaryTips">$ 0</strong></article>
-          <article class="metric summary-secondary"><span class="metric-label">Comisiones <button class="info-tip" type="button" aria-label="Cómo se calculan las comisiones" data-tip="Monto generado para barberos. Se calcula sumando precio del servicio × porcentaje de cada corte.">?</button></span><strong id="summaryCommission">$ 0</strong></article>
           <article class="metric summary-secondary"><span>Adelantos</span><strong id="summaryAdvances">$ 0</strong></article>
           <article class="metric summary-secondary"><span>Salidas de caja</span><strong id="summaryExpenses">$ 0</strong></article>
           <article class="metric summary-secondary"><span>Retiros totales</span><strong id="summaryWithdrawals">$ 0</strong></article>
-          <article class="metric featured summary-secondary"><span class="metric-label">Balance <button class="info-tip" type="button" aria-label="Cómo se calcula el balance" data-tip="Facturación luego de comisiones. Se calcula: total facturado − comisiones.">?</button></span><strong id="summaryBalance">$ 0</strong></article>
-          <article class="metric summary-secondary"><span class="metric-label">Ticket promedio <button class="info-tip" type="button" aria-label="Cómo se calcula el ticket promedio" data-tip="Promedio por operación. Se calcula: total facturado ÷ (cortes + ventas).">?</button></span><strong id="summaryAverageTicket">$ 0</strong></article>
         </div>
         <article class="card daily-sheet">
           <div class="section-heading"><div><span class="step">DESGLOSE</span><h2 id="summaryBreakdownTitle">Resumen por día</h2></div></div>
