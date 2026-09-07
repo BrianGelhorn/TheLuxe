@@ -12,6 +12,13 @@ const emptyRevenue = {
   cashInvoiced: 0, mpInvoiced: 0, cashNet: 0, mpNet: 0,
 };
 
+test('REV-033 - Una recaudacion sin snapshots ni callback usa comision cero', () => {
+  assert.deepEqual({ ...loadLogic().dailyRevenue([{ payment: 'Efectivo', amount: 100, tip: 10 }], []) }, {
+    ...emptyRevenue, collected: 110, services: 110, invoiced: 100, tips: 10, net: 100,
+    cashInvoiced: 100, cashServices: 100, cashTips: 10, cashNet: 100,
+  });
+});
+
 for (const [id, description, payment, expected] of [
   ['REV-001', 'El resumen completo coincide con el oraculo fijo', 'Ambas', {
     cuts: 3, saleCount: 2, services: 3900, sales: 1200, tips: 300, commission: 1950,

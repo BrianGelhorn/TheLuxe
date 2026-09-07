@@ -15,7 +15,8 @@ export default {
   async fetch(request) {
     if (!['GET', 'HEAD'].includes(request.method)) return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
     const path = new URL(request.url).pathname;
-    const asset = assets[path === '/' ? 'index.html' : path.slice(1)];
+    const key = path === '/' ? 'index.html' : path.slice(1);
+    const asset = Object.hasOwn(assets, key) ? assets[key] : null;
     if (!asset) return new Response('Not Found', { status: 404 });
     return new Response(request.method === 'HEAD' ? null : asset[0], { headers: { 'Content-Type': asset[1], 'Cache-Control': path === '/' ? 'no-cache' : 'public, max-age=3600' } });
   },

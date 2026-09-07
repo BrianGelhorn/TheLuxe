@@ -119,9 +119,15 @@ function saveConfig() {
 }
 
 function populateSelectors() {
+  const options = [...document.querySelectorAll('#summaryServiceOptions input')];
+  const selectedServices = new Set(options.filter((input) => input.checked).map((input) => input.value));
+  const allServices = options.every((input) => input.checked);
+  const selectedBarber = document.getElementById('summaryBarberFilter').value;
   serviceInput.innerHTML = '<option value="">Seleccionar servicio</option>' + config.services.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
-  document.getElementById('summaryServiceOptions').innerHTML = config.services.map(({ name }) => `<label><input type="checkbox" value="${escapeHtml(name)}" checked> ${escapeHtml(name)}</label>`).join('');
+  document.getElementById('summaryServiceOptions').innerHTML = config.services.map(({ name }) => `<label><input type="checkbox" value="${escapeHtml(name)}" ${allServices || selectedServices.has(name) ? 'checked' : ''}> ${escapeHtml(name)}</label>`).join('');
   document.getElementById('summaryBarberFilter').innerHTML = '<option value="">Todos los barberos</option>' + config.barbers.map(({ name }) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  document.getElementById('summaryBarberFilter').value = config.barbers.some(({ name }) => name === selectedBarber) ? selectedBarber : '';
+  updateServiceFilterLabel();
   document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + config.products.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
   advanceForm.elements.barber.innerHTML = '<option value="">Seleccionar barbero</option>' + config.barbers.filter(({ active }) => active !== false).map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
 }
@@ -170,7 +176,11 @@ function saveCatalog(type, formElement) {
 function configInUse(type, name) {
   if (type === 'services') return entries.some((entry) => entry.service === name);
   if (type === 'products') return sales.some((sale) => sale.product === name);
-  return entries.some((entry) => entry.barber === name) || advances.some((advance) => advance.barber === name);
+  return entries.some((entry) => entry.barber === name) || advances.some((advance) => advance.barber === name)
+    || Object.keys(barberPayments).some((date) => {
+      const payment = barberPaymentRecord(name, date);
+      return payment.status !== 'No pago' || Number(payment.cashAmount || 0) > 0 || Number(payment.mpAmount || 0) > 0;
+    });
 }
 
 function openConfigDialog(type, item = null) {
@@ -448,6 +458,7 @@ function barberColumn(barber, list) {
 
 function openCutDialog(barber) {
   form.reset();
+  amountInput.setCustomValidity('');
   toggleSplitPayment();
   editingId = null;
   barberInput.value = barber;
@@ -489,8 +500,8 @@ function openEditDialog(id) {
   amountInput.value = formatAmount(entry.amount);
   tipInput.value = entry.tip ? formatAmount(entry.tip) : '';
   paymentInput.value = entry.payment;
-  cashAmountInput.value = entry.cashAmount ? formatAmount(entry.cashAmount) : '';
-  mpAmountInput.value = entry.mpAmount ? formatAmount(entry.mpAmount) : '';
+  cashAmountInput.value = formatAmount(entry.cashAmount);
+  mpAmountInput.value = formatAmount(entry.mpAmount);
   toggleSplitPayment();
   notesInput.value = entry.notes || '';
   document.getElementById('formMode').textContent = 'MODIFICAR CORTE';
@@ -597,7 +608,8 @@ document.querySelector('.app-shell').addEventListener('click', (event) => {
   if (!button) return;
   document.querySelectorAll('[data-view]').forEach((item) => {
     item.classList.toggle('active', item.dataset.view === button.dataset.view);
-    item.toggleAttribute('aria-current', item.dataset.view === button.dataset.view);
+    if (item.dataset.view === button.dataset.view) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
   });
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === button.dataset.view));
   document.querySelector('h1').textContent = button.dataset.view === 'salesView' ? 'Caja y movimientos' : button.dataset.view === 'summaryView' ? 'Resúmenes' : button.dataset.view === 'configView' ? 'Configuración' : 'Panel diario';
@@ -617,10 +629,13 @@ document.getElementById('summaryDate').addEventListener('change', () => {
   renderSummary();
 });
 document.getElementById('summaryWeek').addEventListener('change', renderSummary);
-document.getElementById('summaryServiceOptions').addEventListener('change', () => {
+function updateServiceFilterLabel() {
   const checked = [...document.querySelectorAll('#summaryServiceOptions input:checked')];
   const summary = document.querySelector('#summaryServiceFilter summary');
   summary.textContent = checked.length === config.services.length ? 'Todos los servicios' : checked.length === 1 ? checked[0].value : `${checked.length} servicios seleccionados`;
+}
+document.getElementById('summaryServiceOptions').addEventListener('change', () => {
+  updateServiceFilterLabel();
   renderSummary();
 });
 document.getElementById('summaryBarberFilter').addEventListener('change', renderSummary);
@@ -758,10 +773,12 @@ cashRegisterForm.addEventListener('submit', (event) => {
 
 serviceInput.addEventListener('change', (event) => {
   amountInput.value = prices[event.target.value] ? formatAmount(prices[event.target.value]) : '';
+  amountInput.setCustomValidity('');
 });
 saleForm.elements.product.addEventListener('change', (event) => {
   const product = config.products.find(({ name }) => name === event.target.value);
   saleForm.elements.unitPrice.value = product ? formatAmount(product.price) : '';
+  saleForm.elements.unitPrice.setCustomValidity('');
   updateSaleTotal();
 });
 paymentInput.addEventListener('change', toggleSplitPayment);
@@ -861,6 +878,9 @@ document.getElementById('deleteExpense').addEventListener('click', () => {
 });
 
 serviceConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('services', serviceConfigForm); });
+[serviceConfigForm, productConfigForm, barberConfigForm].forEach((catalogForm) => {
+  catalogForm.elements.name.addEventListener('input', () => catalogForm.elements.name.setCustomValidity(''));
+});
 productConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('products', productConfigForm); });
 barberConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('barbers', barberConfigForm); });
 document.getElementById('addServiceConfig').addEventListener('click', () => openConfigDialog('services'));

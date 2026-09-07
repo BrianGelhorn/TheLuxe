@@ -6,6 +6,7 @@ function updateSaleTotal() {
 
 function openSaleDialog(id = null) {
   saleForm.reset();
+  saleForm.elements.unitPrice.setCustomValidity('');
   editingSaleId = id;
   const sale = sales.find((item) => item.id === id);
   saleForm.elements.time.value = sale?.time || nowTime();

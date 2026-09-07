@@ -9,7 +9,7 @@ function renderSales(list) {
   document.getElementById('salesEmpty').hidden = list.length > 0;
   document.getElementById('salesCashTotal').textContent = money.format(salePaymentTotal(list, 'Efectivo'));
   document.getElementById('salesMpTotal').textContent = money.format(salePaymentTotal(list, 'Mercado Pago'));
-  document.getElementById('salesGrandTotal').textContent = money.format(list.reduce((sum, sale) => sum + sale.total, 0));
+  document.getElementById('salesGrandTotal').textContent = money.format(list.reduce((sum, sale) => sum + Number(sale.total), 0));
 }
 
 function renderAdvances(list) {
@@ -22,7 +22,7 @@ function renderAdvances(list) {
   document.getElementById('advancesEmpty').hidden = list.length > 0;
   document.getElementById('advancesCashTotal').textContent = money.format(advancePaymentTotal(list, 'Efectivo'));
   document.getElementById('advancesMpTotal').textContent = money.format(advancePaymentTotal(list, 'Mercado Pago'));
-  document.getElementById('advancesGrandTotal').textContent = money.format(list.reduce((sum, advance) => sum + advance.amount, 0));
+  document.getElementById('advancesGrandTotal').textContent = money.format(list.reduce((sum, advance) => sum + Number(advance.amount), 0));
 }
 
 function renderExpenses(list) {
@@ -30,7 +30,7 @@ function renderExpenses(list) {
   document.getElementById('expensesEmpty').hidden = list.length > 0;
   document.getElementById('expensesCashTotal').textContent = money.format(expensePaymentTotal(list, 'Efectivo'));
   document.getElementById('expensesMpTotal').textContent = money.format(expensePaymentTotal(list, 'Mercado Pago'));
-  document.getElementById('expensesGrandTotal').textContent = money.format(list.reduce((sum, expense) => sum + expense.amount, 0));
+  document.getElementById('expensesGrandTotal').textContent = money.format(list.reduce((sum, expense) => sum + Number(expense.amount), 0));
 }
 
 function cashMovements(list, adjustments = []) {
@@ -67,6 +67,8 @@ function updateWeekOptions() {
 }
 
 function renderSummary() {
+  const reference = document.getElementById('summaryDate');
+  if (!reference.value || !reference.checkValidity()) updateSummaryReference();
   const period = document.getElementById('summaryPeriod').value;
   const [from, to] = periodBounds(period, document.getElementById('summaryDate').value, document.getElementById('summaryWeek').value);
   const inRange = (item) => item.date >= from && item.date <= to;
