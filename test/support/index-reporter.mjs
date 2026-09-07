@@ -16,7 +16,8 @@ export default async function* report(events) {
   yield 'Una linea por test. Los IDs se pueden buscar en el codigo o ejecutar con `--test-name-pattern`.\n\n';
   yield 'Alcance y comandos: [TESTING.md](TESTING.md). No certifica estilos ni interaccion nativa de un navegador real.\n\n';
   const ids = new Set();
-  for (const file of [...new Set(cases.map((item) => item.file))].sort()) {
+  const files = [...new Set(cases.map((item) => item.file))].sort();
+  for (const [index, file] of files.entries()) {
     yield `## ${file}\n\n`;
     for (const item of cases.filter((row) => row.file === file).sort((a, b) => a.name.localeCompare(b.name, 'en'))) {
       const match = item.name.match(/^([A-Z][A-Z-]*-\d+) - (.+)$/);
@@ -24,6 +25,6 @@ export default async function* report(events) {
       ids.add(match[1]);
       yield `- **${match[1]}**: ${match[2]}.${item.failed ? ' **FALLA**' : ''}\n`;
     }
-    yield '\n';
+    if (index < files.length - 1) yield '\n';
   }
 }
