@@ -1,2 +1,5 @@
 /BarberControl/
 /docs/toconfirm.md
+/dist/
+/node_modules/
+/coverage/

@@ -6,19 +6,17 @@
   <title>The Luxe — Panel diario</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=21">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=141">
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="#" aria-label="The Luxe inicio">
+      <button id="sidebarToggle" class="brand" type="button" aria-label="Abrir menú lateral" aria-controls="sidebarNav" aria-expanded="false">
         <span class="brand-mark">TL</span>
-        <span><strong>The Luxe</strong><small>Barber studio</small></span>
-      </a>
-      <nav class="nav" aria-label="Secciones principales">
-        <button class="nav-item active" type="button" data-view="dailyView" aria-current="page"><span class="nav-icon">⌁</span> Panel diario</button>
-        <button class="nav-item" type="button" data-view="salesView"><span class="nav-icon">$</span> Caja y movimientos</button>
+        <span class="brand-copy"><strong>The Luxe</strong><small>Barber studio</small></span>
+      </button>
+      <nav id="sidebarNav" class="nav" aria-label="Secciones principales">
         <button class="nav-item" type="button" data-view="summaryView"><span class="nav-icon">Σ</span> Resúmenes</button>
         <button class="nav-item" type="button" data-view="configView"><span class="nav-icon">⚙</span> Configuración</button>
       </nav>
@@ -30,6 +28,10 @@
           <p class="eyebrow">OPERACIÓN DIARIA</p>
           <h1>Panel diario</h1>
         </div>
+        <nav class="workspace-tabs" aria-label="Operación de la jornada">
+          <button class="workspace-tab active" type="button" data-view="dailyView" aria-current="page"><span>⌁</span>Panel diario</button>
+          <button class="workspace-tab" type="button" data-view="salesView"><span>$</span>Caja y movimientos</button>
+        </nav>
         <label class="date-field">
           <span>Jornada</span>
           <input id="workday" type="date">
@@ -41,8 +43,9 @@
           <div class="section-heading"><div><span class="step">APERTURA DE JORNADA</span><h2>Cajas iniciales</h2></div><div class="heading-actions"><small id="openingStatus">Pendiente</small><button id="changeCommission" class="secondary-btn" type="button">Cambiar comisión</button></div></div>
           <form id="openingCashForm" class="cash-register-form opening-form">
             <label class="field"><span>Efectivo inicial</span><div class="money-input"><b>$</b><input name="initialCash" type="text" inputmode="numeric" required></div></label>
-            <label class="field"><span>Mercado Pago inicial</span><div class="money-input"><b>$</b><input name="initialMp" type="text" inputmode="numeric" required></div></label>
-            <button class="primary-btn compact-btn" type="submit">Iniciar jornada</button>
+            <label class="field"><span>Mercado Pago inicial</span><div class="money-input"><b>$</b><input name="initialMp" type="text" inputmode="numeric" required></div><small id="inheritedMpHint" class="inherited-value" hidden></small></label>
+            <label id="openingEditDescription" class="field full-width" hidden><span>Descripción del ajuste</span><input name="editDescription" type="text" maxlength="120" placeholder="Motivo de la modificación"></label>
+            <div class="opening-actions"><button id="cancelOpeningEdit" class="secondary-btn" type="button" hidden>Cancelar</button><button class="primary-btn compact-btn" type="submit">Iniciar jornada</button></div>
           </form>
           <div id="openingSaved" class="opening-saved" hidden>
             <span>Efectivo inicial <strong id="openingCashValue">$ 0</strong></span>
@@ -50,27 +53,109 @@
             <button id="editOpeningCash" class="secondary-btn" type="button">Editar caja inicial</button>
           </div>
         </article>
-        <div class="metrics">
-          <article class="metric featured"><span>Recaudado</span><strong id="dailyTotal">$ 0</strong><small id="dailyCount">0 cortes</small></article>
-          <article class="metric"><span>Propinas</span><strong id="tipsTotal">$ 0</strong><small>Registradas</small></article>
-          <article class="metric"><span>Efectivo</span><strong id="cashTotal">$ 0</strong><small>Saldo</small></article>
-          <article class="metric"><span>Mercado Pago</span><strong id="mpTotal">$ 0</strong><small>Saldo</small></article>
-        </div>
-
         <article class="card daily-sheet">
           <div class="section-heading">
-            <div><span class="step">PLANILLA DEL DÍA</span><h2>Servicios por barbero</h2></div>
+            <div><span class="step">PLANILLA DEL DÍA</span><h2 class="card-sheet-title">Servicios por barbero <button class="info-tip card-structure-help" type="button" aria-label="Cómo leer las tarjetas de servicios" data-tip="Verde: efectivo. Azul: MP. Dorado: total. Gris: propina.">?</button></h2></div>
+            <div class="heading-actions barber-order-actions">
+              <small id="barberOrderHint" hidden>Arrastrá las columnas para ordenarlas</small>
+              <button id="cancelBarberOrder" class="secondary-btn" type="button" hidden>Cancelar</button>
+              <button id="reorderBarbers" class="secondary-btn" type="button">Ordenar columnas</button>
+            </div>
           </div>
           <div id="barberColumns" class="barber-columns"></div>
         </article>
+
+        <div class="day-overview">
+        <div class="metrics daily-metrics daily-totals">
+          <article class="metric featured collection-metric">
+            <div class="collection-head">
+              <div class="metric-title">
+                <svg class="micon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.2" cy="9.2" r="5.4"/><circle cx="14.8" cy="14.8" r="5.4" opacity=".4"/></svg>
+                <span>Total cobrado</span>
+                <button class="info-tip" type="button" aria-label="Cómo se calcula el total cobrado" data-tip="Ingreso bruto del día. Se calcula: servicios + propinas + ventas.">?</button>
+              </div>
+              <small class="metric-sub"><span id="dailyCount">0 cortes</span> · <span id="dailySalesCount">0 ventas</span></small>
+              <strong class="metric-value" id="dailyCollected">$ 0</strong>
+            </div>
+            <div class="collection-table-wrap">
+              <table class="collection-table" aria-label="Desglose diario por concepto y medio de cobro">
+                <thead><tr><th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Efectivo</th><th scope="col" aria-label="Mercado Pago">MP</th></tr></thead>
+                <tbody class="collection-services" aria-label="Servicios y propinas">
+                  <tr><th scope="row">Servicios</th><td id="dailyServices">$ 0</td><td id="dailyServicesCash">$ 0</td><td id="dailyServicesMp">$ 0</td></tr>
+                  <tr><th scope="row">Propinas</th><td id="dailyTips">$ 0</td><td id="dailyTipsCash">$ 0</td><td id="dailyTipsMp">$ 0</td></tr>
+                  <tr class="collection-subtotal"><th scope="row">Servicios + propinas</th><td id="dailyServicesTotal">$ 0</td><td id="dailyServicesTotalCash">$ 0</td><td id="dailyServicesTotalMp">$ 0</td></tr>
+                </tbody>
+                <tbody class="collection-sales" aria-label="Ventas de productos">
+                  <tr><th scope="row">Ventas</th><td id="dailySalesTotal">$ 0</td><td id="dailySalesCash">$ 0</td><td id="dailySalesMp">$ 0</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="metric featured accounting-metric">
+<div class="accounting-head">
+              <div class="metric-title">
+                <svg class="micon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h7.2L18 7.8V20.5H6.5z"/><path d="M13.6 3.5v4.4h4.3"/><path d="M9.5 12.8h4.8M9.5 15.7h4.8"/></svg>
+                <span>Total final</span>
+                <button class="info-tip" type="button" aria-label="Cómo se calcula el total final" data-tip="Facturación luego de comisiones. Se calcula: servicios + ventas − comisiones.">?</button>
+              </div>
+            </div>
+            <div class="accounting-detail">
+              <small class="accounting-note">Facturado<strong id="dailyInvoiced">$ 0</strong></small>
+              <small class="accounting-note">Comisión<strong id="dailyCommission">$ 0</strong></small>
+              <div class="net-card"><span class="net-card-label">Total final</span><strong class="metric-value" id="dailyNet">$ 0</strong></div>
+            </div>
+          </article>
+
+          <article class="metric saldos-metric">
+            <div class="metric-title">
+              <svg class="micon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5a2 2 0 0 1 2-2h12.5"/><path d="M3.5 8.5v9a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H8.8"/><path d="M16.5 13.5h.01"/></svg>
+              <span>Saldos disponibles</span>
+              <button class="info-tip" type="button" aria-label="Cómo se calculan los saldos" data-tip="Por medio: apertura + cobros − pagos a barberos − adelantos − gastos ± transferencias.">?</button>
+            </div>
+            <div class="saldos-boxes">
+              <div class="saldo-box ticket">
+                <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/></svg><b class="saldo-label">Ticket promedio</b></span>
+                <strong class="saldo-value" id="dailyAverageTicket">$ 0</strong>
+              </div>
+              <div class="saldo-box cash">
+                <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.2"/><path d="M6.5 12h.01M17.5 12h.01"/></svg><b class="saldo-label">Efectivo</b></span>
+                <strong class="saldo-value" id="cashTotal">$ 0</strong>
+              </div>
+              <div class="saldo-box mp">
+                <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 10.5h19"/></svg><b class="saldo-label">Mercado Pago</b></span>
+                <strong class="saldo-value" id="mpTotal">$ 0</strong>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <article class="card daily-sheet closing-card">
+          <div class="section-heading"><div><span class="step">CIERRE DE CAJA</span><h2>Real, teórico y diferencia</h2></div><small id="closingStatus">Pendiente</small></div>
+          <div class="closing-comparison">
+            <span>Efectivo teórico<strong id="theoreticalCash">$ 0</strong></span>
+            <span>MP teórico<strong id="theoreticalMp">$ 0</strong></span>
+            <span>Diferencia efectivo<strong id="cashDifference">—</strong></span>
+            <span>Diferencia MP<strong id="mpDifference">—</strong></span>
+          </div>
+          <form id="cashRegisterForm" class="cash-register-form closing-form">
+            <label class="field"><span>Efectivo real</span><div class="money-input"><b>$</b><input name="realCash" type="text" inputmode="numeric" required></div></label>
+            <label class="field"><span>MP real</span><div class="money-input"><b>$</b><input name="realMp" type="text" inputmode="numeric" required></div></label>
+            <label class="field"><span>Retiro al final del día</span><div class="money-input"><b>$</b><input name="withdrawal" type="text" inputmode="numeric" value="0" required></div></label>
+            <button class="primary-btn compact-btn" type="submit">Guardar cierre</button>
+          </form>
+          <p class="next-opening">Caja inicial calculada para el día siguiente: <strong id="nextOpeningCash">$ 0 efectivo</strong> · <strong id="nextOpeningMp">$ 0 MP</strong></p>
+        </article>
+        </div>
       </section>
 
       <section id="salesView" class="view">
-        <article class="card daily-sheet">
+        <article class="card daily-sheet sales-card">
           <div class="section-heading">
             <div><span class="step">VENTAS DEL DÍA</span><h2>Productos vendidos</h2></div>
             <button id="addSale" class="primary-btn compact-btn" type="button">Agregar venta</button>
           </div>
+          <div class="movement-body" tabindex="0" role="region" aria-label="Detalle de productos vendidos">
           <div class="sales-table-wrap">
             <table class="sales-table">
               <thead><tr><th>Hora</th><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th><th>Medio de pago</th><th>Notas</th></tr></thead>
@@ -78,6 +163,7 @@
             </table>
           </div>
           <div id="salesEmpty" class="barber-empty">Sin ventas cargadas</div>
+          </div>
           <div class="movement-summary"><span>Efectivo <strong id="salesCashTotal">$ 0</strong></span><span>Mercado Pago <strong id="salesMpTotal">$ 0</strong></span><span>Total <strong id="salesGrandTotal">$ 0</strong></span></div>
         </article>
         <article class="card daily-sheet">
@@ -85,6 +171,7 @@
             <div><span class="step">ADELANTOS DEL DÍA</span><h2>Salidas para barberos</h2></div>
             <button id="addAdvance" class="primary-btn compact-btn" type="button">Agregar adelanto</button>
           </div>
+          <div class="movement-body" tabindex="0" role="region" aria-label="Detalle de adelantos para barberos">
           <div class="sales-table-wrap">
             <table class="sales-table">
               <thead><tr><th>Hora</th><th>Barbero</th><th>Importe</th><th>Medio</th><th>Motivo</th></tr></thead>
@@ -92,55 +179,131 @@
             </table>
           </div>
           <div id="advancesEmpty" class="barber-empty">Sin adelantos cargados</div>
+          </div>
           <div class="movement-summary outgoing"><span>Efectivo <strong id="advancesCashTotal">$ 0</strong></span><span>Mercado Pago <strong id="advancesMpTotal">$ 0</strong></span><span>Total <strong id="advancesGrandTotal">$ 0</strong></span></div>
         </article>
         <article class="card daily-sheet">
           <div class="section-heading"><div><span class="step">SALIDAS DE CAJA</span><h2>Gastos de la jornada</h2></div><button id="addExpense" class="primary-btn compact-btn" type="button">Agregar salida</button></div>
+          <div class="movement-body" tabindex="0" role="region" aria-label="Detalle de gastos de la jornada">
           <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Hora</th><th>Motivo</th><th>Importe</th><th>Medio</th></tr></thead><tbody id="expenseRows"></tbody></table></div>
           <div id="expensesEmpty" class="barber-empty">Sin salidas de caja</div>
+          </div>
           <div class="movement-summary outgoing"><span>Efectivo <strong id="expensesCashTotal">$ 0</strong></span><span>Mercado Pago <strong id="expensesMpTotal">$ 0</strong></span><span>Total <strong id="expensesGrandTotal">$ 0</strong></span></div>
         </article>
-        <article class="card daily-sheet">
-          <div class="section-heading"><div><span class="step">CIERRE DE CAJA</span><h2>Cajas reales</h2></div></div>
-          <form id="cashRegisterForm" class="cash-register-form">
-            <label class="field"><span>Efectivo real</span><div class="money-input"><b>$</b><input name="realCash" type="text" inputmode="numeric"></div></label>
-            <label class="field"><span>MP real</span><div class="money-input"><b>$</b><input name="realMp" type="text" inputmode="numeric"></div></label>
-            <button class="primary-btn compact-btn" type="submit">Guardar cierre</button>
+        <article class="card daily-sheet inventory-card">
+          <div class="section-heading"><div><span class="step">INSUMOS Y PRODUCTOS</span><h2>Control de stock</h2></div><button class="secondary-btn compact-btn" type="button" data-view="configView">Configurar productos</button></div>
+          <div class="movement-body" tabindex="0" role="region" aria-label="Registro y detalle del stock">
+          <p class="stock-hint">Registrá lo usado y las reposiciones de la jornada seleccionada. No modifica las ventas ni la caja.</p>
+          <form id="stockMovementForm" class="stock-form">
+            <label class="field"><span>Producto</span><select name="stockProduct" required></select></label>
+            <label class="field"><span>Movimiento</span><select name="stockType"><option value="consumo">Consumo del día</option><option value="entrada">Ingreso de stock</option></select></label>
+            <label class="field"><span>Cantidad</span><input name="stockQuantity" type="number" min="1" max="1000000000" step="1" value="1" required></label>
+            <label class="field"><span>Nota <small>(opcional)</small></span><input name="stockNotes" maxlength="120" placeholder="Ej. reposición de navajas"></label>
+            <button class="primary-btn compact-btn" type="submit">Registrar</button>
           </form>
+          <p id="stockMessage" class="stock-message" role="status" hidden></p>
+          <div class="sales-table-wrap"><table class="sales-table stock-table"><thead><tr><th>Producto</th><th>Stock actual</th><th>Ingresó en el día</th><th>Se usó en el día</th></tr></thead><tbody id="stockRows"></tbody></table></div>
+          <div id="stockEmpty" class="barber-empty">Agregá los productos que quieras controlar en Configuración.</div>
+          <details class="movement-history"><summary>Movimientos de stock <span id="stockMovementCount">0</span></summary><div class="sales-table-wrap"><table class="sales-table stock-table"><thead><tr><th>Hora</th><th>Producto</th><th>Movimiento</th><th>Cantidad</th><th>Nota</th><th></th></tr></thead><tbody id="stockMovementRows"></tbody></table></div><div id="stockMovementsEmpty" class="barber-empty">Sin movimientos en esta jornada</div></details>
+          </div>
+          <small class="stock-hint">Guardado en este navegador. Las ventas no descuentan stock automáticamente.</small>
+        </article>
+        <article class="card daily-sheet transfer-card">
+          <div class="section-heading"><div><span class="step">ENTRE MEDIOS</span><h2>Transferir dinero</h2></div><div class="transfer-balances"><span>Efectivo <strong id="transferCashAvailable">$ 0</strong></span><span>Mercado Pago <strong id="transferMpAvailable">$ 0</strong></span></div></div>
+          <div class="movement-body" tabindex="0" role="region" aria-label="Transferir dinero e historial de movimientos">
+          <form id="transferForm" class="cash-register-form transfer-form">
+            <label class="field"><span>Dirección</span><select name="from" required><option value="Efectivo">Efectivo → Mercado Pago</option><option value="Mercado Pago">Mercado Pago → Efectivo</option></select></label>
+            <label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label>
+            <label class="field"><span>Nota <small>(opcional)</small></span><input name="description" type="text" maxlength="120" placeholder="Motivo del movimiento"></label>
+            <button class="primary-btn compact-btn" type="submit">Transferir</button>
+          </form>
+          <details class="movement-history"><summary>Movimientos de la jornada <span id="transferCount">0</span></summary><div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Hora</th><th>Movimiento</th><th>Importe</th><th>Nota</th><th></th></tr></thead><tbody id="transferRows"></tbody></table></div><div id="transfersEmpty" class="barber-empty">Sin movimientos registrados</div></details>
+          </div>
         </article>
       </section>
 
       <section id="summaryView" class="view">
-        <article class="card daily-sheet">
+        <article class="card daily-sheet summary-filter-card">
           <div class="summary-controls">
             <label class="field"><span>Período</span><select id="summaryPeriod"><option value="week">Semanal</option><option value="month">Mensual</option><option value="year">Anual</option></select></label>
             <label class="field"><span id="summaryDateLabel">Mes</span><input id="summaryDate" type="month"></label>
             <label id="summaryWeekField" class="field"><span>Número de semana</span><select id="summaryWeek"></select></label>
+            <div id="summaryServiceField" class="field"><span>Tipos de servicio</span><details id="summaryServiceFilter" class="checkbox-dropdown"><summary>Todos los servicios</summary><div id="summaryServiceOptions" class="checkbox-options"></div></details></div>
+            <label class="field"><span>Barbero</span><select id="summaryBarberFilter"><option value="">Todos los barberos</option></select></label>
+            <label class="field"><span>Medio de pago</span><select id="summaryPaymentFilter"><option value="Ambas">Efectivo y MP</option><option value="Efectivo">Efectivo</option><option value="Mercado Pago">Mercado Pago</option></select></label>
             <div class="summary-range"><span class="step">RANGO SELECCIONADO</span><h2 id="summaryRange"></h2></div>
           </div>
         </article>
-        <div class="metrics summary-metrics">
-          <article class="metric"><span>Cortes</span><strong id="summaryCuts">0</strong></article>
-          <article class="metric"><span>Ventas registradas</span><strong id="summarySaleCount">0</strong></article>
-          <article class="metric"><span>Servicios</span><strong id="summaryServices">$ 0</strong></article>
-          <article class="metric"><span>Ventas</span><strong id="summarySales">$ 0</strong></article>
-          <article class="metric featured"><span>Total facturado</span><strong id="summaryInvoiced">$ 0</strong></article>
-          <article class="metric"><span>Propinas</span><strong id="summaryTips">$ 0</strong></article>
-          <article class="metric"><span>Comisiones</span><strong id="summaryCommission">$ 0</strong></article>
-          <article class="metric"><span>Adelantos</span><strong id="summaryAdvances">$ 0</strong></article>
-          <article class="metric"><span>Salidas de caja</span><strong id="summaryExpenses">$ 0</strong></article>
-          <article class="metric featured"><span>Balance</span><strong id="summaryBalance">$ 0</strong></article>
+        <section id="barbersSummary" aria-labelledby="summaryBarbersTitle">
+        <div class="section-heading summary-section-heading"><div><span class="step">INGRESOS POR SERVICIOS</span><div class="metric-title"><h2 id="summaryBarbersTitle">Barberos</h2><button class="info-tip" type="button" aria-label="Alcance del resumen de Barberos" data-tip="Todos los filtros.">?</button></div></div></div>
+        <div class="metrics daily-totals summary-highlights">
+          <article class="metric featured collection-metric">
+            <div class="collection-head">
+              <div class="metric-title"><span>Facturado total</span><button class="info-tip" type="button" aria-label="Cómo se calcula el facturado total" data-tip="Servicios + propinas.">?</button></div>
+              <small class="metric-sub"><span id="summaryOperationCount">0 servicios</span></small>
+              <strong class="metric-value" id="summaryInvoiced">$ 0</strong>
+            </div>
+            <div class="collection-table-wrap" tabindex="0" role="region" aria-label="Desglose del facturado por medio de cobro">
+              <table class="collection-table" aria-label="Facturado por concepto y medio de cobro">
+                <thead><tr><th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Efectivo</th><th scope="col" aria-label="Mercado Pago">MP</th></tr></thead>
+                <tbody class="collection-services">
+                  <tr><th scope="row">Servicios</th><td id="summaryInvoicedCuts">$ 0</td><td id="summaryInvoicedCutsCash">$ 0</td><td id="summaryInvoicedCutsMp">$ 0</td></tr>
+                  <tr><th scope="row">Propinas</th><td id="summaryInvoicedTips">$ 0</td><td id="summaryInvoicedTipsCash">$ 0</td><td id="summaryInvoicedTipsMp">$ 0</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+          <article class="metric featured accounting-metric">
+            <div class="accounting-head"><div class="metric-title"><span>Comisión</span><button class="info-tip" type="button" aria-label="Cómo se calcula la comisión" data-tip="Comisión + propinas.">?</button></div></div>
+            <div class="accounting-detail">
+              <small class="accounting-note">Comisión de cortes<strong id="summaryCommissionAmount">$ 0</strong></small>
+              <small class="accounting-note">Propinas<strong id="summaryCommissionTips">$ 0</strong></small>
+            </div>
+            <div class="net-card"><span class="net-card-label">Ingreso neto</span><strong class="metric-value" id="summaryCommission">$ 0</strong></div>
+          </article>
+          <article class="metric accounting-metric">
+            <div class="accounting-head"><div class="metric-title"><span>Ticket promedio</span><button class="info-tip" type="button" aria-label="Cómo se calcula el ticket promedio" data-tip="Bruto: facturado ÷ servicios. Neto: (comisión + propinas) ÷ servicios.">?</button></div></div>
+            <div class="accounting-detail"><small class="accounting-note">Bruto<strong id="summaryAverageTicket">$ 0</strong></small></div>
+            <div class="net-card"><span class="net-card-label">Neto</span><strong class="metric-value" id="summaryAverageTicketNeto">$ 0</strong></div>
+          </article>
         </div>
-        <article class="card daily-sheet"><div class="section-heading"><div><span class="step">CAJAS</span><h2>Resumen por medio</h2></div></div><div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Medio</th><th>Inicial</th><th>Entradas</th><th>Propinas</th><th>Adelantos</th><th>Gastos</th><th>Teórica</th><th>Real</th><th>Diferencia</th></tr></thead><tbody id="cashSummaryRows"></tbody></table></div></article>
+        <div class="metrics summary-metrics" role="group" aria-label="Movimientos del período">
+          <article class="metric summary-secondary"><span>Adelantos</span><strong id="summaryAdvances">$ 0</strong></article>
+          <article class="metric summary-secondary"><span>Salidas de caja</span><strong id="summaryExpenses">$ 0</strong></article>
+          <article class="metric summary-secondary"><span>Retiros totales</span><strong id="summaryWithdrawals">$ 0</strong></article>
+        </div>
+        </section>
+        <section id="shopSummary" class="card daily-sheet shop-summary" aria-labelledby="shopTitle" hidden>
+          <div class="section-heading"><div class="metric-title"><h2 id="shopTitle">Barbería</h2><button class="info-tip" id="shopScope" type="button" aria-label="Alcance del resumen de Barbería" data-tip="Local completo; período y medio.">?</button></div></div>
+          <div class="metrics daily-totals summary-highlights">
+            <article class="metric featured collection-metric">
+              <div class="metric-title"><span>Total facturado</span><button class="info-tip" type="button" aria-label="Cómo se calcula el total facturado de Barbería" data-tip="Servicios + ventas.">?</button></div>
+              <strong class="metric-value" id="shopInvoiced">$ 0</strong>
+              <small class="metric-sub">Ventas registradas: <span id="shopSaleCount">0</span> · Unidades: <span id="shopSaleQuantity">0</span></small>
+              <div class="collection-table-wrap" tabindex="0" role="region" aria-label="Facturación de Barbería por medio de cobro">
+                <table class="collection-table"><thead><tr><th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Efectivo</th><th scope="col" aria-label="Mercado Pago">MP</th></tr></thead><tbody id="shopRevenueRows"></tbody></table>
+              </div>
+            </article>
+            <article class="metric featured accounting-metric">
+              <div class="metric-title"><span>Balance del local</span><button class="info-tip" type="button" aria-label="Cómo se calcula el balance del local" data-tip="Facturado - comisiones - gastos.">?</button></div>
+              <div class="accounting-detail">
+                <small class="accounting-note">Comisiones<strong id="shopCommission">$ 0</strong></small>
+                <small class="accounting-note">Gastos operativos<strong id="shopExpenses">$ 0</strong></small>
+              </div>
+              <div class="net-card"><span class="net-card-label">Queda al local</span><strong class="metric-value" id="shopBalance">$ 0</strong></div>
+            </article>
+            <article class="metric collection-metric summary-movements">
+              <div class="metric-title"><span>Movimientos</span><button class="info-tip" type="button" aria-label="Cómo leer los movimientos de Barbería" data-tip="Por medio; retiros solo efectivo.">?</button></div>
+              <div class="collection-table-wrap" tabindex="0" role="region" aria-label="Movimientos de Barbería por medio de pago">
+                <table class="collection-table"><thead><tr><th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Efectivo</th><th scope="col" aria-label="Mercado Pago">MP</th></tr></thead><tbody id="shopMovementRows"></tbody></table>
+              </div>
+            </article>
+          </div>
+        </section>
         <article class="card daily-sheet">
-          <div class="section-heading"><div><span class="step">DESGLOSE</span><h2 id="summaryBreakdownTitle">Resumen por día</h2></div></div>
-          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Período</th><th>Cortes</th><th>Servicios</th><th>Ventas</th><th>Propinas</th><th>Comisiones</th><th>Adelantos</th><th>Gastos</th><th>Balance</th></tr></thead><tbody id="summaryRows"></tbody></table></div>
+          <div class="section-heading"><div><span class="step">HISTÓRICO FILTRADO</span><div class="metric-title"><h2 id="summaryBreakdownTitle">Resumen por día</h2><button class="info-tip" id="summaryHistoryScope" type="button" aria-label="Alcance y balance del histórico" data-tip="Balance = servicios + ventas - comisiones.">?</button></div></div></div>
+          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Período</th><th>Cortes</th><th>Servicios</th><th>Ventas</th><th>Propinas</th><th>Comisiones</th><th>Adelantos</th><th>Gastos</th><th>Retiro</th><th>Balance</th></tr></thead><tbody id="summaryRows"></tbody></table></div>
           <div id="summaryEmpty" class="barber-empty">Sin movimientos en el período</div>
-        </article>
-        <article class="card daily-sheet">
-          <div class="section-heading"><div><span class="step">BARBEROS</span><h2>Resumen por barbero</h2></div></div>
-          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Barbero</th><th>Cortes</th><th>Servicios</th><th>Propinas</th><th>Adelantos</th><th>Balance</th></tr></thead><tbody id="barberSummaryRows"></tbody></table></div>
-          <div id="barberSummaryEmpty" class="barber-empty">Sin actividad de barberos</div>
         </article>
       </section>
 
@@ -148,8 +311,21 @@
         <div class="config-grid">
           <article class="card form-card"><div class="section-heading"><div><span class="step">SERVICIOS</span><h2>Servicios y precios</h2></div><button id="addServiceConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="serviceConfigList" class="config-list"></div></article>
           <article class="card form-card"><div class="section-heading"><div><span class="step">PRODUCTOS</span><h2>Productos y precios</h2></div><button id="addProductConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="productConfigList" class="config-list"></div></article>
-          <article class="card form-card"><div class="section-heading"><div><span class="step">BARBEROS</span><h2>Equipo</h2></div><button id="addBarberConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="barberConfigList" class="config-list"></div></article>
-          <article class="card form-card"><span class="step">COMISIÓN GENERAL</span><h2>Porcentaje para todos</h2><form id="commissionForm" class="config-form"><label class="field"><span>Comisión (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn compact-btn" type="submit">Guardar</button></form></article>
+          <article class="card form-card"><div class="section-heading"><div><span class="step">BARBEROS</span><h2>Equipo</h2></div><button id="addBarberConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><input id="barberConfigSearch" type="search" placeholder="Buscar barbero" aria-label="Buscar barbero"><div id="barberConfigList" class="config-list"></div></article>
+          <article class="card form-card"><span class="step">COMISIÓN PREDETERMINADA</span><h2>Porcentaje para nuevos cortes</h2><form id="commissionForm" class="config-form"><label class="field"><span>Comisión (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn compact-btn" type="submit">Guardar</button></form></article>
+          <article class="card form-card stock-config-card">
+            <div class="section-heading"><div><span class="step">INVENTARIO</span><h2>Productos para controlar stock</h2></div></div>
+            <p class="stock-hint">Navajas, guantes, insumos o productos. Cargá el stock inicial y luego registrá ingresos y consumos desde Caja y movimientos.</p>
+            <form id="stockProductForm" class="stock-product-form">
+              <input name="stockId" type="hidden">
+              <label class="field"><span>Nombre</span><input name="stockName" maxlength="80" placeholder="Ej. Navajas" required></label>
+              <label class="field"><span>Unidad</span><select name="stockUnit"><option value="unidades">Unidades</option><option value="ml">Mililitros</option><option value="g">Gramos</option></select></label>
+              <label class="field"><span>Stock inicial</span><input name="initialStock" type="number" min="0" max="1000000000" step="1" value="0" required></label>
+              <button id="saveStockProduct" class="primary-btn compact-btn" type="submit">Agregar producto</button><button id="cancelStockProduct" class="secondary-btn compact-btn" type="button" hidden>Cancelar</button>
+            </form>
+            <p id="stockInitialDate" class="stock-hint"></p><p id="stockConfigMessage" class="stock-message" role="status" hidden></p>
+            <div id="stockConfigList" class="config-list stock-config-list"></div>
+          </article>
         </div>
       </section>
 
@@ -297,7 +473,7 @@
 
       <dialog id="expenseDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span id="expenseFormMode" class="step">NUEVA SALIDA</span><h2>Salida de caja</h2></div><button id="closeExpenseDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="expenseForm" class="cut-form"><label class="field"><span>Hora</span><input name="time" type="time" required></label><label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label><label class="field"><span>Medio de salida</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label><label class="field full-width"><span>Motivo o descripción</span><textarea name="reason" rows="3" required></textarea></label><button class="primary-btn" type="submit">Guardar salida</button></form></article></dialog>
       <dialog id="expenseDetailDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">DETALLE DE SALIDA</span><h2 id="expenseDetailTitle">Datos completos</h2></div><button id="closeExpenseDetail" class="close-btn" type="button" aria-label="Cerrar">×</button></div><dl id="expenseDetail" class="detail-list"></dl><div class="detail-actions"><button id="editExpense" class="secondary-btn" type="button">Modificar</button><button id="deleteExpense" class="danger-btn" type="button">Eliminar</button></div></article></dialog>
-      <dialog id="commissionDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">COMISIÓN GENERAL</span><h2>Cambiar comisión</h2></div><button id="closeCommissionDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="dailyCommissionForm" class="cut-form"><label class="field full-width"><span>Comisión para nuevos cortes (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn" type="submit">Guardar comisión</button></form></article></dialog>
+      <dialog id="commissionDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">COMISIÓN DE LA JORNADA</span><h2>Cambiar solo este día</h2></div><button id="closeCommissionDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="dailyCommissionForm" class="cut-form"><label class="field full-width"><span>Comisión para todos los cortes del día (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn" type="submit">Guardar comisión</button></form></article></dialog>
 
       <dialog id="serviceConfigDialog" class="cut-dialog">
         <article class="form-card"><div class="card-heading"><div><span id="serviceConfigMode" class="step">NUEVO SERVICIO</span><h2>Servicio</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="serviceConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Precio</span><div class="money-input"><b>$</b><input name="price" type="text" inputmode="numeric" required></div></label><button class="primary-btn" type="submit">Guardar servicio</button></form></article>
@@ -310,8 +486,10 @@
       </dialog>
     </main>
   </div>
-  <script src="reports.js?v=1"></script>
-  <script src="dialogs.js?v=1"></script>
-  <script src="script.js?v=19"></script>
+  <script src="logic.js?v=7"></script>
+  <script src="reports.js?v=21"></script>
+  <script src="dialogs.js?v=2"></script>
+  <script src="inventory.js?v=2"></script>
+  <script src="script.js?v=72"></script>
 </body>
 </html>

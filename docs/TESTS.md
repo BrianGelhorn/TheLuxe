@@ -1,0 +1,778 @@
+# Indice de tests
+
+Generado con `npm run test:docs`. 720 tests; 0 fallos.
+
+Una linea por test. Los IDs se pueden buscar en el codigo o ejecutar con `--test-name-pattern`.
+
+Alcance y comandos: [TESTING.md](TESTING.md). No certifica estilos ni interaccion nativa de un navegador real.
+
+## test/app/bootstrap.test.mjs
+
+- **BOOT-001**: Carga todos los scripts y muestra los 24 cortes de ejemplo sin errores.
+- **BOOT-002**: Una jornada vacia muestra todos los importes en cero.
+- **BOOT-003**: El inicio conserva inventario y claves ajenas pero descarta finanzas de sesiones anteriores.
+
+## test/app/cash-register.test.mjs
+
+- **REG-001**: Sin apertura ni cierre anterior se bloquean las operaciones.
+- **REG-002**: La apertura exige ambos importes por validacion nativa.
+- **REG-003**: Abrir con ceros habilita operaciones y conserva la comision diaria.
+- **REG-004**: La apertura formatea importes y guarda fecha y saldos iniciales.
+- **REG-005**: Editar apertura requiere motivo nativo y no guarda si falta.
+- **REG-006**: El motivo con espacios se rechaza y cancelar limpia su error.
+- **REG-007**: Editar ambos medios registra diferencias sin sumarlas dos veces.
+- **REG-008**: Cambiar solo un medio genera un unico ajuste firmado.
+- **REG-009**: Guardar apertura sin diferencias no crea ajustes ni pierde cierre.
+- **REG-010**: Cancelar edicion restaura apertura y no crea movimientos.
+- **REG-011**: Cambiar jornada sale de la edicion de apertura.
+- **REG-012**: La apertura hereda el ultimo cierre anterior aunque haya dias vacios.
+- **REG-013**: Inicializar desde cierre conserva un override diario de cero.
+- **REG-014**: Una apertura manual existente no se reemplaza por herencia.
+- **REG-015**: Los inputs del cierre muestran diferencias y proxima apertura sin guardar.
+- **REG-016**: El cierre exige efectivo MP y retiro por required.
+- **REG-017**: El retiro mayor al efectivo real se rechaza y permite correccion.
+- **REG-018**: Retirar todo el efectivo deja apertura cero y conserva MP.
+- **REG-019**: Guardar cierre conserva apertura y comision sin restar retiro al saldo diario.
+- **REG-020**: Cerrar fin de anio inicializa la fecha siguiente correcta.
+- **REG-021**: Corregir cierre actualiza la apertura automatica siguiente y su override.
+- **REG-022**: Corregir cierre no pisa una apertura siguiente editada manualmente.
+- **REG-023**: Corregir cierre actualiza la apertura heredada aunque haya salto de fechas.
+- **REG-024**: Corregir un cierre no cambia herencias de otro cierre.
+- **REG-025**: Los cierres guardados se restauran al volver a cada jornada.
+- **REG-026**: Transferir todo el efectivo resta origen y suma destino.
+- **REG-027**: Transferir desde MP usa descripcion predeterminada si esta vacia.
+- **REG-028**: La transferencia exige origen e importe nativos.
+- **REG-029**: La transferencia cero se rechaza y un peso es valido.
+- **REG-030**: La transferencia rechaza importes fuera del entero seguro.
+- **REG-031**: La transferencia no permite superar el disponible del origen.
+- **REG-032**: Cambiar el origen limpia el error y revalida sus fondos.
+- **REG-033**: Cancelar eliminacion de transferencia conserva ambos saldos.
+- **REG-034**: Eliminar transferencia revierte origen y destino.
+- **REG-035**: Transferir en una jornada anterior no toca la actual.
+
+## test/app/commission.test.mjs
+
+- **COM-001**: La tasa predeterminada respeta fechas e historial desordenado.
+- **COM-002**: El cambio diario reemplaza comisiones de todos los barberos ya cargados.
+- **COM-003**: Las propinas y ventas no se comisionan al cambiar la tasa diaria.
+- **COM-004**: Un override de cero anula comisiones existentes sin anular propinas.
+- **COM-005**: Los cortes nuevos usan el override y las ediciones recalculan con esa tasa.
+- **COM-006**: La jornada siguiente usa el default y la anterior conserva su override.
+- **COM-007**: Modificar la tasa de un dia no reescribe cortes de otras fechas.
+- **COM-008**: Repetir cambios de tasa reemplaza el calculo sin acumular diferencias.
+- **COM-009**: El reporte mensual y el pago coinciden con la comision diaria modificada.
+- **COM-010**: Cambiar el default no modifica snapshots ni override pero rige cortes futuros.
+- **COM-011**: Cambiar default sin override preserva cortes previos incluso al editarlos.
+- **COM-012**: Rechaza comision vacia sin tocar datos.
+- **COM-013**: Rechaza comision negativa sin tocar datos.
+- **COM-014**: Rechaza comision mayor a cien sin tocar datos.
+- **COM-015**: Rechaza comision fuera del paso entero del formulario sin tocar datos.
+- **COM-016**: Cerrar el dialogo descarta cambios y solo el mousedown externo lo cierra.
+- **COM-017**: El cambio diario reemplaza tambien snapshots antiguos sin tasa.
+
+## test/app/configuration.test.mjs
+
+- **CFG-001**: Crea edita y elimina un elemento de services sin operaciones.
+- **CFG-002**: Crea edita y elimina un elemento de products sin operaciones.
+- **CFG-003**: Crea edita y elimina un elemento de barbers sin operaciones.
+- **CFG-004**: Un nombre duplicado se rechaza y puede corregirse sin reabrir el dialogo.
+- **CFG-005**: Precio cero en catalogo no guarda y corregirlo permite continuar.
+- **CFG-006**: No elimina services con operaciones asociadas.
+- **CFG-007**: No elimina products con operaciones asociadas.
+- **CFG-008**: No elimina barbers con operaciones asociadas.
+- **CFG-009**: Renombrar barbero conserva cortes adelantos y pagos de todas sus fechas.
+- **CFG-010**: Renombrar servicio y producto actualiza referencias sin tocar precios vendidos.
+- **CFG-011**: No elimina un barbero sin cortes que tenga dinero pagado.
+- **CFG-012**: Desactivar y reactivar barbero conserva historial y permite buscar sin tildes.
+- **CFG-013**: Guardar configuracion no cambia silenciosamente los filtros del reporte.
+- **CFG-014**: Cerrar catalogos cancela borradores sin crear elementos.
+
+## test/app/inventory.test.mjs
+
+- **STO-001**: Inventario nuevo inicia vacio sin escribir almacenamiento.
+- **STO-002**: Carga inventario guardado sin alterar bytes originales.
+- **STO-003**: Alta real recorta nombre y persiste fecha y stock.
+- **STO-004**: Alta con stock cero muestra sin stock y permite ingresos.
+- **STO-005**: Alta acepta stock inicial maximo.
+- **STO-006**: Alta acepta nombre de ochenta caracteres.
+- **STO-007**: Alta acepta unidad mililitros.
+- **STO-008**: Alta acepta unidad gramos.
+- **STO-009**: Nombre requerido bloquea submit nativo y listener.
+- **STO-010**: Stock inicial requerido bloquea formulario.
+- **STO-011**: Stock inicial negativo falla por minimo HTML.
+- **STO-012**: Stock inicial fraccionario falla por paso HTML.
+- **STO-013**: Stock inicial excesivo falla por maximo HTML.
+- **STO-014**: Stock inicial no numerico queda vacio e invalido.
+- **STO-015**: Nombre de espacios pasa required pero no validador de negocio.
+- **STO-016**: Nombre excesivo no se guarda aunque se asigne por script.
+- **STO-017**: Unidad inexistente no se guarda aunque select no sea required.
+- **STO-018**: Alta duplicada normaliza acentos mayusculas y espacios.
+- **STO-019**: Alta no reutiliza nombre de producto archivado.
+- **STO-020**: Alta retroactiva usa jornada seleccionada.
+- **STO-021**: Alta futura se rechaza sin escribir.
+- **STO-022**: Alta sin jornada se rechaza sin escribir.
+- **STO-023**: Editar carga producto y bloquea unidad y stock inicial.
+- **STO-024**: Editar solo cambia nombre y conserva historial e identidad.
+- **STO-025**: Cancelar edicion descarta borrador sin escribir.
+- **STO-026**: Editar rechaza nombre duplicado sin perder borrador.
+- **STO-027**: Editar archivado conserva estado inactivo.
+- **STO-028**: Editar nombre no depende de jornada futura.
+- **STO-029**: Archivar oculta producto activo pero conserva movimientos.
+- **STO-030**: Activar devuelve producto y stock conservado.
+- **STO-031**: Archivar producto en edicion cancela ese borrador.
+- **STO-032**: Archivar otro producto conserva edicion actual.
+- **STO-033**: Consumo por boton real descuenta y limpia campos transitorios.
+- **STO-034**: Ingreso real incrementa stock y contador diario.
+- **STO-035**: Consumo exacto muestra cero y sin stock.
+- **STO-036**: Ingreso acepta cantidad maxima del formulario.
+- **STO-037**: Consumo acepta cantidad minima del formulario.
+- **STO-038**: Nota opcional acepta ciento veinte caracteres.
+- **STO-039**: Producto requerido impide registrar movimiento.
+- **STO-040**: Cantidad requerida impide registrar movimiento.
+- **STO-041**: Cantidad cero falla por minimo HTML.
+- **STO-042**: Cantidad negativa falla por minimo HTML.
+- **STO-043**: Cantidad fraccionaria falla por paso HTML.
+- **STO-044**: Cantidad excesiva falla por maximo HTML.
+- **STO-045**: Cantidad no numerica queda vacia e invalida.
+- **STO-046**: Tipo de movimiento invalido se rechaza en negocio.
+- **STO-047**: Nota excesiva no se guarda aunque se asigne por script.
+- **STO-048**: Consumo insuficiente conserva borrador y estado.
+- **STO-049**: Corregir consumo limpia mensaje de error anterior.
+- **STO-050**: Consumo retroactivo no puede romper jornada posterior.
+- **STO-051**: Ingreso retroactivo aumenta stock actual y solo ingreso de ese dia.
+- **STO-052**: Jornada futura deshabilita boton y rechaza submit directo.
+- **STO-053**: Jornada vacia deshabilita movimientos.
+- **STO-054**: Selector excluye productos anteriores a su fecha inicial.
+- **STO-055**: Producto archivado no puede enviarse con opcion obsoleta.
+- **STO-056**: Producto inexistente no puede enviarse con opcion obsoleta.
+- **STO-057**: Movimiento anterior al inicio falla aun con opcion obsoleta.
+- **STO-058**: Cambio de jornada muestra historial diario y stock actual.
+- **STO-059**: Historial conserva anulados pero no los cuenta como activos.
+- **STO-060**: Anular consumo restaura stock sin eliminar fila.
+- **STO-061**: Restaurar consumo descuenta una sola vez.
+- **STO-062**: Anular ingreso descuenta stock e ingreso diario.
+- **STO-063**: Restaurar ingreso recupera stock e ingreso diario.
+- **STO-064**: Anular ingreso rechaza stock negativo de jornada posterior.
+- **STO-065**: Restaurar consumo rechaza stock negativo posterior.
+- **STO-066**: Historial de archivado permite anular sin reactivarlo.
+- **STO-067**: Delegacion de editar reconoce descendiente del boton.
+- **STO-068**: Delegacion de archivar reconoce descendiente del boton.
+- **STO-069**: Delegacion de anular reconoce descendiente del boton.
+- **STO-070**: Click sin accion en configuracion no modifica inventario.
+- **STO-071**: Click sin accion en historial no modifica inventario.
+- **STO-072**: Accion obsoleta de producto inexistente es inocua.
+- **STO-073**: Accion obsoleta de movimiento inexistente es inocua.
+- **STO-074**: Nombre con HTML se representa como texto en todas las vistas.
+- **STO-075**: Nota con HTML se representa como texto sin crear nodos.
+- **STO-076**: ID persistido con comillas no inyecta atributos.
+- **STO-077**: Movimientos de stock no alteran ventas caja ni finanzas.
+- **STO-078**: Recarga completa conserva altas ediciones archivo y anulaciones.
+- **STO-079**: JSON corrupto al iniciar bloquea escritura sin sobrescribir.
+- **STO-080**: Version incompatible al iniciar se conserva sin sobrescribir.
+- **STO-081**: Historial negativo guardado se rechaza al iniciar.
+- **STO-082**: Cuota agotada al crear no confirma ni aplica producto.
+- **STO-083**: Reintentar alta tras recuperar almacenamiento guarda una vez.
+- **STO-084**: Fallo al editar conserva nombre anterior y borrador.
+- **STO-085**: Fallo al archivar no oculta ni cancela edicion.
+- **STO-086**: Fallo al registrar consumo conserva cantidad y nota.
+- **STO-087**: Fallo al anular mantiene movimiento activo y stock.
+- **STO-088**: Fallo al restaurar mantiene movimiento anulado y stock.
+- **STO-089**: Fallo de lectura durante guardado no aplica cambio.
+- **STO-090**: Fallo de lectura por evento conserva ultimo inventario y bloquea acciones.
+- **STO-091**: Error de lectura bloquea incluso submit directo posterior.
+- **STO-092**: Evento valido posterior recupera lectura y acciones.
+- **STO-093**: Evento de otra clave no lee ni cambia inventario.
+- **STO-094**: Evento de inventario carga vista sin escribir de vuelta.
+- **STO-095**: Evento de clear con clave nula vacia inventario.
+- **STO-096**: Evento de borrado de clave permite nueva alta.
+- **STO-097**: Evento corrupto preserva ultimo estado pero no datos corruptos en memoria.
+- **STO-098**: Evento de version invalida bloquea acciones sin borrar historial.
+- **STO-099**: Conflicto de alta sin evento carga remoto y no pisa sus datos.
+- **STO-100**: Reintento explicito tras conflicto agrega sobre estado actualizado.
+- **STO-101**: Conflicto de edicion no sobrescribe nombre remoto.
+- **STO-102**: Conflicto de archivo no revierte cambios remotos.
+- **STO-103**: Conflicto de consumo no elimina movimiento remoto.
+- **STO-104**: Conflicto de anulacion conserva movimientos remotos.
+- **STO-105**: Conflicto de restauracion conserva anulacion remota.
+- **STO-106**: Conflicto con borrado remoto no resucita productos.
+- **STO-107**: Conflicto con JSON corrupto no sobrescribe ni confirma.
+- **STO-108**: Edicion de producto eliminado por evento no crea reemplazo.
+- **STO-109**: Evento durante edicion no permite pisar nombre remoto con borrador viejo.
+- **STO-110**: Evento de stock conserva seleccion de producto aun disponible.
+- **STO-111**: Evento de archivo elimina seleccion y evita consumo obsoleto.
+- **STO-112**: Guardado no modifica claves ajenas al inventario.
+
+## test/app/navigation.test.mjs
+
+- **NAV-001**: El menu lateral alterna estado y accesibilidad.
+- **NAV-002**: Cambiar vista deja una seccion activa y marca su pagina actual.
+- **NAV-003**: Abrir resumen inicializa semana y cambiar mes actualiza opciones.
+- **NAV-004**: Ordenar columnas y cancelar no altera el orden guardado.
+- **NAV-005**: Aplicar orden guarda las columnas y conserva barberos inactivos.
+- **NAV-006**: Los eventos de arrastre cambian orden pendiente sin guardar antes de aplicar.
+- **NAV-007**: Detalles inexistentes o teclas distintas de Enter no abren dialogos.
+- **NAV-008**: Los detalles escapan notas y cierran por boton o fondo.
+- **NAV-009**: Editar un corte mixto conserva ceros explicitos y permite guardar notas.
+- **NAV-010**: Elegir un precio de catalogo limpia errores de cero al reabrir formularios.
+- **NAV-011**: Reordenar bloquea el clic del control de pagos sin mutar registros.
+
+## test/app/payments.test.mjs
+
+- **PAY-001**: El pago mostrado suma comision y propinas sin descontar adelantos.
+- **PAY-002**: Un clic en efectivo descuenta el pago completo con propinas.
+- **PAY-003**: Un clic en MP descuenta el pago completo solo de MP.
+- **PAY-004**: Cambiar efectivo por MP libera el medio anterior sin doble descuento.
+- **PAY-005**: No pago ignora importes mixtos retenidos y devuelve los fondos.
+- **PAY-006**: Los pagos de dos barberos se descuentan de forma independiente.
+- **PAY-007**: Un mixto parcial descuenta lo ingresado aunque falte pagar.
+- **PAY-008**: Un mixto exacto marca completo y descuenta cada aporte.
+- **PAY-009**: Un mixto excesivo descuenta todo y muestra el excedente.
+- **PAY-010**: Borrar importes mixtos o ingresar cero devuelve sus descuentos.
+- **PAY-011**: Los medios unicos ignoran importes retenidos y mixto los recupera.
+- **PAY-012**: Elegir mixto conserva el desplegable y enfoca el mismo input.
+- **PAY-013**: Formatear un pago conserva foco y caret entre los digitos.
+- **PAY-014**: El input MP conserva caret al inicio y al borrar su importe.
+- **PAY-015**: Pagar actualiza diferencias sin borrar el borrador de cierre.
+- **PAY-016**: Renderizar y repetir el mismo pago no duplica descuentos.
+- **PAY-017**: Un corte posterior recalcula el pago unico con su nueva propina.
+- **PAY-018**: Editar un corte pagado recalcula cobro y descuento una sola vez.
+- **PAY-019**: Eliminar un corte pagado elimina tambien su parte del pago unico.
+- **PAY-020**: Un nuevo corte deja mixto incompleto sin cambiar importes entregados.
+- **PAY-021**: Eliminar corte mantiene el mixto entregado y muestra nuevo excedente.
+- **PAY-022**: Cambiar comision diaria recalcula el descuento del pago completo.
+- **PAY-023**: Los estados de pago y sus descuentos quedan aislados por jornada.
+- **PAY-024**: Pagar un barbero sin cortes no descuenta sus adelantos otra vez.
+- **PAY-025**: Desactivar un barbero no devuelve el pago ya descontado.
+- **PAY-026**: Tras pagar en efectivo una transferencia no puede usar fondos entregados.
+- **PAY-027**: Tras pagar en efectivo se puede transferir exactamente el remanente.
+- **PAY-028**: Tras pagar por MP se rechaza un peso sobre el remanente.
+- **PAY-029**: El pago unico descuenta el redondeo mostrado de la suma de cortes.
+- **PAY-030**: Ordenar columnas bloquea cambios de pago y deja el estado intacto.
+- **PAY-031**: Guardar cierre tras pago conserva sus importes reales al volver.
+
+## test/app/reports.test.mjs
+
+- **RPT-001**: El reporte de Ambas suma cada concepto y su ticket promedio.
+- **RPT-002**: El reporte de Efectivo suma cada concepto y su ticket promedio.
+- **RPT-003**: El reporte de Mercado Pago suma cada concepto y su ticket promedio.
+- **RPT-004**: Filtrar barbero excluye ventas gastos y retiros sin borrar sus adelantos.
+- **RPT-005**: Quitar todos los servicios conserva ventas gastos y adelantos.
+- **RPT-006**: Elegir un servicio actualiza etiqueta y no incluye otros servicios.
+- **RPT-007**: Los limites mensuales incluyen ambos extremos y excluyen fechas externas.
+- **RPT-008**: Un retiro sin operaciones genera fila y se excluye al filtrar MP.
+- **RPT-009**: El reporte anual agrupa operaciones y retiros por mes.
+- **RPT-010**: Cambiar semana actualiza rango y excluye ventas de la semana anterior.
+- **RPT-011**: Una referencia vacia se recupera sin romper los contadores.
+- **RPT-012**: No hay divisiones por cero ni filas viejas en un reporte vacio.
+- **RPT-013**: La tabla de sales ordena hora escapa texto y suma importes escritos.
+- **RPT-014**: La tabla de advances ordena hora escapa texto y suma importes escritos.
+- **RPT-015**: La tabla de expenses ordena hora escapa texto y suma importes escritos.
+- **RPT-016**: Los ajustes de apertura se muestran firmados sin botones para borrarlos.
+- **RPT-017**: Cambiar filtro de barbero y medio dispara el recuento inmediatamente.
+- **RPT-018**: Las tres tarjetas reutilizan el panel diario y etiquetan cada importe.
+- **RPT-019**: El mixto dominante MP desglosa propinas y conserva balance y comision por dia.
+- **RPT-020**: Barberia separa facturado cobrado balance y movimientos en Ambas.
+- **RPT-021**: Barberia separa facturado cobrado balance y movimientos en Efectivo.
+- **RPT-022**: Barberia separa facturado cobrado balance y movimientos en Mercado Pago.
+- **RPT-023**: Cambio ida y vuelta conserva servicios y adapta el historico al modo.
+- **RPT-024**: Adelantos retiros pagos apertura y transferencias no reducen otra vez balance.
+- **RPT-025**: Barberia mixto dominante MP y empate asignan propina una sola vez.
+- **RPT-026**: Barberia vacia limpia importes conteos y desgloses anteriores.
+- **RPT-027**: Barberia incluye extremos y excluye externos de month en todas las colecciones.
+- **RPT-028**: Barberia incluye extremos y excluye externos de year en todas las colecciones.
+- **RPT-029**: Barberia incluye extremos y excluye externos de week en todas las colecciones.
+- **RPT-030**: Barberia tiene IDs unicos regiones accesibles y alcance en ayuda.
+- **RPT-031**: Render y configuracion conservan Barberia sin colision con nombres.
+- **RPT-032**: Explicaciones en ayudas enfocables conservan etiquetas y conteos.
+- **RPT-033**: Ayuda historica conserva formula breve y boton en ambos modos.
+- **RPT-034**: Jerarquia separa facturado resultado y movimientos sin duplicar importes.
+
+## test/app/transactions.test.mjs
+
+- **TXN-001**: El servicio carga su precio y permite un importe manual.
+- **TXN-002**: Un corte de un peso admite propina vacia.
+- **TXN-003**: Un corte por MP suma precio y propina solo a MP.
+- **TXN-004**: El corte mixto asigna la propina al efectivo dominante.
+- **TXN-005**: El corte mixto asigna la propina al MP dominante.
+- **TXN-006**: El empate mixto cuenta el corte y la propina una sola vez.
+- **TXN-007**: El corte mixto permite cero explicito en un medio.
+- **TXN-008**: Cambiar medio activa y desactiva los campos mixtos requeridos.
+- **TXN-009**: Una suma mixta insuficiente se rechaza y se puede corregir.
+- **TXN-010**: Una suma mixta excesiva no registra el corte.
+- **TXN-011**: La propina mixta no puede superar el aporte dominante.
+- **TXN-012**: El formulario de corte respeta los campos nativos requeridos.
+- **TXN-013**: El precio cero del corte se rechaza y el input limpia el error.
+- **TXN-014**: Editar un corte reemplaza precio propina y medio sin duplicarlo.
+- **TXN-015**: Rechazar la eliminacion del corte conserva datos y saldos.
+- **TXN-016**: Eliminar un corte mixto resta ambos aportes y su contador.
+- **TXN-017**: Cerrar alta o edicion de corte descarta el borrador.
+- **TXN-018**: El producto y los inputs recalculan cantidad por precio.
+- **TXN-019**: La venta en efectivo suma el total y cuenta una operacion.
+- **TXN-020**: La venta por MP suma cantidad por precio solo a MP.
+- **TXN-021**: Editar venta revierte el total anterior y conserva su identidad.
+- **TXN-022**: Cancelar la eliminacion de venta conserva su total.
+- **TXN-023**: Eliminar venta resta todas las unidades vendidas.
+- **TXN-024**: Cerrar alta y edicion de venta no guarda el borrador.
+- **TXN-025**: La cantidad de venta vacia es invalida por required.
+- **TXN-026**: La cantidad cero de venta es invalida por minimo.
+- **TXN-027**: La cantidad negativa de venta no llega al handler.
+- **TXN-028**: La cantidad fraccionaria de venta es invalida por paso.
+- **TXN-029**: La venta exige hora producto precio y medio nativos.
+- **TXN-030**: El precio cero de venta se rechaza y un peso es valido.
+- **TXN-031**: El adelanto en efectivo resta sin modificar ingresos ni comision.
+- **TXN-032**: El adelanto por MP resta solo del saldo MP.
+- **TXN-033**: Editar adelanto devuelve el medio anterior y resta el nuevo.
+- **TXN-034**: Rechazar la eliminacion de adelanto conserva la salida.
+- **TXN-035**: Eliminar adelanto devuelve su importe al medio original.
+- **TXN-036**: Cancelar alta y edicion de adelanto conserva los registros.
+- **TXN-037**: El adelanto exige sus campos nativos obligatorios.
+- **TXN-038**: El adelanto cero se rechaza y un peso se descuenta.
+- **TXN-039**: El gasto en efectivo resta sin alterar facturacion.
+- **TXN-040**: El gasto por MP resta solo del saldo MP.
+- **TXN-041**: Editar gasto devuelve el importe anterior y resta el nuevo.
+- **TXN-042**: Rechazar la eliminacion del gasto conserva saldos.
+- **TXN-043**: Eliminar gasto devuelve dinero y actualiza su total.
+- **TXN-044**: Cancelar alta y edicion de gasto descarta el borrador.
+- **TXN-045**: El gasto exige hora importe medio y motivo nativos.
+- **TXN-046**: El gasto cero se rechaza y un peso es valido.
+- **TXN-047**: La caja suma cobros y resta adelantos gastos y transferencias.
+- **TXN-048**: Cambiar jornada aisla todos los movimientos y contadores.
+- **TXN-049**: Las altas usan la jornada seleccionada y no la fecha actual.
+
+## test/build.test.mjs
+
+- **HTTP-001**: El build sirve el HTML actual y no una copia vieja.
+- **HTTP-002**: El build sirve styles.css completo con version de cache.
+- **HTTP-003**: El build sirve logic.js completo con version de cache.
+- **HTTP-004**: El build sirve reports.js completo con version de cache.
+- **HTTP-005**: El build sirve dialogs.js completo con version de cache.
+- **HTTP-006**: El build sirve inventory.js completo con version de cache.
+- **HTTP-007**: El build sirve script.js completo con version de cache.
+- **HTTP-008**: HEAD responde sin cuerpo conservando los encabezados.
+- **HTTP-009**: POST se rechaza sin modificar recursos.
+- **HTTP-010**: Las rutas inexistentes e heredadas del prototipo devuelven 404.
+
+## test/logic/calendar.test.mjs
+
+- **CAL-001**: isoDate rellena mes y dia con ceros.
+- **CAL-002**: isoDate conserva mes y dia de dos digitos.
+- **CAL-003**: isoDate conserva el dia bisiesto.
+- **CAL-004**: isoDate ignora la hora sin mutar Date.
+- **CAL-005**: isoDate usa fecha local al oeste de UTC.
+- **CAL-006**: isoDate usa fecha local al este de UTC.
+- **CAL-007**: Mes que empieza lunes puede tener cinco semanas.
+- **CAL-008**: Mes que empieza martes conserva cuatro lunes.
+- **CAL-009**: Mes que empieza miercoles conserva cuatro lunes.
+- **CAL-010**: Mes que empieza jueves conserva cuatro lunes.
+- **CAL-011**: Mes que empieza viernes conserva cuatro lunes.
+- **CAL-012**: Mes que empieza sabado puede tener cinco lunes.
+- **CAL-013**: Mes que empieza domingo puede tener cinco lunes.
+- **CAL-014**: Febrero comun que empieza lunes tiene cuatro semanas.
+- **CAL-015**: Febrero bisiesto que empieza lunes tiene cinco semanas.
+- **CAL-016**: Febrero bisiesto que empieza jueves tiene cuatro semanas.
+- **CAL-017**: Dia anterior al primer lunes queda en semana uno.
+- **CAL-018**: Primer dia del mes queda en semana uno aunque sea martes.
+- **CAL-019**: Hoy fijo anterior al primer lunes queda en semana uno.
+- **CAL-020**: Primer lunes inicia semana uno.
+- **CAL-021**: Primer domingo posterior sigue en semana uno.
+- **CAL-022**: Segundo lunes inicia semana dos.
+- **CAL-023**: Sabado de segunda semana conserva numero.
+- **CAL-024**: Tercer lunes inicia semana tres.
+- **CAL-025**: Cuarto lunes inicia semana cuatro.
+- **CAL-026**: Ultimo dia conserva cuarta semana del mes.
+- **CAL-027**: Quinto lunes inicia semana cinco.
+- **CAL-028**: Veintinueve de febrero puede iniciar quinta semana.
+- **CAL-029**: Nuevo mes reinicia semana aunque continue rango anterior.
+- **CAL-030**: Semana predeterminada empieza en primer lunes.
+- **CAL-031**: Primera semana no incorpora dias anteriores al lunes.
+- **CAL-032**: Semana acepta numero textual del selector.
+- **CAL-033**: Tercera semana termina domingo inclusivo.
+- **CAL-034**: Cuarta semana cruza al mes siguiente sin truncar.
+- **CAL-035**: Quinta semana cruza al mes siguiente sin truncar.
+- **CAL-036**: Ultima semana cruza de diciembre a enero.
+- **CAL-037**: Semana que inicia en dia bisiesto cruza a marzo.
+- **CAL-038**: Mes comun de febrero termina el veintiocho.
+- **CAL-039**: Mes bisiesto de febrero termina el veintinueve.
+- **CAL-040**: Siglo divisible por cuatrocientos es bisiesto.
+- **CAL-041**: Siglo no divisible por cuatrocientos no es bisiesto.
+- **CAL-042**: Mes de treinta dias termina en treinta.
+- **CAL-043**: Diciembre termina en treinta y uno del mismo anio.
+- **CAL-044**: Rango anual comun incluye enero y diciembre completos.
+- **CAL-045**: Rango anual bisiesto conserva extremos.
+- **CAL-046**: Rango mensual no depende de semana seleccionada.
+- **CAL-047**: Rango anual acepta anio numerico.
+- **CAL-048**: Zona DST de prueba cambia realmente una hora en marzo.
+- **CAL-049**: Domingo del adelanto DST sigue en semana uno.
+- **CAL-050**: Lunes posterior al adelanto DST inicia semana dos.
+- **CAL-051**: Segundo lunes posterior al adelanto DST inicia semana tres.
+- **CAL-052**: Ultimo lunes de marzo tras DST inicia semana cinco.
+- **CAL-053**: Martes posterior al adelanto DST sigue en semana dos.
+- **CAL-054**: Marzo con adelanto DST conserva cinco lunes.
+- **CAL-055**: Semana posterior al adelanto DST conserva lunes y domingo.
+- **CAL-056**: Mes con adelanto DST conserva limites civiles.
+- **CAL-057**: Zona DST europea cambia una hora en octubre.
+- **CAL-058**: Domingo de retroceso DST sigue en semana tres.
+- **CAL-059**: Lunes posterior al retroceso DST inicia semana cuatro.
+- **CAL-060**: Mes con retroceso DST conserva cuatro lunes.
+- **CAL-061**: Ultima semana tras retroceso DST cruza mes correctamente.
+- **CAL-062**: Lunes posterior al adelanto europeo inicia semana cinco.
+- **CAL-063**: Anio bisiesto conserva lunes correcto despues de DST.
+- **CAL-064**: Zona DST de media hora cambia realmente treinta minutos.
+- **CAL-065**: Lunes posterior al adelanto de media hora inicia semana dos.
+- **CAL-066**: Adelanto de media hora no desplaza limites semanales.
+- **CAL-067**: isoDate conserva fecha durante hora repetida de DST.
+- **CAL-068**: isoDate conserva fecha a ambos lados del salto DST.
+
+## test/logic/commissions.test.mjs
+
+- **PAYOUT-001**: El pago fijo conserva comisiones guardadas y todas las propinas.
+- **PAYOUT-002**: Sin cortes el pago es cero y no consulta la tasa.
+- **PAYOUT-003**: El importe guardado prevalece sobre tasa y callback.
+- **PAYOUT-004**: El importe guardado de cero es autoritativo.
+- **PAYOUT-005**: El importe guardado de cero escrito es autoritativo.
+- **PAYOUT-006**: Un importe nulo permite usar la tasa guardada.
+- **PAYOUT-007**: Una tasa guardada de cero no usa el callback.
+- **PAYOUT-008**: Una tasa guardada de cero escrito no usa el callback.
+- **PAYOUT-009**: Una tasa guardada escrita se convierte a numero.
+- **PAYOUT-010**: Un importe guardado funciona sin tasa.
+- **PAYOUT-011**: Las comisiones sin snapshots usan el callback de cada fecha.
+- **PAYOUT-012**: Sin callback ni snapshots la comision predeterminada es cero.
+- **PAYOUT-013**: Mezcla snapshots y fallback sin descontar comision de propinas.
+- **PAYOUT-014**: Redondea hacia arriba una comision de medio peso.
+- **PAYOUT-015**: Suma fracciones antes de redondear el pago.
+- **PAYOUT-016**: Redondea hacia abajo una comision menor a medio peso.
+- **PAYOUT-017**: Acumula fracciones guardadas como numero y texto.
+- **PAYOUT-018**: Una propina sin servicio se paga completa.
+- **PAYOUT-019**: Cambiar el fallback conserva cortes historicos con snapshots.
+- **PAYOUT-030**: Efectivo queda pagado con un clic sin importes mixtos.
+- **PAYOUT-031**: MP queda pagado con un clic sin importes mixtos.
+- **PAYOUT-032**: No pago permanece pendiente sin importes.
+- **PAYOUT-033**: Efectivo ignora importes mixtos parciales retenidos.
+- **PAYOUT-034**: MP ignora importes mixtos retenidos en cero.
+- **PAYOUT-035**: No pago ignora importes mixtos que cubren la deuda.
+- **PAYOUT-040**: El mixto vacio mantiene toda la deuda.
+- **PAYOUT-041**: El mixto nulo trata ambos importes como cero.
+- **PAYOUT-042**: El mixto parcial suma textos y calcula el faltante.
+- **PAYOUT-043**: El mixto exacto queda completo sin exceso.
+- **PAYOUT-044**: El mixto excedido conserva el sobrante.
+- **PAYOUT-045**: Una deuda mayor vuelve incompleto el mismo pago.
+- **PAYOUT-046**: Vaciar MP vuelve a calcular el faltante mixto.
+- **PAYOUT-047**: Un mixto puede completarse solo con efectivo.
+- **PAYOUT-048**: Un mixto puede completarse solo con MP.
+- **PAYOUT-049**: Un mixto vacio sin deuda esta completo.
+- **PAYOUT-050**: Un mixto sin campos conserva la deuda.
+- **PAYOUT-051**: Un mixto pagado sin deuda muestra todo como exceso.
+- **PAYOUT-052**: Un corte nuevo recalcula el pago mixto desde la comision redondeada.
+
+## test/logic/finance.test.mjs
+
+- **FIN-001**: Convierte pesos enteros numericos.
+- **FIN-002**: Conserva el cero numerico.
+- **FIN-003**: Convierte el cero escrito.
+- **FIN-004**: Quita ceros iniciales.
+- **FIN-005**: Quita simbolo y separadores de miles.
+- **FIN-006**: Quita moneda y varios grupos de miles.
+- **FIN-007**: Quita espacios de un importe entero.
+- **FIN-008**: Interpreta un campo vacio como cero.
+- **FIN-009**: Interpreta espacios sin importe como cero.
+- **FIN-010**: Interpreta un importe nulo como cero.
+- **FIN-011**: Interpreta un importe ausente como cero.
+- **FIN-012**: Conserva el mayor entero seguro con formato.
+- **FIN-020**: Suma cortes simples y mixtos por medio.
+- **FIN-021**: Suma ventas por medio sin incluir otros movimientos.
+- **FIN-022**: Suma adelantos por medio.
+- **FIN-023**: Suma gastos por medio.
+- **FIN-024**: Los pagos simples suman propinas opcionales y textos numericos.
+- **FIN-025**: Los pagos mixtos ya incluyen propina y admiten un medio en cero.
+- **FIN-026**: Las ventas usan el total guardado sin multiplicarlo por cantidad.
+- **FIN-027**: Los adelantos convierten importes escritos antes de sumar.
+- **FIN-028**: Los gastos convierten importes escritos antes de sumar.
+- **FIN-030**: Una lista de transferencias vacia no mueve saldo.
+- **FIN-031**: Transferir a MP resta efectivo y suma MP.
+- **FIN-032**: Transferir a efectivo convierte el importe escrito.
+- **FIN-033**: Compensa transferencias sucesivas en ambas direcciones.
+- **FIN-034**: Una transferencia de cero es neutra.
+- **FIN-035**: Transferir efectivo al mismo medio es neutro.
+- **FIN-036**: Transferir MP al mismo medio es neutro.
+- **FIN-040**: El saldo sin apertura ni movimientos es cero.
+- **FIN-041**: El saldo conserva una apertura numerica.
+- **FIN-042**: El saldo convierte una apertura escrita.
+- **FIN-043**: Una apertura nula equivale a cero.
+- **FIN-044**: Una apertura vacia equivale a cero.
+- **FIN-045**: El saldo suma solamente los cortes con propina.
+- **FIN-046**: El saldo suma solamente las ventas.
+- **FIN-047**: El saldo resta solamente los adelantos.
+- **FIN-048**: El saldo resta solamente los gastos.
+- **FIN-049**: El saldo aplica solamente las transferencias.
+- **FIN-050**: El saldo completo coincide con el oraculo fijo de caja.
+- **FIN-051**: El saldo permite deficit sin alterar egresos validos.
+- **FIN-052**: Dos transferencias opuestas actualizan ambas aperturas.
+- **FIN-060**: Asigna un corte simple al efectivo.
+- **FIN-061**: Asigna un corte simple escrito a MP.
+- **FIN-062**: El mixto mayor en efectivo le asigna toda la propina.
+- **FIN-063**: El mixto mayor en MP le asigna toda la propina.
+- **FIN-064**: El empate mixto asigna la propina al efectivo.
+- **FIN-065**: El predominio mixto compara numeros y no textos.
+- **FIN-066**: La propina puede agotar el medio dominante.
+- **FIN-067**: Un mixto puede cobrarse solo en efectivo.
+- **FIN-068**: Un mixto puede cobrarse solo en MP.
+- **FIN-069**: El mixto de cero numerico no divide por cero.
+- **FIN-070**: El mixto de cero escrito no produce NaN.
+- **FIN-071**: El mixto de solo propina no genera comision.
+- **FIN-072**: El mixto admite propina ausente y reparte comision.
+- **FIN-073**: El corte simple admite propina y comision ausentes.
+- **FIN-074**: Acumula asignaciones de varios cortes y de listas vacias.
+- **FIN-080**: Rechaza propina mayor que el efectivo dominante.
+- **FIN-081**: Rechaza propina mayor que MP dominante.
+- **FIN-082**: Rechaza propina mayor que ambos medios empatados.
+- **FIN-083**: Un mixto sin campos opcionales no tiene error de propina.
+- **FIN-084**: Una propina sin aportes mixtos produce error.
+- **FIN-085**: Los pagos simples no limitan la propina al precio.
+
+## test/logic/invariants.test.mjs
+
+- **INV-CASH-001**: La jornada vacia conserva todas las identidades.
+- **INV-CASH-002**: Las ventas sin cortes conservan el neto y ambos medios.
+- **INV-CASH-003**: Un mixto con fracciones conserva cobros y neto redondeado.
+- **INV-CASH-004**: Un mixto de ceros numericos conserva importes finitos.
+- **INV-CASH-005**: Una propina sin servicio queda fuera del neto.
+- **INV-CASH-006**: El caso financiero fijo conserva caja propinas y comisiones.
+- **INV-CASH-007**: El historial con tasas cero conserva el reparto.
+- **INV-CASH-008**: Un mixto de ceros escritos conserva importes finitos.
+- **INV-CASH-009**: Transferir y revertir conserva la caja conjunta en cada paso.
+- **INV-CASH-010**: Caja y neto comercial se reconcilian con pago y egresos.
+- **INV-CASH-011**: Particionar movimientos conserva el resumen sin redondear por grupo.
+- **INV-CASH-012**: Las funciones financieras no modifican entradas congeladas.
+- **INV-CASH-020**: La semilla 1 concilia todas las operaciones y snapshots.
+- **INV-CASH-021**: La semilla 7 concilia todas las operaciones y snapshots.
+- **INV-CASH-022**: La semilla 42 concilia todas las operaciones y snapshots.
+- **INV-CASH-023**: La semilla 20260903 concilia todas las operaciones y snapshots.
+- **INV-CASH-024**: La semilla 305419896 concilia todas las operaciones y snapshots.
+- **INV-CASH-025**: La semilla 3735928559 concilia todas las operaciones y snapshots.
+
+## test/logic/inventory.test.mjs
+
+- **STK-001**: Acepta inventario vacio de version uno.
+- **STK-002**: Acepta producto y movimiento completos.
+- **STK-003**: Rechaza estado nulo.
+- **STK-004**: Rechaza estado ausente.
+- **STK-005**: Rechaza objeto sin estructura.
+- **STK-006**: Rechaza version futura sin otros errores.
+- **STK-007**: Rechaza version textual sin coercion.
+- **STK-008**: Rechaza version ausente.
+- **STK-009**: Rechaza productos que no son una lista.
+- **STK-010**: Rechaza movimientos que no son una lista.
+- **STK-011**: Rechaza producto nulo.
+- **STK-012**: Rechaza movimiento nulo.
+- **STK-013**: Acepta ID de producto de un caracter.
+- **STK-014**: Acepta ID de producto de ochenta caracteres.
+- **STK-015**: Rechaza ID de producto vacio.
+- **STK-016**: Rechaza ID de producto solo con espacios.
+- **STK-017**: Rechaza ID de producto de ochenta y un caracteres.
+- **STK-018**: Rechaza ID de producto numerico.
+- **STK-019**: Rechaza ID de producto ausente.
+- **STK-020**: Rechaza ID duplicado aunque los nombres difieran.
+- **STK-021**: Acepta nombre de un caracter.
+- **STK-022**: Acepta nombre de ochenta caracteres.
+- **STK-023**: Rechaza nombre vacio.
+- **STK-024**: Rechaza nombre solo con espacios.
+- **STK-025**: Rechaza nombre de ochenta y un caracteres.
+- **STK-026**: Rechaza nombre no textual.
+- **STK-027**: Rechaza nombre ausente.
+- **STK-028**: Rechaza nombre duplicado exacto.
+- **STK-029**: Rechaza nombre duplicado por mayusculas.
+- **STK-030**: Rechaza nombre duplicado por espacios externos.
+- **STK-031**: Rechaza nombre duplicado por acento compuesto.
+- **STK-032**: Rechaza nombre duplicado por acento descompuesto.
+- **STK-033**: Rechaza nombre duplicado entre archivados.
+- **STK-034**: Acepta nombres distintos que comparten prefijo.
+- **STK-035**: Acepta unidad unidades.
+- **STK-036**: Acepta unidad mililitros.
+- **STK-037**: Acepta unidad gramos.
+- **STK-038**: Rechaza unidad desconocida.
+- **STK-039**: Rechaza unidad con mayusculas.
+- **STK-040**: Rechaza unidad no textual.
+- **STK-041**: Rechaza unidad ausente.
+- **STK-042**: Acepta stock inicial cero.
+- **STK-043**: Acepta stock inicial maximo.
+- **STK-044**: Rechaza stock inicial negativo.
+- **STK-045**: Rechaza stock inicial fraccionario.
+- **STK-046**: Rechaza stock inicial sobre el maximo.
+- **STK-047**: Rechaza stock inicial textual.
+- **STK-048**: Rechaza stock inicial NaN.
+- **STK-049**: Rechaza stock inicial infinito.
+- **STK-050**: Rechaza stock inicial entero inseguro.
+- **STK-051**: Rechaza stock inicial booleano.
+- **STK-052**: Rechaza stock inicial ausente.
+- **STK-053**: Acepta inicio igual a la fecha del movimiento.
+- **STK-054**: Acepta inicio el veintinueve de febrero bisiesto.
+- **STK-055**: Rechaza inicio en febrero no bisiesto.
+- **STK-056**: Rechaza inicio en dia inexistente.
+- **STK-057**: Rechaza inicio en mes inexistente.
+- **STK-058**: Rechaza inicio sin ceros de relleno.
+- **STK-059**: Rechaza inicio con hora adicional.
+- **STK-060**: Rechaza inicio con salto de linea final.
+- **STK-061**: Rechaza inicio no textual.
+- **STK-062**: Rechaza inicio ausente.
+- **STK-063**: Acepta producto activo.
+- **STK-064**: Acepta producto archivado con historial.
+- **STK-065**: Rechaza activo textual.
+- **STK-066**: Rechaza activo numerico.
+- **STK-067**: Rechaza activo ausente.
+- **STK-068**: Acepta ID de movimiento de un caracter.
+- **STK-069**: Acepta ID de movimiento de ochenta caracteres.
+- **STK-070**: Rechaza ID de movimiento vacio.
+- **STK-071**: Rechaza ID de movimiento solo con espacios.
+- **STK-072**: Rechaza ID de movimiento demasiado largo.
+- **STK-073**: Rechaza ID de movimiento numerico.
+- **STK-074**: Rechaza ID de movimiento ausente.
+- **STK-075**: Rechaza ID de movimiento duplicado.
+- **STK-076**: Rechaza ID duplicado aunque el original este anulado.
+- **STK-077**: Rechaza ID duplicado entre productos diferentes.
+- **STK-078**: Acepta referencia exacta a producto existente.
+- **STK-079**: Rechaza referencia a producto inexistente.
+- **STK-080**: Rechaza referencia a producto con otra capitalizacion.
+- **STK-081**: Rechaza referencia a producto no textual.
+- **STK-082**: Rechaza referencia a producto ausente.
+- **STK-083**: Acepta movimiento en la fecha inicial.
+- **STK-084**: Rechaza movimiento un dia antes del inicio.
+- **STK-085**: Acepta movimiento en febrero bisiesto.
+- **STK-086**: Rechaza movimiento en febrero no bisiesto.
+- **STK-087**: Rechaza movimiento en dia inexistente.
+- **STK-088**: Rechaza movimiento en mes inexistente.
+- **STK-089**: Rechaza fecha de movimiento sin relleno.
+- **STK-090**: Rechaza fecha de movimiento con hora.
+- **STK-091**: Rechaza fecha de movimiento con salto final.
+- **STK-092**: Rechaza fecha de movimiento no textual.
+- **STK-093**: Rechaza fecha de movimiento ausente.
+- **STK-094**: Acepta hora minima medianoche.
+- **STK-095**: Acepta hora maxima del dia.
+- **STK-096**: Rechaza hora veinticuatro.
+- **STK-097**: Rechaza minuto sesenta.
+- **STK-098**: Rechaza hora sin cero inicial.
+- **STK-099**: Rechaza minuto sin cero inicial.
+- **STK-100**: Rechaza hora con segundos.
+- **STK-101**: Rechaza hora con espacio inicial.
+- **STK-102**: Rechaza hora con espacio final.
+- **STK-103**: Rechaza hora con salto de linea final.
+- **STK-104**: Rechaza hora con retorno de carro final.
+- **STK-105**: Rechaza hora como lista aunque convierta a texto valido.
+- **STK-106**: Rechaza hora como objeto String.
+- **STK-107**: Rechaza hora numerica.
+- **STK-108**: Rechaza hora ausente.
+- **STK-109**: Rechaza hora simbolo sin lanzar excepcion.
+- **STK-110**: Acepta tipo entrada.
+- **STK-111**: Acepta tipo consumo.
+- **STK-112**: Rechaza tipo desconocido.
+- **STK-113**: Rechaza tipo con mayusculas.
+- **STK-114**: Rechaza tipo no textual.
+- **STK-115**: Rechaza tipo ausente.
+- **STK-116**: Acepta cantidad minima uno.
+- **STK-117**: Acepta cantidad maxima de ingreso.
+- **STK-118**: Rechaza cantidad cero.
+- **STK-119**: Rechaza cantidad negativa.
+- **STK-120**: Rechaza cantidad fraccionaria.
+- **STK-121**: Rechaza cantidad sobre el maximo.
+- **STK-122**: Rechaza cantidad textual.
+- **STK-123**: Rechaza cantidad NaN.
+- **STK-124**: Rechaza cantidad infinita.
+- **STK-125**: Rechaza cantidad entera insegura.
+- **STK-126**: Rechaza cantidad booleana.
+- **STK-127**: Rechaza cantidad ausente.
+- **STK-128**: Acepta nota vacia.
+- **STK-129**: Acepta nota de ciento veinte caracteres.
+- **STK-130**: Rechaza nota de ciento veintiun caracteres.
+- **STK-131**: Rechaza nota numerica.
+- **STK-132**: Rechaza nota nula.
+- **STK-133**: Rechaza nota ausente.
+- **STK-134**: Acepta movimiento no anulado.
+- **STK-135**: Acepta movimiento anulado.
+- **STK-136**: Rechaza anulacion textual.
+- **STK-137**: Rechaza anulacion numerica.
+- **STK-138**: Rechaza anulacion ausente.
+- **STK-139**: Valida cantidad incluso en movimiento anulado.
+- **STK-140**: Valida referencia incluso en movimiento anulado.
+- **STK-141**: Valida fecha inicial incluso en movimiento anulado.
+- **STK-142**: Stock es cero antes de la fecha inicial.
+- **STK-143**: Stock inicial entra exactamente en su fecha.
+- **STK-144**: Stock inicial persiste sin movimientos posteriores.
+- **STK-145**: Stock inicial cero no se reemplaza por otro valor.
+- **STK-146**: Suma cada ingreso del dia.
+- **STK-147**: Resta cada consumo del dia.
+- **STK-148**: Separa ingresos y consumos sin compensar contadores.
+- **STK-149**: Ingreso anterior afecta stock pero no ingreso diario.
+- **STK-150**: Consumo anterior afecta stock pero no consumo diario.
+- **STK-151**: Ignora ingreso futuro.
+- **STK-152**: Ignora consumo futuro.
+- **STK-153**: Ignora ingreso anulado del dia.
+- **STK-154**: Ignora consumo anulado del dia.
+- **STK-155**: Ignora ingreso anulado anterior.
+- **STK-156**: Ignora consumo anulado anterior.
+- **STK-157**: Ignora ingreso de otro producto.
+- **STK-158**: Ignora consumo de otro producto.
+- **STK-159**: Calcula stock de producto archivado sin borrar historial.
+- **STK-160**: Consumo exacto deja stock cero.
+- **STK-161**: Rechaza consumo una unidad sobre el disponible.
+- **STK-162**: No oculta stock negativo al resumir historial invalido.
+- **STK-163**: Stock inicial no se vuelve a sumar cada jornada.
+- **STK-164**: Resumen no depende del orden del arreglo.
+- **STK-165**: Valida jornadas en orden cronologico y no de insercion.
+- **STK-166**: Ingreso futuro no repara saldo negativo pasado.
+- **STK-167**: Compensa movimientos del mismo dia aunque consumo llegue primero.
+- **STK-168**: Compensa movimientos del mismo dia con ingreso primero.
+- **STK-169**: Rechaza saldo diario negativo despues de varios ingresos.
+- **STK-170**: Anular ingreso rechaza deuda en jornada posterior.
+- **STK-171**: Consumo retroactivo rechaza deuda en jornada posterior.
+- **STK-172**: Anular consumo devuelve disponible a jornadas posteriores.
+- **STK-173**: Restaurar consumo rechaza deuda posterior.
+- **STK-174**: Restaurar ingreso incrementa stock sin duplicarlo.
+- **STK-175**: Stock de otro producto no financia consumo.
+- **STK-176**: Verifica tambien deuda del segundo producto.
+- **STK-177**: Archivar producto no oculta historial negativo.
+- **STK-178**: Rechaza primer dia negativo aunque el cierre final sea positivo.
+- **STK-179**: Valida tambien consumo futuro en historial persistido.
+- **STK-180**: Limite por cantidad no limita stock acumulado valido.
+- **STK-181**: Acepta consumo maximo con disponible suficiente.
+- **STK-182**: Validar y resumir no mutan productos ni orden del historial.
+
+## test/logic/revenue.test.mjs
+
+- **REV-001**: El resumen completo coincide con el oraculo fijo.
+- **REV-002**: El resumen de efectivo asigna mixtos y filtra otros movimientos.
+- **REV-003**: El resumen de MP asigna mixtos y filtra otros movimientos.
+- **REV-004**: El resumen vacio de ambos medios tiene todos sus campos en cero.
+- **REV-005**: El resumen vacio de efectivo tiene todos sus campos en cero.
+- **REV-006**: El resumen vacio de MP tiene todos sus campos en cero.
+- **REV-007**: El resumen sin argumentos opcionales conserva tasas y fracciones.
+- **REV-008**: El resumen sin callback ni snapshots usa comision cero.
+- **REV-009**: El resumen prioriza importe luego tasa y solo entonces callback.
+- **REV-010**: El resumen consulta fechas solo para cortes sin snapshots.
+- **REV-011**: Cambiar el callback predeterminado no reescribe el resumen historico.
+- **REV-012**: Ventas y egresos no generan comision ni cambian el balance comercial.
+- **REV-013**: El resumen convierte ventas y egresos escritos sin concatenarlos.
+- **REV-014**: El conteo mixto usa predominio mientras los importes se reparten.
+- **REV-020**: La recaudacion diaria completa coincide con el oraculo fijo.
+- **REV-021**: Una jornada vacia tiene todos los campos monetarios en cero.
+- **REV-022**: Una venta escrita en MP no genera comision de cortes.
+- **REV-023**: La recaudacion historica conserva importes tasas cero y fallback.
+- **REV-024**: Redondea comision sin perder los cobros de un mixto empatado.
+- **REV-025**: MP recibe el remanente para no redondear dos veces el neto.
+- **REV-026**: La comision diaria suma fracciones de distintos cortes antes de redondear.
+- **REV-027**: Un mixto de ceros escritos produce una recaudacion finita de cero.
+- **REV-028**: Una propina sola en efectivo no es facturacion ni neto.
+- **REV-029**: Una propina sola en MP no es facturacion ni neto.
+- **REV-030**: El neto mixto descuenta propina y comision del efectivo dominante.
+- **REV-031**: El neto mixto descuenta propina y comision de MP dominante.
+- **REV-032**: El neto mixto empatado asigna la propina al efectivo.
+- **REV-033**: Una recaudacion sin snapshots ni callback usa comision cero.
+
+## test/page.test.mjs
+
+- **HTML-001**: Todos los scripts compilan sin redeclaraciones globales.
+- **HTML-002**: Cada ID de HTML es unico y todos los IDs usados por JavaScript existen.
+- **HTML-003**: Los campos referenciados tienen controles con nombre en el HTML.
+- **HTML-004**: Los recursos locales existen y los scripts cargan en orden.
+- **HTML-005**: El desglose presenta servicios y propinas antes de su subtotal.
+- **HTML-006**: Facturado se integra al neto y ambos saldos comparten tarjeta.
+- **HTML-007**: Transferir conserva una direccion y queda al final de movimientos.
+- **HTML-008**: Las tarjetas de movimientos tienen alto fijo y contenido desplazable.

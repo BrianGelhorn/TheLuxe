@@ -436,13 +436,13 @@ Para el período seleccionado, el sistema deberá mostrar como mínimo:
 
 El resumen deberá mostrar:
 
-- Total facturado por servicios.
-- Total facturado por ventas de productos.
-- Total general facturado.
-- Total de propinas.
-- Total de comisiones generadas.
-- Cantidad de cortes realizados.
-- Cantidad de ventas registradas.
+- Facturado total: servicios + propinas, sin ventas ni descuento de comisiones, con desglose de Servicios y Propinas por medio de pago (Efectivo y Mercado Pago).
+- Comisión: ingreso neto del barbero (comisión + propinas), con desglose de propinas y comisión.
+- Ticket promedio bruto = (servicios + propinas) / cantidad de servicios; neto = (comisión + propinas) / cantidad de servicios. Ambos son cero si no hay servicios.
+- Cantidad de servicios realizados, sin sumar ventas, tanto para todos los barberos como para uno seleccionado.
+- Adelantos, Salidas de caja y Retiros totales como indicadores adicionales.
+
+No se muestran tarjetas independientes de Recaudado por servicios, Recaudado por ventas, Propinas ni Balance, ni una fila de ventas dentro del facturado. Las propinas permanecen en el bruto y en el ingreso neto. La tabla histórica diaria/mensual conserva sus columnas y fórmulas: ventas, propinas, comisiones sin propinas y balance comercial (servicios + ventas - comisiones).
 
 ##### Resumen de caja
 
@@ -481,8 +481,11 @@ actividad dentro del período seleccionado. Para cada barbero deberá informar:
 - Cantidad de cortes realizados.
 - Ingresos generados por servicios.
 - Propinas registradas.
+- Facturado total (servicios + propinas, sin ventas), con desglose de Servicios y Propinas por medio de pago.
+- Comisión (ingreso neto del barbero), con desglose de propinas y comisión.
+- Ticket promedio bruto y neto por servicio, sin ventas en numeradores ni denominadores.
 - Adelantos recibidos.
-- Balance correspondiente al período.
+- Balance correspondiente al período en la tabla histórica, no como tarjeta independiente.
 
 El resumen por barbero deberá actualizarse junto con el resumen general al
 cambiar el período o la fecha seleccionada.
