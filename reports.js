@@ -73,10 +73,43 @@ function renderSummary() {
   const [from, to] = periodBounds(period, document.getElementById('summaryDate').value, document.getElementById('summaryWeek').value);
   const inRange = (item) => item.date >= from && item.date <= to;
   const selectedServices = [...document.querySelectorAll('#summaryServiceOptions input:checked')].map(({ value }) => value);
-  const selectedBarber = document.getElementById('summaryBarberFilter').value;
+  const barberFilter = document.getElementById('summaryBarberFilter');
+  const shopMode = barberFilter.selectedOptions[0]?.dataset.scope === 'shop';
+  const selectedBarber = shopMode ? '' : barberFilter.value;
+  document.getElementById('barbersSummary').hidden = shopMode;
+  document.getElementById('shopSummary').hidden = !shopMode;
+  document.getElementById('summaryServiceField').hidden = shopMode;
   const payment = document.getElementById('summaryPaymentFilter').value;
   const matchesPayment = (item) => payment === 'Ambas' || item.payment === payment;
-  const periodCuts = entries.filter((cut) => inRange(cut) && selectedServices.includes(cut.service) && (!selectedBarber || cut.barber === selectedBarber) && (payment === 'Ambas' || cut.payment === payment || cut.payment === 'Ambos'));
+  // Local-wide result always ignores service and barber filters.
+  const shopCuts = entries.filter(inRange);
+  const shopSales = sales.filter(inRange);
+  const shopAdvances = advances.filter(inRange);
+  const shopExpenses = expenses.filter(inRange);
+  const shopWithdrawals = Object.entries(cashRegisters).filter(([date]) => date >= from && date <= to)
+    .reduce((sum, [, register]) => sum + Number(register.withdrawal || 0), 0);
+  const shopTotals = ['Ambas', 'Efectivo', 'Mercado Pago'].map((medium) => {
+    const result = summarize(shopCuts, shopSales, shopAdvances, shopExpenses, medium, defaultCommission);
+    return { ...result, collected: result.invoiced + result.tips, withdrawals: medium === 'Mercado Pago' ? 0 : shopWithdrawals };
+  });
+  const shop = shopTotals[['Ambas', 'Efectivo', 'Mercado Pago'].indexOf(payment)];
+  document.getElementById('shopInvoiced').textContent = money.format(shop.invoiced);
+  document.getElementById('shopCommission').textContent = money.format(shop.commission);
+  document.getElementById('shopExpenses').textContent = money.format(shop.expenses);
+  document.getElementById('shopBalance').textContent = money.format(shop.invoiced - shop.commission - shop.expenses);
+  document.getElementById('shopSaleCount').textContent = String(shop.saleCount);
+  document.getElementById('shopSaleQuantity').textContent = String(shopSales.filter(matchesPayment).reduce((sum, sale) => sum + Number(sale.quantity || 0), 0));
+  for (const [id, concepts] of [
+    ['shopRevenueRows', [['Servicios sin propinas', 'services'], ['Ventas de productos', 'sales'], ['Facturado sin propinas', 'invoiced'], ['Propinas', 'tips'], ['Total facturado con propinas', 'collected']]],
+    ['shopMovementRows', [['Gastos', 'expenses'], ['Adelantos', 'advances'], ['Retiros', 'withdrawals']]],
+  ]) {
+    document.getElementById(id).innerHTML = concepts.map(([label, field]) => {
+      const cash = payment === 'Mercado Pago' ? 0 : shopTotals[1][field];
+      const mp = payment === 'Efectivo' ? 0 : shopTotals[2][field];
+      return `<tr><th scope="row">${label}</th><td>${money.format(shop[field])}</td><td>${money.format(cash)}</td><td>${money.format(mp)}</td></tr>`;
+    }).join('');
+  }
+  const periodCuts = entries.filter((cut) => inRange(cut) && (shopMode || selectedServices.includes(cut.service)) && (!selectedBarber || cut.barber === selectedBarber) && (payment === 'Ambas' || cut.payment === payment || cut.payment === 'Ambos'));
   const periodSales = selectedBarber ? [] : sales.filter((sale) => inRange(sale) && matchesPayment(sale));
   const periodAdvances = advances.filter((advance) => inRange(advance) && (!selectedBarber || advance.barber === selectedBarber) && matchesPayment(advance));
   const periodExpenses = selectedBarber ? [] : expenses.filter((expense) => inRange(expense) && matchesPayment(expense));

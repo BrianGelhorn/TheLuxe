@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=140">
+  <link rel="stylesheet" href="styles.css?v=141">
 </head>
 <body>
   <div class="app-shell">
@@ -228,17 +228,19 @@
             <label class="field"><span>Período</span><select id="summaryPeriod"><option value="week">Semanal</option><option value="month">Mensual</option><option value="year">Anual</option></select></label>
             <label class="field"><span id="summaryDateLabel">Mes</span><input id="summaryDate" type="month"></label>
             <label id="summaryWeekField" class="field"><span>Número de semana</span><select id="summaryWeek"></select></label>
-            <div class="field"><span>Tipos de servicio</span><details id="summaryServiceFilter" class="checkbox-dropdown"><summary>Todos los servicios</summary><div id="summaryServiceOptions" class="checkbox-options"></div></details></div>
+            <div id="summaryServiceField" class="field"><span>Tipos de servicio</span><details id="summaryServiceFilter" class="checkbox-dropdown"><summary>Todos los servicios</summary><div id="summaryServiceOptions" class="checkbox-options"></div></details></div>
             <label class="field"><span>Barbero</span><select id="summaryBarberFilter"><option value="">Todos los barberos</option></select></label>
             <label class="field"><span>Medio de pago</span><select id="summaryPaymentFilter"><option value="Ambas">Efectivo y MP</option><option value="Efectivo">Efectivo</option><option value="Mercado Pago">Mercado Pago</option></select></label>
             <div class="summary-range"><span class="step">RANGO SELECCIONADO</span><h2 id="summaryRange"></h2></div>
           </div>
         </article>
+        <section id="barbersSummary" aria-labelledby="summaryBarbersTitle">
+        <div class="section-heading summary-section-heading"><div><span class="step">INGRESOS POR SERVICIOS</span><div class="metric-title"><h2 id="summaryBarbersTitle">Barberos</h2><button class="info-tip" type="button" aria-label="Alcance del resumen de Barberos" data-tip="Todos los filtros.">?</button></div></div></div>
         <div class="metrics daily-totals summary-highlights">
           <article class="metric featured collection-metric">
             <div class="collection-head">
-              <div class="metric-title"><span>Facturado total</span><button class="info-tip" type="button" aria-label="Cómo se calcula el facturado total" data-tip="Ingreso bruto: servicios + propinas. Excluye ventas y no descuenta comisiones.">?</button></div>
-              <small class="metric-sub">Bruto con propinas · <span id="summaryOperationCount">0 servicios</span></small>
+              <div class="metric-title"><span>Facturado total</span><button class="info-tip" type="button" aria-label="Cómo se calcula el facturado total" data-tip="Servicios + propinas.">?</button></div>
+              <small class="metric-sub"><span id="summaryOperationCount">0 servicios</span></small>
               <strong class="metric-value" id="summaryInvoiced">$ 0</strong>
             </div>
             <div class="collection-table-wrap" tabindex="0" role="region" aria-label="Desglose del facturado por medio de cobro">
@@ -252,7 +254,7 @@
             </div>
           </article>
           <article class="metric featured accounting-metric">
-            <div class="accounting-head"><div class="metric-title"><span>Comisión</span><button class="info-tip" type="button" aria-label="Cómo se calcula la comisión" data-tip="Ingreso neto del barbero: comisión de los cortes + propinas. No resta adelantos ni pagos realizados; no es el saldo pendiente de pago.">?</button></div><small class="metric-sub">Ingreso neto del barbero</small></div>
+            <div class="accounting-head"><div class="metric-title"><span>Comisión</span><button class="info-tip" type="button" aria-label="Cómo se calcula la comisión" data-tip="Comisión + propinas.">?</button></div></div>
             <div class="accounting-detail">
               <small class="accounting-note">Comisión de cortes<strong id="summaryCommissionAmount">$ 0</strong></small>
               <small class="accounting-note">Propinas<strong id="summaryCommissionTips">$ 0</strong></small>
@@ -260,18 +262,46 @@
             <div class="net-card"><span class="net-card-label">Ingreso neto</span><strong class="metric-value" id="summaryCommission">$ 0</strong></div>
           </article>
           <article class="metric accounting-metric">
-            <div class="accounting-head"><div class="metric-title"><span>Ticket promedio</span><button class="info-tip" type="button" aria-label="Cómo se calcula el ticket promedio" data-tip="Promedio por servicio. Bruto = (servicios + propinas) ÷ cantidad de servicios. Neto = (comisión de servicios + propinas) ÷ cantidad de servicios. Excluye ventas.">?</button></div><small class="metric-sub">Por servicio del período</small></div>
+            <div class="accounting-head"><div class="metric-title"><span>Ticket promedio</span><button class="info-tip" type="button" aria-label="Cómo se calcula el ticket promedio" data-tip="Bruto: facturado ÷ servicios. Neto: (comisión + propinas) ÷ servicios.">?</button></div></div>
             <div class="accounting-detail"><small class="accounting-note">Bruto<strong id="summaryAverageTicket">$ 0</strong></small></div>
             <div class="net-card"><span class="net-card-label">Neto</span><strong class="metric-value" id="summaryAverageTicketNeto">$ 0</strong></div>
           </article>
         </div>
-        <div class="metrics summary-metrics">
+        <div class="metrics summary-metrics" role="group" aria-label="Movimientos del período">
           <article class="metric summary-secondary"><span>Adelantos</span><strong id="summaryAdvances">$ 0</strong></article>
           <article class="metric summary-secondary"><span>Salidas de caja</span><strong id="summaryExpenses">$ 0</strong></article>
           <article class="metric summary-secondary"><span>Retiros totales</span><strong id="summaryWithdrawals">$ 0</strong></article>
         </div>
+        </section>
+        <section id="shopSummary" class="card daily-sheet shop-summary" aria-labelledby="shopTitle" hidden>
+          <div class="section-heading"><div class="metric-title"><h2 id="shopTitle">Barbería</h2><button class="info-tip" id="shopScope" type="button" aria-label="Alcance del resumen de Barbería" data-tip="Local completo; período y medio.">?</button></div></div>
+          <div class="metrics daily-totals summary-highlights">
+            <article class="metric featured collection-metric">
+              <div class="metric-title"><span>Total facturado</span><button class="info-tip" type="button" aria-label="Cómo se calcula el total facturado de Barbería" data-tip="Servicios + ventas.">?</button></div>
+              <strong class="metric-value" id="shopInvoiced">$ 0</strong>
+              <small class="metric-sub">Ventas registradas: <span id="shopSaleCount">0</span> · Unidades: <span id="shopSaleQuantity">0</span></small>
+              <div class="collection-table-wrap" tabindex="0" role="region" aria-label="Facturación de Barbería por medio de cobro">
+                <table class="collection-table"><thead><tr><th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Efectivo</th><th scope="col" aria-label="Mercado Pago">MP</th></tr></thead><tbody id="shopRevenueRows"></tbody></table>
+              </div>
+            </article>
+            <article class="metric featured accounting-metric">
+              <div class="metric-title"><span>Balance del local</span><button class="info-tip" type="button" aria-label="Cómo se calcula el balance del local" data-tip="Facturado - comisiones - gastos.">?</button></div>
+              <div class="accounting-detail">
+                <small class="accounting-note">Comisiones<strong id="shopCommission">$ 0</strong></small>
+                <small class="accounting-note">Gastos operativos<strong id="shopExpenses">$ 0</strong></small>
+              </div>
+              <div class="net-card"><span class="net-card-label">Queda al local</span><strong class="metric-value" id="shopBalance">$ 0</strong></div>
+            </article>
+            <article class="metric collection-metric summary-movements">
+              <div class="metric-title"><span>Movimientos</span><button class="info-tip" type="button" aria-label="Cómo leer los movimientos de Barbería" data-tip="Por medio; retiros solo efectivo.">?</button></div>
+              <div class="collection-table-wrap" tabindex="0" role="region" aria-label="Movimientos de Barbería por medio de pago">
+                <table class="collection-table"><thead><tr><th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Efectivo</th><th scope="col" aria-label="Mercado Pago">MP</th></tr></thead><tbody id="shopMovementRows"></tbody></table>
+              </div>
+            </article>
+          </div>
+        </section>
         <article class="card daily-sheet">
-          <div class="section-heading"><div><span class="step">DESGLOSE</span><h2 id="summaryBreakdownTitle">Resumen por día</h2></div></div>
+          <div class="section-heading"><div><span class="step">HISTÓRICO FILTRADO</span><div class="metric-title"><h2 id="summaryBreakdownTitle">Resumen por día</h2><button class="info-tip" id="summaryHistoryScope" type="button" aria-label="Alcance y balance del histórico" data-tip="Balance = servicios + ventas - comisiones.">?</button></div></div></div>
           <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Período</th><th>Cortes</th><th>Servicios</th><th>Ventas</th><th>Propinas</th><th>Comisiones</th><th>Adelantos</th><th>Gastos</th><th>Retiro</th><th>Balance</th></tr></thead><tbody id="summaryRows"></tbody></table></div>
           <div id="summaryEmpty" class="barber-empty">Sin movimientos en el período</div>
         </article>
@@ -457,9 +487,9 @@
     </main>
   </div>
   <script src="logic.js?v=7"></script>
-  <script src="reports.js?v=20"></script>
+  <script src="reports.js?v=21"></script>
   <script src="dialogs.js?v=2"></script>
   <script src="inventory.js?v=2"></script>
-  <script src="script.js?v=71"></script>
+  <script src="script.js?v=72"></script>
 </body>
 </html>

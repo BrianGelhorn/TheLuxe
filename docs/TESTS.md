@@ -1,6 +1,6 @@
 # Indice de tests
 
-Generado con `npm run test:docs`. 703 tests; 0 fallos.
+Generado con `npm run test:docs`. 720 tests; 0 fallos.
 
 Una linea por test. Los IDs se pueden buscar en el codigo o ejecutar con `--test-name-pattern`.
 
@@ -269,6 +269,23 @@ Alcance y comandos: [TESTING.md](TESTING.md). No certifica estilos ni interaccio
 - **RPT-015**: La tabla de expenses ordena hora escapa texto y suma importes escritos.
 - **RPT-016**: Los ajustes de apertura se muestran firmados sin botones para borrarlos.
 - **RPT-017**: Cambiar filtro de barbero y medio dispara el recuento inmediatamente.
+- **RPT-018**: Las tres tarjetas reutilizan el panel diario y etiquetan cada importe.
+- **RPT-019**: El mixto dominante MP desglosa propinas y conserva balance y comision por dia.
+- **RPT-020**: Barberia separa facturado cobrado balance y movimientos en Ambas.
+- **RPT-021**: Barberia separa facturado cobrado balance y movimientos en Efectivo.
+- **RPT-022**: Barberia separa facturado cobrado balance y movimientos en Mercado Pago.
+- **RPT-023**: Cambio ida y vuelta conserva servicios y adapta el historico al modo.
+- **RPT-024**: Adelantos retiros pagos apertura y transferencias no reducen otra vez balance.
+- **RPT-025**: Barberia mixto dominante MP y empate asignan propina una sola vez.
+- **RPT-026**: Barberia vacia limpia importes conteos y desgloses anteriores.
+- **RPT-027**: Barberia incluye extremos y excluye externos de month en todas las colecciones.
+- **RPT-028**: Barberia incluye extremos y excluye externos de year en todas las colecciones.
+- **RPT-029**: Barberia incluye extremos y excluye externos de week en todas las colecciones.
+- **RPT-030**: Barberia tiene IDs unicos regiones accesibles y alcance en ayuda.
+- **RPT-031**: Render y configuracion conservan Barberia sin colision con nombres.
+- **RPT-032**: Explicaciones en ayudas enfocables conservan etiquetas y conteos.
+- **RPT-033**: Ayuda historica conserva formula breve y boton en ambos modos.
+- **RPT-034**: Jerarquia separa facturado resultado y movimientos sin duplicar importes.
 
 ## test/app/transactions.test.mjs
 

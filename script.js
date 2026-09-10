@@ -122,11 +122,15 @@ function populateSelectors() {
   const options = [...document.querySelectorAll('#summaryServiceOptions input')];
   const selectedServices = new Set(options.filter((input) => input.checked).map((input) => input.value));
   const allServices = options.every((input) => input.checked);
-  const selectedBarber = document.getElementById('summaryBarberFilter').value;
+  const barberFilter = document.getElementById('summaryBarberFilter');
+  const selectedBarber = barberFilter.value;
+  const shopMode = barberFilter.selectedOptions[0]?.dataset.scope === 'shop';
   serviceInput.innerHTML = '<option value="">Seleccionar servicio</option>' + config.services.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
   document.getElementById('summaryServiceOptions').innerHTML = config.services.map(({ name }) => `<label><input type="checkbox" value="${escapeHtml(name)}" ${allServices || selectedServices.has(name) ? 'checked' : ''}> ${escapeHtml(name)}</label>`).join('');
-  document.getElementById('summaryBarberFilter').innerHTML = '<option value="">Todos los barberos</option>' + config.barbers.map(({ name }) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
-  document.getElementById('summaryBarberFilter').value = config.barbers.some(({ name }) => name === selectedBarber) ? selectedBarber : '';
+  barberFilter.innerHTML = '<option value="">Todos los barberos</option><option value="__shop__" data-scope="shop">Barbería</option>' + config.barbers.map(({ name }) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  // Identify the local option by scope, not by a value that could be a barber name.
+  const selectedIndex = [...barberFilter.options].findIndex((option) => shopMode ? option.dataset.scope === 'shop' : option.dataset.scope !== 'shop' && option.value === selectedBarber);
+  barberFilter.selectedIndex = selectedIndex < 0 ? 0 : selectedIndex;
   updateServiceFilterLabel();
   document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + config.products.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
   advanceForm.elements.barber.innerHTML = '<option value="">Seleccionar barbero</option>' + config.barbers.filter(({ active }) => active !== false).map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
