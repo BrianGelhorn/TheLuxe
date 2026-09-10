@@ -1,11 +1,21 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
 import test from 'node:test';
 import { read, root, scripts } from './support/logic.mjs';
 import { fileURLToPath } from 'node:url';
 
 execFileSync(process.execPath, ['build.mjs'], { cwd: fileURLToPath(root) });
 const worker = (await import(new URL('dist/server/index.js', root))).default;
+
+test('HTTP-011 - Vercel publica solo los archivos de la web desde la carpeta generada', () => {
+  const { outputDirectory, buildCommand, framework } = JSON.parse(read('vercel.json'));
+  assert.equal(buildCommand, 'npm run build');
+  assert.equal(framework, null);
+  const files = ['index.html', 'styles.css', ...scripts];
+  assert.deepEqual(readdirSync(new URL(`${outputDirectory}/`, root)).sort(), files.sort());
+  for (const file of files) assert.equal(read(`${outputDirectory}/${file}`), read(file));
+});
 
 test('HTTP-001 - El build sirve el HTML actual y no una copia vieja', async () => {
   const response = await worker.fetch(new Request('http://local/'));

@@ -10,6 +10,8 @@ const types = {
   'dialogs.js': 'text/javascript; charset=utf-8',
 };
 const assets = Object.fromEntries(Object.entries(types).map(([file, type]) => [file, [readFileSync(file, 'utf8'), type]]));
+mkdirSync('dist/client', { recursive: true });
+for (const [file, [content]] of Object.entries(assets)) writeFileSync(`dist/client/${file}`, content);
 const worker = `const assets = ${JSON.stringify(assets)};
 export default {
   async fetch(request) {
