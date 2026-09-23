@@ -93,7 +93,14 @@ function applyDailyLock(opened, closed) {
     view.classList.toggle('daily-locked', locked);
     view.setAttribute('aria-disabled', String(locked));
     view.querySelectorAll('button, input, select, textarea').forEach((control) => {
-      if (locked && !control.closest('#cashRegisterForm, .closing-edit-actions')) control.disabled = true;
+      if (control.closest('#cashRegisterForm, .closing-edit-actions')) return;
+      if (locked) {
+        control.disabled = true;
+        control.dataset.dailyLockDisabled = 'true';
+      } else if (control.dataset.dailyLockDisabled === 'true') {
+        control.disabled = false;
+        delete control.dataset.dailyLockDisabled;
+      }
     });
   }
   document.getElementById('dailyLockFeedback').hidden = !locked;
@@ -807,7 +814,7 @@ openingCashForm.addEventListener('submit', (event) => {
   const initialCash = parseAmount(values.initialCash);
   const initialMp = parseAmount(values.initialMp);
   const changed = isDayOpen(workday.value) && (initialCash !== Number(current.initialCash) || initialMp !== Number(current.initialMp));
-  const description = values.editDescription.trim();
+  const description = String(values.editDescription || '').trim();
   openingCashForm.elements.editDescription.setCustomValidity(changed && !description ? 'Ingresá el motivo de la modificación.' : '');
   if (!openingCashForm.reportValidity()) return;
   if (changed) {
