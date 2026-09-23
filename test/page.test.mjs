@@ -42,13 +42,24 @@ test('HTML-006 - Facturado se integra al neto y ambos saldos comparten tarjeta',
 
 test('HTML-007 - Transferir conserva una direccion y queda al final de movimientos', () => {
   const cashView = html.match(/<section id="salesView"[\s\S]*?<\/section>/)[0];
-  assert.ok(cashView.indexOf('transfer-card') > cashView.indexOf('inventory-card'));
+  assert.ok(cashView.indexOf('transfer-card') > -1);
+  assert.doesNotMatch(cashView, /inventory-card/);
   assert.doesNotMatch(cashView, /name="to"/);
   assert.equal([...cashView.matchAll(/class="movement-body" tabindex="0" role="region"/g)].length, [...cashView.matchAll(/<article\b/g)].length);
 });
 
-test('HTML-008 - Las tarjetas de movimientos tienen alto fijo y contenido desplazable', () => {
+test('HTML-009 - El control de stock vive en una vista operativa propia', () => {
+  const stockView = html.match(/<section id="stockView"[\s\S]*?<\/section>/)[0];
+  assert.match(stockView, /id="stockMovementForm"/);
+  assert.match(stockView, /data-view="configView"/);
+  assert.match(html, /data-view="stockView"/);
+});
+
+test('HTML-008 - El scroll horizontal queda limitado al kanban de barberos', () => {
   const css = read('styles.css');
   assert.match(css, /#salesView > \.daily-sheet\s*\{[^}]*grid-column: auto;[^}]*height: 28rem;/);
-  assert.match(css, /#salesView \.movement-body\s*\{[^}]*min-height: 0;[^}]*overflow: auto;/);
+  assert.match(css, /#salesView \.movement-body\s*\{[^}]*min-height: 0;[^}]*overflow-x: clip;[^}]*overflow-y: auto;/);
+  assert.match(css, /\.barber-columns\s*\{[^}]*overflow-x:\s*auto/);
+  assert.doesNotMatch(css, /\.sales-table-wrap\s*\{[^}]*overflow-x:\s*auto/);
+  assert.doesNotMatch(css, /\.collection-table-wrap\s*\{[^}]*overflow-x:\s*auto/);
 });

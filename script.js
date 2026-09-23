@@ -2,6 +2,7 @@ const defaultConfig = {
   services: [{ id: 'corte', name: 'Corte clásico', price: 15000 }, { id: 'corte-barba', name: 'Corte + barba', price: 22000 }, { id: 'barba', name: 'Barba', price: 10000 }, { id: 'diseno', name: 'Diseño', price: 18000 }],
   products: [{ id: 'pomada', name: 'Pomada', price: 12000 }, { id: 'shampoo', name: 'Shampoo', price: 9000 }],
   barbers: ['Mateo', 'Julián', 'Nicolás', 'Tomás', 'Franco', 'Agustín', 'Lucas', 'Bruno', 'Santino'].map((name) => ({ id: name, name, active: true })),
+  expenseCategories: [{ id: 'otros', name: 'Otros' }],
   commission: 50,
   commissionHistory: [{ date: '0000-01-01', rate: 50 }],
 };
@@ -45,18 +46,22 @@ const advanceDetailDialog = document.getElementById('advanceDetailDialog');
 const expenseForm = document.getElementById('expenseForm');
 const expenseDialog = document.getElementById('expenseDialog');
 const expenseDetailDialog = document.getElementById('expenseDetailDialog');
+const expenseCategoryConfigForm = document.getElementById('expenseCategoryConfigForm');
 const openingCashForm = document.getElementById('openingCashForm');
 const cashRegisterForm = document.getElementById('cashRegisterForm');
 const transferForm = document.getElementById('transferForm');
 const dailyView = document.getElementById('dailyView');
 const salesView = document.getElementById('salesView');
+const stockView = document.getElementById('stockView');
 const commissionDialog = document.getElementById('commissionDialog');
 const dailyCommissionForm = document.getElementById('dailyCommissionForm');
 const serviceConfigForm = document.getElementById('serviceConfigForm');
 const productConfigForm = document.getElementById('productConfigForm');
 const barberConfigForm = document.getElementById('barberConfigForm');
 const commissionForm = document.getElementById('commissionForm');
-const configDialogs = { services: document.getElementById('serviceConfigDialog'), products: document.getElementById('productConfigDialog'), barbers: document.getElementById('barberConfigDialog') };
+const configDialogs = { services: document.getElementById('serviceConfigDialog'), products: document.getElementById('productConfigDialog'), barbers: document.getElementById('barberConfigDialog'), expenseCategories: document.getElementById('expenseCategoryConfigDialog') };
+const configForms = { services: serviceConfigForm, products: productConfigForm, barbers: barberConfigForm, expenseCategories: expenseCategoryConfigForm };
+const configLabels = { services: 'SERVICIO', products: 'PRODUCTO', barbers: 'BARBERO', expenseCategories: 'CATEGORÍA' };
 const demoCutCounts = [3, 2, 4, 1, 3, 2, 4, 2, 3];
 let entries = barbers.flatMap((barber, barberIndex) => Array.from({ length: demoCutCounts[barberIndex] }, (_, cutIndex) => {
   const service = config.services[(barberIndex + cutIndex) % config.services.length];
@@ -93,7 +98,7 @@ function dailyOperationsLocked() {
 
 function applyDailyLock(opened, closed) {
   const locked = dailyOperationsLocked();
-  for (const view of [dailyView, salesView]) {
+  for (const view of [dailyView, salesView, stockView]) {
     view.classList.toggle('daily-locked', locked);
     view.setAttribute('aria-disabled', String(locked));
     view.querySelectorAll('button, input, select, textarea').forEach((control) => {
@@ -109,6 +114,7 @@ function applyDailyLock(opened, closed) {
   }
   document.getElementById('dailyLockFeedback').hidden = !locked;
   document.getElementById('salesLockFeedback').hidden = !locked;
+  document.getElementById('stockLockFeedback').hidden = !locked;
   ['realCash', 'realMp', 'withdrawal'].forEach((name) => {
     cashRegisterForm.elements[name].disabled = closed && !editingClosing;
     cashRegisterForm.elements[name].readOnly = closed && !editingClosing;
@@ -173,12 +179,14 @@ function populateSelectors() {
   updateServiceFilterLabel();
   document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + config.products.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
   advanceForm.elements.barber.innerHTML = '<option value="">Seleccionar barbero</option>' + config.barbers.filter(({ active }) => active !== false).map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
+  expenseForm.elements.category.innerHTML = '<option value="">Sin categoría</option>' + config.expenseCategories.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
 }
 
 function renderConfig() {
   const list = (type, price = false) => config[type].map((item) => `<div class="config-item"><span>${escapeHtml(item.name)}${price ? ` · ${money.format(item.price)}` : ''}</span><span class="config-actions"><button type="button" data-config-edit="${type}" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="${type}" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
   document.getElementById('serviceConfigList').innerHTML = list('services', true);
   document.getElementById('productConfigList').innerHTML = list('products', true);
+  document.getElementById('expenseCategoryConfigList').innerHTML = list('expenseCategories');
   document.getElementById('barberConfigList').innerHTML = config.barbers.map((item) => `<div class="config-item" data-name="${escapeHtml(item.name)}"><span>${escapeHtml(item.name)}</span><span class="config-actions"><label class="config-active"><input type="checkbox" data-config-active="barbers" data-id="${escapeHtml(item.id)}" ${item.active !== false ? 'checked' : ''}> Activo</label><button type="button" data-config-edit="barbers" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="barbers" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
   filterBarberConfig();
   commissionForm.elements.commission.value = config.commission;
@@ -195,8 +203,9 @@ function saveCatalog(type, formElement) {
   const duplicate = config[type].some((item) => item.id !== values.id && item.name.toLowerCase() === values.name.trim().toLowerCase());
   formElement.elements.name.setCustomValidity(duplicate ? 'Ya existe un elemento con ese nombre.' : '');
   if (!formElement.reportValidity()) return;
-  const item = { id: values.id || crypto.randomUUID(), name: values.name.trim(), ...(type !== 'barbers' ? { price: parseAmount(values.price) } : { active: existing?.active !== false }) };
-  if (type !== 'barbers' && item.price <= 0) {
+  const priced = ['services', 'products'].includes(type);
+  const item = { id: values.id || crypto.randomUUID(), name: values.name.trim(), ...(priced ? { price: parseAmount(values.price) } : type === 'barbers' ? { active: existing?.active !== false } : {}) };
+  if (priced && item.price <= 0) {
     formElement.elements.price.setCustomValidity('El precio debe ser mayor que cero.');
     return formElement.reportValidity();
   }
@@ -208,7 +217,8 @@ function saveCatalog(type, formElement) {
       advances = advances.map((advance) => advance.barber === existing?.name ? { ...advance, barber: item.name } : advance);
       barberPayments = Object.fromEntries(Object.entries(barberPayments).map(([date, payments]) => [date, Object.fromEntries(Object.entries(payments).map(([barber, payment]) => [barber === existing.name ? item.name : barber, payment]))]));
     }
-    save(); saveSales(); saveAdvances();
+    if (type === 'expenseCategories') expenses = expenses.map((expense) => expense.category === existing.name ? { ...expense, category: item.name } : expense);
+    save(); saveSales(); saveAdvances(); saveExpenses();
   }
   config[type] = existing ? config[type].map((current) => current.id === existing.id ? item : current) : [...config[type], item];
   formElement.reset();
@@ -219,6 +229,7 @@ function saveCatalog(type, formElement) {
 function configInUse(type, name) {
   if (type === 'services') return entries.some((entry) => entry.service === name);
   if (type === 'products') return sales.some((sale) => sale.product === name);
+  if (type === 'expenseCategories') return expenses.some((expense) => expense.category === name);
   return entries.some((entry) => entry.barber === name) || advances.some((advance) => advance.barber === name)
     || Object.keys(barberPayments).some((date) => {
       const payment = barberPaymentRecord(name, date);
@@ -227,14 +238,14 @@ function configInUse(type, name) {
 }
 
 function openConfigDialog(type, item = null) {
-  const formElement = type === 'services' ? serviceConfigForm : type === 'products' ? productConfigForm : barberConfigForm;
+  const formElement = configForms[type];
   formElement.reset();
   formElement.elements.name.setCustomValidity('');
-  if (type !== 'barbers') formElement.elements.price.setCustomValidity('');
+  if (['services', 'products'].includes(type)) formElement.elements.price.setCustomValidity('');
   formElement.elements.id.value = item?.id || '';
   formElement.elements.name.value = item?.name || '';
-  if (type !== 'barbers') formElement.elements.price.value = item ? formatAmount(item.price) : '';
-  document.getElementById(`${type === 'services' ? 'service' : type === 'products' ? 'product' : 'barber'}ConfigMode`).textContent = item ? `MODIFICAR ${type === 'services' ? 'SERVICIO' : type === 'products' ? 'PRODUCTO' : 'BARBERO'}` : `NUEVO ${type === 'services' ? 'SERVICIO' : type === 'products' ? 'PRODUCTO' : 'BARBERO'}`;
+  if (['services', 'products'].includes(type)) formElement.elements.price.value = item ? formatAmount(item.price) : '';
+  document.getElementById(`${type === 'expenseCategories' ? 'expenseCategory' : type.slice(0, -1)}ConfigMode`).textContent = item ? `MODIFICAR ${configLabels[type]}` : `NUEVO ${configLabels[type]}`;
   configDialogs[type].showModal();
 }
 
@@ -313,32 +324,12 @@ function renderOpenDaysWarning() {
     : '';
 }
 
-function shiftDate(date, days) {
-  const value = new Date(`${date}T12:00:00`);
-  value.setDate(value.getDate() + days);
-  return isoDate(value);
-}
-
 function defaultCommission(date) {
   return Number([...(config.commissionHistory || [])].filter((item) => item.date <= date).sort((a, b) => a.date.localeCompare(b.date)).at(-1)?.rate ?? config.commission);
 }
 
 function effectiveCommission(date) {
   return Number(cashRegisters[date]?.commissionRate ?? defaultCommission(date));
-}
-
-function initializeOpening(date) {
-  if (isDayOpen(date)) return false;
-  const previous = previousClosedRegister(date);
-  if (!previous) return false;
-  cashRegisters[date] = {
-    ...(cashRegisters[date] || {}),
-    initialCash: Math.max(0, Number(previous.register.realCash || 0) - Number(previous.register.withdrawal || 0)),
-    initialMp: Number(previous.register.realMp || 0), opened: true, autoOpened: true,
-    openedAt: new Date().toISOString(), inheritedFrom: previous.date,
-  };
-  saveCashRegisters();
-  return true;
 }
 
 function dayBalance(type, list = selectedEntries(), daySales = selectedSales(), dayAdvances = selectedAdvances(), dayExpenses = selectedExpenses(), dayTransfers = selectedTransfers()) {
@@ -396,7 +387,6 @@ function toggleSaleSplitPayment() {
 }
 
 function render() {
-  initializeOpening(workday.value);
   const list = selectedEntries();
   const daySales = selectedSales();
   const dayAdvances = selectedAdvances();
@@ -442,7 +432,7 @@ function render() {
   renderTransfers(dayTransfers, selectedOpeningAdjustments());
   renderInventory();
   const previousClosing = opened ? null : previousClosedRegister(workday.value);
-  openingCashForm.elements.initialCash.value = 'initialCash' in register ? formatAmount(register.initialCash) : '';
+  openingCashForm.elements.initialCash.value = 'initialCash' in register ? formatAmount(register.initialCash) : previousClosing ? formatAmount(Math.max(0, Number(previousClosing.register.realCash || 0) - Number(previousClosing.register.withdrawal || 0))) : '';
   openingCashForm.elements.initialMp.value = 'initialMp' in register ? formatAmount(register.initialMp) : previousClosing ? formatAmount(previousClosing.register.realMp) : '';
   const inheritedMpHint = document.getElementById('inheritedMpHint');
   inheritedMpHint.hidden = !previousClosing;
@@ -511,8 +501,9 @@ function barberColumn(barber, list) {
       </header>
       <div class="barber-services">${rows}</div>
       <footer class="barber-column-footer">
-        <div class="barber-column-total"><span>Total</span><span class="barber-total-value"><strong>${money.format(total)}</strong><small>${cuts.length} ${cuts.length === 1 ? 'corte' : 'cortes'}</small></span></div>
-        <dl class="payment-breakdown">
+       <div class="barber-column-total"><span>Total de servicios</span><span class="barber-total-value"><strong>${money.format(total)}</strong><small>${cuts.length} ${cuts.length === 1 ? 'corte' : 'cortes'}</small></span></div>
+       <div class="barber-payout-label">Resumen del barbero</div>
+       <dl class="payment-breakdown">
           <div><dt>Propinas</dt><dd>${money.format(payout.tips)}</dd></div>
           <div title="Suma de los cortes con su comisión aplicada, sin propinas"><dt>Comisión</dt><dd>${money.format(payout.commission)}</dd></div>
           <div class="payment-amount-due" title="Comisión de los cortes más propinas; no descuenta adelantos"><dt>Total a pagar</dt><dd>${money.format(payout.total)}</dd></div>
@@ -696,7 +687,7 @@ document.querySelector('.app-shell').addEventListener('click', (event) => {
     else item.removeAttribute('aria-current');
   });
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === button.dataset.view));
-  document.querySelector('h1').textContent = button.dataset.view === 'salesView' ? 'Caja y movimientos' : button.dataset.view === 'summaryView' ? 'Resúmenes' : button.dataset.view === 'configView' ? 'Configuración' : 'Panel diario';
+  document.querySelector('h1').textContent = button.dataset.view === 'salesView' ? 'Caja y movimientos' : button.dataset.view === 'stockView' ? 'Control de stock' : button.dataset.view === 'summaryView' ? 'Resúmenes' : button.dataset.view === 'configView' ? 'Configuración' : 'Panel diario';
   if (button.dataset.view === 'summaryView') {
     document.getElementById('summaryPeriod').value = 'week';
     updateSummaryReference();
@@ -827,6 +818,7 @@ expenseForm.addEventListener('submit', (event) => {
   expenseForm.elements.amount.setCustomValidity(parseAmount(values.amount) > 0 ? '' : 'El importe debe ser mayor que cero.');
   if (!expenseForm.reportValidity()) return;
   const expense = { ...values, amount: parseAmount(values.amount), date: workday.value, id: editingExpenseId || crypto.randomUUID() };
+  if (!expense.category) delete expense.category;
   expenses = editingExpenseId ? expenses.map((item) => item.id === editingExpenseId ? expense : item) : [...expenses, expense];
   saveExpenses();
   editingExpenseId = null;
@@ -869,14 +861,12 @@ cashRegisterForm.addEventListener('submit', (event) => {
   if (!cashRegisterForm.reportValidity()) return;
   cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), realCash, realMp: parseAmount(values.realMp), withdrawal, closedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   saveCashRegisters();
-  const nextDate = shiftDate(workday.value, 1);
   for (const [date, register] of Object.entries(cashRegisters)) {
     if (register.autoOpened && register.inheritedFrom === workday.value) {
       cashRegisters[date] = { ...register, initialCash: Math.max(0, realCash - withdrawal), initialMp: parseAmount(values.realMp), updatedAt: new Date().toISOString() };
     }
   }
   saveCashRegisters();
-  initializeOpening(nextDate);
   editingClosing = false;
   render();
 });
@@ -1004,9 +994,11 @@ serviceConfigForm.addEventListener('submit', (event) => { event.preventDefault()
 });
 productConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('products', productConfigForm); });
 barberConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('barbers', barberConfigForm); });
+expenseCategoryConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('expenseCategories', expenseCategoryConfigForm); });
 document.getElementById('addServiceConfig').addEventListener('click', () => openConfigDialog('services'));
 document.getElementById('addProductConfig').addEventListener('click', () => openConfigDialog('products'));
 document.getElementById('addBarberConfig').addEventListener('click', () => openConfigDialog('barbers'));
+document.getElementById('addExpenseCategoryConfig').addEventListener('click', () => openConfigDialog('expenseCategories'));
 document.getElementById('barberConfigSearch').addEventListener('input', filterBarberConfig);
 Object.values(configDialogs).forEach((configDialog) => {
   configDialog.querySelector('.config-close').addEventListener('click', () => configDialog.close());

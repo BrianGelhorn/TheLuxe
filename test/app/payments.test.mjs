@@ -456,8 +456,11 @@ test('PAY-031 - Guardar cierre tras pago conserva sus importes reales al volver'
   app.submit('cashRegisterForm');
   app.element('workday').value = '2026-09-04';
   app.emit('#workday', 'change');
-  balances(app, 1500, 4900);
+  balances(app, 0, 0);
+  assert.deepEqual(['initialCash', 'initialMp'].map((name) => app.element('openingCashForm').elements.namedItem(name).value), ['1.500', '4.900']);
   assert.equal(app.query(mateo).dataset.paymentStatus, 'No pago');
+  app.submit('openingCashForm');
+  balances(app, 1500, 4900);
   app.element('workday').value = '2026-09-03';
   app.emit('#workday', 'change');
   assert.deepEqual(['realCash', 'realMp', 'withdrawal'].map((name) => app.element('cashRegisterForm').elements.namedItem(name).value), ['1.600', '4.900', '100']);

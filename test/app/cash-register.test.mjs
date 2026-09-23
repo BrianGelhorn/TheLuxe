@@ -164,7 +164,7 @@ test('REG-011 - Cambiar jornada sale de la edicion de apertura', (t) => {
   assert.equal(app.run('openingAdjustments.length'), 0);
 });
 
-test('REG-012 - La apertura hereda el ultimo cierre anterior aunque haya dias vacios', (t) => {
+test('REG-012 - La apertura siguiente muestra valores heredados sin iniciar la jornada', (t) => {
   const app = createApp(t);
   app.seed({ cashRegisters: {
     '2026-09-04': { realCash: 99999, realMp: 99999, withdrawal: 0 },
@@ -174,21 +174,21 @@ test('REG-012 - La apertura hereda el ultimo cierre anterior aunque haya dias va
   } });
   app.render();
   assert.equal(app.run('previousClosedRegister(workday.value).date'), '2026-08-31');
-  assert.deepEqual(app.snapshot('(({ initialCash, initialMp, opened, autoOpened, inheritedFrom }) => ({ initialCash, initialMp, opened, autoOpened, inheritedFrom }))(cashRegisters[workday.value])'), {
-    initialCash: 7000, initialMp: 12000, opened: true, autoOpened: true, inheritedFrom: '2026-08-31',
-  });
-  assert.equal(app.run('cashRegisters[workday.value].openedAt'), app.run('new Date().toISOString()'));
-  balances(app, 7000, 12000);
+  assert.equal(app.run('cashRegisters[workday.value]'), undefined);
+  assert.equal(app.run('isDayOpen(workday.value)'), false);
+  assert.equal(app.element('openingCashForm').elements.initialCash.value, '7.000');
+  assert.equal(app.element('openingCashForm').elements.initialMp.value, '12.000');
+  balances(app, 0, 0);
   const before = app.snapshot('cashRegisters');
   app.render();
   assert.deepEqual(app.snapshot('cashRegisters'), before);
 });
 
-test('REG-013 - Inicializar desde cierre conserva un override diario de cero', (t) => {
+test('REG-013 - Una apertura conserva un override diario de cero', (t) => {
   const app = createApp(t);
   app.seed({ cashRegisters: {
     '2026-09-01': { realCash: 900, realMp: 1200, withdrawal: 200, commissionRate: 80 },
-    '2026-09-03': { commissionRate: 0 },
+    '2026-09-03': { opened: true, initialCash: 700, initialMp: 1200, commissionRate: 0 },
   } });
   app.render();
   assert.equal(app.run('cashRegisters[workday.value].commissionRate'), 0);
@@ -207,7 +207,6 @@ test('REG-014 - Una apertura manual existente no se reemplaza por herencia', (t)
   } });
   const before = app.snapshot('cashRegisters');
   app.render();
-  assert.equal(app.run('initializeOpening(workday.value)'), false);
   assert.deepEqual(app.snapshot('cashRegisters'), before);
   balances(app, 300, 400);
 });
@@ -246,13 +245,14 @@ test('REG-017 - El retiro mayor al efectivo real se rechaza y permite correccion
   assert.equal(app.run('cashRegisters["2026-09-04"]'), undefined);
   app.input('#cashRegisterForm [name="withdrawal"]', '40');
   app.submit('cashRegisterForm');
-  assert.equal(app.run('cashRegisters["2026-09-04"].initialCash'), 60);
+  assert.equal(app.run('cashRegisters["2026-09-04"]'), undefined);
+  assert.equal(app.element('nextOpeningCash').textContent, `${app.money(60)} efectivo`);
 });
 
 test('REG-018 - Retirar todo el efectivo deja apertura cero y conserva MP', (t) => {
   const app = createApp(t);
   assert.equal(app.submit('cashRegisterForm', { realCash: '1500', realMp: '2700', withdrawal: '1500' }), true);
-  assert.deepEqual(app.snapshot('[cashRegisters["2026-09-04"].initialCash, cashRegisters["2026-09-04"].initialMp]'), [0, 2700]);
+  assert.equal(app.run('cashRegisters["2026-09-04"]'), undefined);
   assert.equal(app.element('closingStatus').textContent, 'Cierre guardado');
   assert.equal(app.element('closingStatus').classList.contains('closed'), true);
 });
@@ -266,33 +266,35 @@ test('REG-019 - Guardar cierre conserva apertura y comision sin restar retiro al
     initialCash: 1000, initialMp: 2000, commissionRate: 60, realCash: 3000, realMp: 5000, withdrawal: 400,
   });
   assert.equal(app.run('cashRegisters[workday.value].closedAt'), app.run('new Date().toISOString()'));
-  assert.deepEqual(app.snapshot('[cashRegisters["2026-09-04"].initialCash, cashRegisters["2026-09-04"].initialMp]'), [2600, 5000]);
-  assert.equal(app.run('cashRegisters["2026-09-04"].commissionRate'), undefined);
+  assert.equal(app.run('cashRegisters["2026-09-04"]'), undefined);
   assert.equal(app.run('effectiveCommission("2026-09-04")'), 50);
   balances(app, 2850, 4900);
 });
 
-test('REG-020 - Cerrar fin de anio inicializa la fecha siguiente correcta', (t) => {
+test('REG-020 - Cerrar fin de año deja la siguiente sin iniciar y permite abrirla manualmente', (t) => {
   const app = createApp(t, { now: '2026-12-31T23:30:00' });
   app.seed({ cashRegisters: { '2026-12-31': { opened: true, initialCash: 100, initialMp: 200 } } });
   app.render();
   app.submit('cashRegisterForm', { realCash: '900', realMp: '1200', withdrawal: '200' });
-  assert.equal(app.run('cashRegisters["2027-01-01"].inheritedFrom'), '2026-12-31');
+  assert.equal(app.run('cashRegisters["2027-01-01"]'), undefined);
   app.element('workday').value = '2027-01-01';
   app.emit('#workday', 'change');
+  assert.equal(app.run('isDayOpen(workday.value)'), false);
+  assert.equal(app.element('openingCashForm').elements.initialCash.value, '700');
+  assert.equal(app.element('openingCashForm').elements.initialMp.value, '1.200');
+  balances(app, 0, 0);
+  app.submit('openingCashForm');
   balances(app, 700, 1200);
   assert.equal(app.element('dailyCount').textContent, '0 cortes');
 });
 
-test('REG-021 - Corregir cierre actualiza la apertura automatica siguiente y su override', (t) => {
+test('REG-021 - Corregir cierre no crea la apertura automatica siguiente', (t) => {
   const app = createApp(t);
   app.submit('cashRegisterForm', { realCash: '1000', realMp: '2000', withdrawal: '100' });
-  app.run('cashRegisters["2026-09-04"].commissionRate = 0');
+  assert.equal(app.run('cashRegisters["2026-09-04"]'), undefined);
   app.click('#editClosing');
   app.submit('cashRegisterForm', { realCash: '1800', realMp: '2400', withdrawal: '300' });
-  assert.deepEqual(app.snapshot('(({ initialCash, initialMp, commissionRate, autoOpened, inheritedFrom }) => ({ initialCash, initialMp, commissionRate, autoOpened, inheritedFrom }))(cashRegisters["2026-09-04"])'), {
-    initialCash: 1500, initialMp: 2400, commissionRate: 0, autoOpened: true, inheritedFrom: '2026-09-03',
-  });
+  assert.equal(app.run('cashRegisters["2026-09-04"]'), undefined);
   assert.equal(app.run('openingAdjustments.length'), 0);
 });
 
@@ -301,8 +303,7 @@ test('REG-022 - Corregir cierre no pisa una apertura siguiente editada manualmen
   app.submit('cashRegisterForm', { realCash: '1000', realMp: '2000', withdrawal: '100' });
   app.element('workday').value = '2026-09-04';
   app.emit('#workday', 'change');
-  app.click('#editOpeningCash');
-  app.submit('openingCashForm', { initialCash: '800', initialMp: '1900', editDescription: 'Arqueo manual' });
+  app.submit('openingCashForm', { initialCash: '800', initialMp: '1900' });
   const next = app.snapshot('cashRegisters["2026-09-04"]');
   app.element('workday').value = '2026-09-03';
   app.emit('#workday', 'change');
@@ -311,22 +312,21 @@ test('REG-022 - Corregir cierre no pisa una apertura siguiente editada manualmen
   assert.deepEqual(app.snapshot('cashRegisters["2026-09-04"]'), next);
 });
 
-test('REG-023 - Corregir cierre actualiza la apertura heredada aunque haya salto de fechas', (t) => {
+test('REG-023 - Corregir un cierre con salto no crea jornadas intermedias', (t) => {
   const app = createApp(t);
   app.seed({ cashRegisters: {
     '2026-09-01': { opened: true, initialCash: 0, initialMp: 0, realCash: 1000, realMp: 2000, withdrawal: 100 },
   } });
   app.render();
-  assert.equal(app.run('cashRegisters["2026-09-03"].inheritedFrom'), '2026-09-01');
-  app.run('cashRegisters["2026-09-03"].commissionRate = 65');
+  assert.equal(app.run('cashRegisters["2026-09-03"]'), undefined);
   app.element('workday').value = '2026-09-01';
   app.emit('#workday', 'change');
   app.click('#editClosing');
   app.submit('cashRegisterForm', { realCash: '1800', realMp: '2400', withdrawal: '300' });
-  assert.deepEqual(app.snapshot('[cashRegisters["2026-09-03"].initialCash, cashRegisters["2026-09-03"].initialMp, cashRegisters["2026-09-03"].commissionRate]'), [1500, 2400, 65]);
+  assert.equal(app.run('cashRegisters["2026-09-03"]'), undefined);
   app.element('workday').value = '2026-09-03';
   app.emit('#workday', 'change');
-  balances(app, 1500, 2400);
+  balances(app, 0, 0);
 });
 
 test('REG-024 - Corregir un cierre no cambia herencias de otro cierre', (t) => {
@@ -382,7 +382,8 @@ test('REG-036 - El cierre guardado queda bloqueado hasta modificarlo y cancelar 
   app.click('#editClosing');
   app.submit('cashRegisterForm', { realCash: '1500', realMp: '2000', withdrawal: '200' });
   assert.equal(fields.realCash.readOnly, true);
-  assert.equal(app.run('cashRegisters["2026-09-04"].initialCash'), 1300);
+  assert.equal(app.run('cashRegisters["2026-09-04"]'), undefined);
+  assert.equal(app.element('nextOpeningCash').textContent, `${app.money(1300)} efectivo`);
 });
 
 test('REG-037 - Advierte jornadas abiertas y limpia la advertencia cuando todas cierran', (t) => {

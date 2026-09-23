@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=144">
+  <link rel="stylesheet" href="styles.css?v=145">
 </head>
 <body>
   <div class="app-shell">
@@ -31,6 +31,7 @@
         <nav class="workspace-tabs" aria-label="Operación de la jornada">
           <button class="workspace-tab active" type="button" data-view="dailyView" aria-current="page"><span>⌁</span>Panel diario</button>
           <button class="workspace-tab" type="button" data-view="salesView"><span>$</span>Caja y movimientos</button>
+          <button class="workspace-tab" type="button" data-view="stockView"><span>▦</span>Control de stock</button>
         </nav>
         <label class="date-field">
           <span>Jornada</span>
@@ -200,11 +201,27 @@
         <article class="card daily-sheet">
           <div class="section-heading"><div><span class="step">SALIDAS DE CAJA</span><h2>Gastos de la jornada</h2></div><button id="addExpense" class="primary-btn compact-btn" type="button">Agregar salida</button></div>
           <div class="movement-body" tabindex="0" role="region" aria-label="Detalle de gastos de la jornada">
-          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Hora</th><th>Motivo</th><th>Importe</th><th>Medio</th></tr></thead><tbody id="expenseRows"></tbody></table></div>
+          <div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Hora</th><th>Categoría</th><th>Motivo</th><th>Importe</th><th>Medio</th></tr></thead><tbody id="expenseRows"></tbody></table></div>
           <div id="expensesEmpty" class="barber-empty">Sin salidas de caja</div>
           </div>
           <div class="movement-summary outgoing"><span>Efectivo <strong id="expensesCashTotal">$ 0</strong></span><span>Mercado Pago <strong id="expensesMpTotal">$ 0</strong></span><span>Total <strong id="expensesGrandTotal">$ 0</strong></span></div>
         </article>
+        <article class="card daily-sheet transfer-card">
+          <div class="section-heading"><div><span class="step">ENTRE MEDIOS</span><h2>Transferir dinero</h2></div><div class="transfer-balances"><span>Efectivo <strong id="transferCashAvailable">$ 0</strong></span><span>Mercado Pago <strong id="transferMpAvailable">$ 0</strong></span></div></div>
+          <div class="movement-body" tabindex="0" role="region" aria-label="Transferir dinero e historial de movimientos">
+          <form id="transferForm" class="cash-register-form transfer-form">
+            <label class="field"><span>Dirección</span><select name="from" required><option value="Efectivo">Efectivo → Mercado Pago</option><option value="Mercado Pago">Mercado Pago → Efectivo</option></select></label>
+            <label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label>
+            <label class="field"><span>Nota <small>(opcional)</small></span><input name="description" type="text" maxlength="120" placeholder="Motivo del movimiento"></label>
+            <button class="primary-btn compact-btn" type="submit">Transferir</button>
+          </form>
+          <details class="movement-history"><summary>Movimientos de la jornada <span id="transferCount">0</span></summary><div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Hora</th><th>Movimiento</th><th>Importe</th><th>Nota</th><th></th></tr></thead><tbody id="transferRows"></tbody></table></div><div id="transfersEmpty" class="barber-empty">Sin movimientos registrados</div></details>
+          </div>
+        </article>
+      </section>
+
+      <section id="stockView" class="view">
+        <p id="stockLockFeedback" class="daily-lock-feedback" role="status" hidden>Jornada cerrada: los movimientos de stock de esta jornada están bloqueados.</p>
         <article class="card daily-sheet inventory-card">
           <div class="section-heading"><div><span class="step">INSUMOS Y PRODUCTOS</span><h2>Control de stock</h2></div><button class="secondary-btn compact-btn" type="button" data-view="configView">Configurar productos</button></div>
           <div class="movement-body" tabindex="0" role="region" aria-label="Registro y detalle del stock">
@@ -222,18 +239,6 @@
           <details class="movement-history"><summary>Movimientos de stock <span id="stockMovementCount">0</span></summary><div class="sales-table-wrap"><table class="sales-table stock-table"><thead><tr><th>Hora</th><th>Producto</th><th>Movimiento</th><th>Cantidad</th><th>Nota</th><th></th></tr></thead><tbody id="stockMovementRows"></tbody></table></div><div id="stockMovementsEmpty" class="barber-empty">Sin movimientos en esta jornada</div></details>
           </div>
           <small class="stock-hint">Guardado en este navegador. Las ventas no descuentan stock automáticamente.</small>
-        </article>
-        <article class="card daily-sheet transfer-card">
-          <div class="section-heading"><div><span class="step">ENTRE MEDIOS</span><h2>Transferir dinero</h2></div><div class="transfer-balances"><span>Efectivo <strong id="transferCashAvailable">$ 0</strong></span><span>Mercado Pago <strong id="transferMpAvailable">$ 0</strong></span></div></div>
-          <div class="movement-body" tabindex="0" role="region" aria-label="Transferir dinero e historial de movimientos">
-          <form id="transferForm" class="cash-register-form transfer-form">
-            <label class="field"><span>Dirección</span><select name="from" required><option value="Efectivo">Efectivo → Mercado Pago</option><option value="Mercado Pago">Mercado Pago → Efectivo</option></select></label>
-            <label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label>
-            <label class="field"><span>Nota <small>(opcional)</small></span><input name="description" type="text" maxlength="120" placeholder="Motivo del movimiento"></label>
-            <button class="primary-btn compact-btn" type="submit">Transferir</button>
-          </form>
-          <details class="movement-history"><summary>Movimientos de la jornada <span id="transferCount">0</span></summary><div class="sales-table-wrap"><table class="sales-table"><thead><tr><th>Hora</th><th>Movimiento</th><th>Importe</th><th>Nota</th><th></th></tr></thead><tbody id="transferRows"></tbody></table></div><div id="transfersEmpty" class="barber-empty">Sin movimientos registrados</div></details>
-          </div>
         </article>
       </section>
 
@@ -326,6 +331,7 @@
         <div class="config-grid">
           <article class="card form-card"><div class="section-heading"><div><span class="step">SERVICIOS</span><h2>Servicios y precios</h2></div><button id="addServiceConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="serviceConfigList" class="config-list"></div></article>
           <article class="card form-card"><div class="section-heading"><div><span class="step">PRODUCTOS</span><h2>Productos y precios</h2></div><button id="addProductConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="productConfigList" class="config-list"></div></article>
+          <article class="card form-card"><div class="section-heading"><div><span class="step">GASTOS</span><h2>Categorías de gastos</h2></div><button id="addExpenseCategoryConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><div id="expenseCategoryConfigList" class="config-list"></div></article>
           <article class="card form-card"><div class="section-heading"><div><span class="step">BARBEROS</span><h2>Equipo</h2></div><button id="addBarberConfig" class="primary-btn compact-btn" type="button">Agregar</button></div><input id="barberConfigSearch" type="search" placeholder="Buscar barbero" aria-label="Buscar barbero"><div id="barberConfigList" class="config-list"></div></article>
           <article class="card form-card"><span class="step">COMISIÓN PREDETERMINADA</span><h2>Porcentaje para nuevos cortes</h2><form id="commissionForm" class="config-form"><label class="field"><span>Comisión (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn compact-btn" type="submit">Guardar</button></form></article>
           <article class="card form-card stock-config-card">
@@ -490,7 +496,7 @@
         </article>
       </dialog>
 
-      <dialog id="expenseDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span id="expenseFormMode" class="step">NUEVA SALIDA</span><h2>Salida de caja</h2></div><button id="closeExpenseDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="expenseForm" class="cut-form"><label class="field"><span>Hora</span><input name="time" type="time" required></label><label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label><label class="field"><span>Medio de salida</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label><label class="field full-width"><span>Motivo o descripción</span><textarea name="reason" rows="3" required></textarea></label><button class="primary-btn" type="submit">Guardar salida</button></form></article></dialog>
+      <dialog id="expenseDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span id="expenseFormMode" class="step">NUEVA SALIDA</span><h2>Salida de caja</h2></div><button id="closeExpenseDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="expenseForm" class="cut-form"><label class="field"><span>Hora</span><input name="time" type="time" required></label><label class="field"><span>Importe</span><div class="money-input"><b>$</b><input name="amount" type="text" inputmode="numeric" required></div></label><label class="field"><span>Categoría</span><select name="category"><option value="">Sin categoría</option></select></label><label class="field"><span>Medio de salida</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label><label class="field full-width"><span>Motivo o descripción</span><textarea name="reason" rows="3" required></textarea></label><button class="primary-btn" type="submit">Guardar salida</button></form></article></dialog>
       <dialog id="expenseDetailDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">DETALLE DE SALIDA</span><h2 id="expenseDetailTitle">Datos completos</h2></div><button id="closeExpenseDetail" class="close-btn" type="button" aria-label="Cerrar">×</button></div><dl id="expenseDetail" class="detail-list"></dl><div class="detail-actions"><button id="editExpense" class="secondary-btn" type="button">Modificar</button><button id="deleteExpense" class="danger-btn" type="button">Eliminar</button></div></article></dialog>
       <dialog id="commissionDialog" class="cut-dialog"><article class="form-card"><div class="card-heading"><div><span class="step">COMISIÓN DE LA JORNADA</span><h2>Cambiar solo este día</h2></div><button id="closeCommissionDialog" class="close-btn" type="button" aria-label="Cerrar">×</button></div><form id="dailyCommissionForm" class="cut-form"><label class="field full-width"><span>Comisión para todos los cortes del día (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn" type="submit">Guardar comisión</button></form></article></dialog>
 
@@ -500,15 +506,18 @@
       <dialog id="productConfigDialog" class="cut-dialog">
         <article class="form-card"><div class="card-heading"><div><span id="productConfigMode" class="step">NUEVO PRODUCTO</span><h2>Producto</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="productConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Precio</span><div class="money-input"><b>$</b><input name="price" type="text" inputmode="numeric" required></div></label><button class="primary-btn" type="submit">Guardar producto</button></form></article>
       </dialog>
+      <dialog id="expenseCategoryConfigDialog" class="cut-dialog">
+        <article class="form-card"><div class="card-heading"><div><span id="expenseCategoryConfigMode" class="step">NUEVA CATEGORÍA</span><h2>Categoría de gasto</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="expenseCategoryConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field full-width"><span>Nombre</span><input name="name" required></label><button class="primary-btn" type="submit">Guardar categoría</button></form></article>
+      </dialog>
       <dialog id="barberConfigDialog" class="cut-dialog">
         <article class="form-card"><div class="card-heading"><div><span id="barberConfigMode" class="step">NUEVO BARBERO</span><h2>Barbero</h2></div><button class="close-btn config-close" type="button" aria-label="Cerrar">×</button></div><form id="barberConfigForm" class="cut-form"><input name="id" type="hidden"><label class="field full-width"><span>Nombre</span><input name="name" required></label><button class="primary-btn" type="submit">Guardar barbero</button></form></article>
       </dialog>
     </main>
   </div>
   <script src="logic.js?v=7"></script>
-  <script src="reports.js?v=22"></script>
-  <script src="dialogs.js?v=2"></script>
+  <script src="reports.js?v=23"></script>
+  <script src="dialogs.js?v=3"></script>
   <script src="inventory.js?v=3"></script>
-  <script src="script.js?v=79"></script>
+  <script src="script.js?v=80"></script>
 </body>
 </html>

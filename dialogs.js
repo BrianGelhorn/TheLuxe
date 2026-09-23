@@ -74,6 +74,7 @@ function openExpenseDialog(id = null) {
   const expense = expenses.find((item) => item.id === id);
   expenseForm.elements.time.value = expense?.time || nowTime();
   expenseForm.elements.amount.value = expense ? formatAmount(expense.amount) : '';
+  expenseForm.elements.category.value = expense?.category || '';
   expenseForm.elements.payment.value = expense?.payment || 'Efectivo';
   expenseForm.elements.reason.value = expense?.reason || '';
   document.getElementById('expenseFormMode').textContent = expense ? 'MODIFICAR SALIDA' : 'NUEVA SALIDA';
@@ -86,6 +87,6 @@ function openExpenseDetail(id) {
   if (!expense) return;
   selectedExpenseId = id;
   document.getElementById('expenseDetailTitle').textContent = expense.reason;
-  document.getElementById('expenseDetail').innerHTML = [['Hora', expense.time], ['Motivo', expense.reason], ['Importe', money.format(expense.amount)], ['Medio de salida', expense.payment]].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
+  document.getElementById('expenseDetail').innerHTML = [['Hora', expense.time], ['Categoría', expense.category || 'Sin categoría'], ['Motivo', expense.reason], ['Importe', money.format(expense.amount)], ['Medio de salida', expense.payment]].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
   expenseDetailDialog.showModal();
 }

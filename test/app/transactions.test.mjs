@@ -655,6 +655,18 @@ test('TXN-045 - El gasto exige hora importe medio y motivo nativos', (t) => {
   }
 });
 
+test('TXN-053 - El gasto conserva una categoría seleccionada y la muestra en su detalle', (t) => {
+  const app = createApp(t);
+  app.click('#addExpenseCategoryConfig');
+  app.submit('expenseCategoryConfigForm', { name: 'Servicios' });
+  app.click('#addExpense');
+  app.submit('expenseForm', { category: 'Servicios', amount: '100', reason: 'Internet' });
+  assert.equal(app.run('expenses[0].category'), 'Servicios');
+  app.click('[data-expense]');
+  assert.match(app.element('expenseDetail').textContent, /Servicios/);
+  assert.match(app.element('expenseRows').textContent, /Servicios/);
+});
+
 test('TXN-046 - El gasto cero se rechaza y un peso es valido', (t) => {
   const app = createApp(t);
   app.click('#addExpense');

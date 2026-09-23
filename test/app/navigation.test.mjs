@@ -21,12 +21,20 @@ test('NAV-001 - El menu lateral alterna estado y accesibilidad', (t) => {
 
 test('NAV-002 - Cambiar vista deja una seccion activa y marca su pagina actual', (t) => {
   const app = createApp(t);
-  for (const id of ['salesView', 'configView', 'summaryView', 'dailyView']) {
+  for (const id of ['salesView', 'stockView', 'configView', 'summaryView', 'dailyView']) {
     app.click(`[data-view="${id}"]`);
     assert.equal(app.window.document.querySelectorAll('.view.active').length, 1);
     assert.equal(app.query('.view.active').id, id);
     assert.equal(app.query(`[data-view="${id}"]`).getAttribute('aria-current'), 'page');
   }
+});
+
+test('NAV-012 - Control de stock tiene vista propia y título correcto', (t) => {
+  const app = createApp(t);
+  app.click('[data-view="stockView"]');
+  assert.equal(app.query('.view.active').id, 'stockView');
+  assert.equal(app.query('h1').textContent, 'Control de stock');
+  assert.equal(app.query('#stockView #stockMovementForm') !== null, true);
 });
 
 test('NAV-003 - Abrir resumen inicializa semana y cambiar mes actualiza opciones', (t) => {

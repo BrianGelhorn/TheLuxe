@@ -123,3 +123,19 @@ test('CFG-014 - Cerrar catalogos cancela borradores sin crear elementos', (t) =>
   }
   assert.deepEqual(app.snapshot('config'), before);
 });
+
+test('CFG-015 - Las categorías de gastos se crean, se usan y actualizan sus referencias', (t) => {
+  const app = createApp(t);
+  app.click('#addExpenseCategoryConfig');
+  app.submit('expenseCategoryConfigForm', { name: 'Servicios' });
+  const categoryId = app.run('config.expenseCategories.at(-1).id');
+  assert.ok([...app.element('expenseForm').elements.category.options].some((option) => option.value === 'Servicios'));
+  app.click('#addExpense');
+  app.submit('expenseForm', { category: 'Servicios', amount: '250', reason: 'Internet' });
+  assert.equal(app.run('expenses[0].category'), 'Servicios');
+  app.click(`[data-config-edit="expenseCategories"][data-id="${categoryId}"]`);
+  app.submit('expenseCategoryConfigForm', { name: 'Servicios y conectividad' });
+  assert.equal(app.run('expenses[0].category'), 'Servicios y conectividad');
+  app.click(`[data-config-delete="expenseCategories"][data-id="${categoryId}"]`);
+  assert.equal(app.alerts.length, 1);
+});
