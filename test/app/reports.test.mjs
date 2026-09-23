@@ -209,7 +209,7 @@ test('RPT-032 - Explicaciones en ayudas enfocables conservan etiquetas y conteos
   assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Total facturado').dataset.tip, 'Servicios + ventas.');
   assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Facturado total').dataset.tip, 'Servicios + propinas.');
   assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Comisión').dataset.tip, 'Comisión + propinas.');
-  assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Ticket promedio').dataset.tip, 'Bruto: facturado ÷ servicios. Neto: (comisión + propinas) ÷ servicios.');
+  assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Ticket promedio').dataset.tip, 'Bruto: cobrado ÷ (servicios + ventas). Neto: (comisión + propinas) ÷ servicios.');
   assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Movimientos').dataset.tip, 'Por medio; retiros solo efectivo.');
 });
 
@@ -266,9 +266,9 @@ test('RPT-031 - Render y configuracion conservan Barberia sin colision con nombr
 });
 
 for (const [id, medium, values, services, sales, balance] of [
-  ['RPT-001', 'Ambas', { InvoicedCuts: 3900, InvoicedTips: 300, Invoiced: 4200, Commission: 2250, Advances: 400, Expenses: 250, AverageTicket: 1400, InvoicedCutsCash: 1500, InvoicedCutsMp: 2400, InvoicedTipsCash: 300, InvoicedTipsMp: 0, CommissionTips: 300, CommissionAmount: 1950, AverageTicketNeto: 750 }, '3 servicios', 1200, 3150],
-  ['RPT-002', 'Efectivo', { InvoicedCuts: 1500, InvoicedTips: 300, Invoiced: 1800, Commission: 1050, Advances: 300, Expenses: 50, AverageTicket: 900, InvoicedCutsCash: 1500, InvoicedCutsMp: 0, InvoicedTipsCash: 300, InvoicedTipsMp: 0, CommissionTips: 300, CommissionAmount: 750, AverageTicketNeto: 525 }, '2 servicios', 500, 1250],
-  ['RPT-003', 'Mercado Pago', { InvoicedCuts: 2400, InvoicedTips: 0, Invoiced: 2400, Commission: 1200, Advances: 100, Expenses: 200, AverageTicket: 2400, InvoicedCutsCash: 0, InvoicedCutsMp: 2400, InvoicedTipsCash: 0, InvoicedTipsMp: 0, CommissionTips: 0, CommissionAmount: 1200, AverageTicketNeto: 1200 }, '1 servicio', 700, 1900],
+  ['RPT-001', 'Ambas', { InvoicedCuts: 3900, InvoicedTips: 300, Invoiced: 4200, Commission: 2250, Advances: 400, Expenses: 250, AverageTicket: 1080, InvoicedCutsCash: 1500, InvoicedCutsMp: 2400, InvoicedTipsCash: 300, InvoicedTipsMp: 0, CommissionTips: 300, CommissionAmount: 1950, AverageTicketNeto: 750 }, '3 servicios', 1200, 3150],
+  ['RPT-002', 'Efectivo', { InvoicedCuts: 1500, InvoicedTips: 300, Invoiced: 1800, Commission: 1050, Advances: 300, Expenses: 50, AverageTicket: 2300 / 3, InvoicedCutsCash: 1500, InvoicedCutsMp: 0, InvoicedTipsCash: 300, InvoicedTipsMp: 0, CommissionTips: 300, CommissionAmount: 750, AverageTicketNeto: 525 }, '2 servicios', 500, 1250],
+  ['RPT-003', 'Mercado Pago', { InvoicedCuts: 2400, InvoicedTips: 0, Invoiced: 2400, Commission: 1200, Advances: 100, Expenses: 200, AverageTicket: 1550, InvoicedCutsCash: 0, InvoicedCutsMp: 2400, InvoicedTipsCash: 0, InvoicedTipsMp: 0, CommissionTips: 0, CommissionAmount: 1200, AverageTicketNeto: 1200 }, '1 servicio', 700, 1900],
 ]) {
   test(`${id} - El reporte de ${medium} suma cada concepto y su ticket promedio`, (t) => {
     const app = createApp(t);
@@ -281,6 +281,19 @@ for (const [id, medium, values, services, sales, balance] of [
     assert.equal(app.element('summaryRows').rows[0].cells[9].textContent, app.money(balance));
   });
 }
+
+test('RPT-035 - El ticket bruto incluye ventas por operación sin cambiar el neto de barberos', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  app.run('sales[0].quantity = 3');
+  report(app);
+  amounts(app, { AverageTicket: 1080, AverageTicketNeto: 750 });
+  report(app, 'month', 'Ambas', 'Mateo');
+  amounts(app, { AverageTicket: 1100, AverageTicketNeto: 625 });
+  app.run('entries = []; renderSummary()');
+  report(app);
+  amounts(app, { AverageTicket: 600, AverageTicketNeto: 0 });
+});
 
 test('RPT-004 - Filtrar barbero excluye ventas gastos y retiros sin borrar sus adelantos', (t) => {
   const app = createApp(t);
@@ -300,7 +313,7 @@ test('RPT-005 - Quitar todos los servicios conserva ventas gastos y adelantos', 
   report(app);
   app.run('document.querySelectorAll("#summaryServiceOptions input").forEach(input => input.checked = false)');
   app.emit('#summaryServiceOptions', 'change');
-  amounts(app, { InvoicedCuts: 0, Invoiced: 0, InvoicedTips: 0, Commission: 0, Advances: 400, Expenses: 250, AverageTicket: 0, AverageTicketNeto: 0 });
+  amounts(app, { InvoicedCuts: 0, Invoiced: 0, InvoicedTips: 0, Commission: 0, Advances: 400, Expenses: 250, AverageTicket: 600, AverageTicketNeto: 0 });
   assert.equal(app.element('summaryOperationCount').textContent, '0 servicios');
   assert.equal(app.element('summaryRows').rows[0].cells[3].textContent, app.money(1200));
   assert.equal(app.element('summaryRows').rows[0].cells[9].textContent, app.money(1200));
@@ -327,7 +340,7 @@ test('RPT-007 - Los limites mensuales incluyen ambos extremos y excluyen fechas 
     { id: 'after', date: '2026-10-01', time: '12:00', product: 'Pomada', payment: 'Mercado Pago', total: 400 },
   ] });
   report(app);
-  amounts(app, { Invoiced: 0, AverageTicket: 0, AverageTicketNeto: 0 });
+  amounts(app, { Invoiced: 0, AverageTicket: 250, AverageTicketNeto: 0 });
   assert.equal(app.element('summaryRows').rows.length, 2);
   assert.deepEqual([...app.element('summaryRows').rows].map(row => row.cells[3].textContent), [app.money(200), app.money(300)]);
   assert.deepEqual([...app.element('summaryRows').rows].map(row => row.cells[9].textContent), [app.money(200), app.money(300)]);
@@ -354,7 +367,7 @@ test('RPT-009 - El reporte anual agrupa operaciones y retiros por mes', (t) => {
   assert.equal(app.element('summaryRows').rows.length, 2);
   assert.equal(app.element('summaryRows').rows[0].cells[8].textContent, app.money(100));
   assert.equal(app.element('summaryRows').rows[1].cells[8].textContent, app.money(200));
-  amounts(app, { Withdrawals: 300, Invoiced: 4200, AverageTicket: 1400, AverageTicketNeto: 750 });
+  amounts(app, { Withdrawals: 300, Invoiced: 4200, AverageTicket: 1080, AverageTicketNeto: 750 });
   assert.equal(app.element('summaryRows').rows[1].cells[3].textContent, app.money(1200));
   assert.equal(app.element('summaryRows').rows[1].cells[9].textContent, app.money(3150));
 });
@@ -366,7 +379,7 @@ test('RPT-010 - Cambiar semana actualiza rango y excluye ventas de la semana ant
   assert.equal(app.element('summaryWeekField').hidden, false);
   app.element('summaryWeek').value = '2';
   app.emit('#summaryWeek', 'change');
-  amounts(app, { Invoiced: 0, AverageTicket: 0, AverageTicketNeto: 0 });
+  amounts(app, { Invoiced: 0, AverageTicket: 200, AverageTicketNeto: 0 });
   assert.equal(app.element('summaryRows').rows.length, 1);
   assert.equal(app.element('summaryRows').rows[0].cells[3].textContent, app.money(200));
   assert.match(app.element('summaryRange').textContent, /14\/09\/2026/);

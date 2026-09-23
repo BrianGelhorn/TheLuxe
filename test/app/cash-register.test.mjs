@@ -288,6 +288,7 @@ test('REG-021 - Corregir cierre actualiza la apertura automatica siguiente y su 
   const app = createApp(t);
   app.submit('cashRegisterForm', { realCash: '1000', realMp: '2000', withdrawal: '100' });
   app.run('cashRegisters["2026-09-04"].commissionRate = 0');
+  app.click('#editClosing');
   app.submit('cashRegisterForm', { realCash: '1800', realMp: '2400', withdrawal: '300' });
   assert.deepEqual(app.snapshot('(({ initialCash, initialMp, commissionRate, autoOpened, inheritedFrom }) => ({ initialCash, initialMp, commissionRate, autoOpened, inheritedFrom }))(cashRegisters["2026-09-04"])'), {
     initialCash: 1500, initialMp: 2400, commissionRate: 0, autoOpened: true, inheritedFrom: '2026-09-03',
@@ -305,6 +306,7 @@ test('REG-022 - Corregir cierre no pisa una apertura siguiente editada manualmen
   const next = app.snapshot('cashRegisters["2026-09-04"]');
   app.element('workday').value = '2026-09-03';
   app.emit('#workday', 'change');
+  app.click('#editClosing');
   app.submit('cashRegisterForm', { realCash: '1800', realMp: '2400', withdrawal: '300' });
   assert.deepEqual(app.snapshot('cashRegisters["2026-09-04"]'), next);
 });
@@ -319,6 +321,7 @@ test('REG-023 - Corregir cierre actualiza la apertura heredada aunque haya salto
   app.run('cashRegisters["2026-09-03"].commissionRate = 65');
   app.element('workday').value = '2026-09-01';
   app.emit('#workday', 'change');
+  app.click('#editClosing');
   app.submit('cashRegisterForm', { realCash: '1800', realMp: '2400', withdrawal: '300' });
   assert.deepEqual(app.snapshot('[cashRegisters["2026-09-03"].initialCash, cashRegisters["2026-09-03"].initialMp, cashRegisters["2026-09-03"].commissionRate]'), [1500, 2400, 65]);
   app.element('workday').value = '2026-09-03';
@@ -336,6 +339,7 @@ test('REG-024 - Corregir un cierre no cambia herencias de otro cierre', (t) => {
   const next = app.snapshot('cashRegisters["2026-09-03"]');
   app.element('workday').value = '2026-09-01';
   app.emit('#workday', 'change');
+  app.click('#editClosing');
   app.submit('cashRegisterForm', { realCash: '900', realMp: '1000', withdrawal: '100' });
   assert.deepEqual(app.snapshot('cashRegisters["2026-09-03"]'), next);
 });
@@ -355,6 +359,30 @@ test('REG-025 - Los cierres guardados se restauran al volver a cada jornada', (t
   assert.equal(app.element('summaryWithdrawals').textContent, app.money(300));
   assert.equal(app.element('summaryRows').children.length, 2);
   balances(app, 0, 0);
+});
+
+test('REG-036 - El cierre guardado queda bloqueado hasta modificarlo y cancelar descarta cambios', (t) => {
+  const app = createApp(t);
+  app.submit('cashRegisterForm', { realCash: '1000', realMp: '2000', withdrawal: '100' });
+  const fields = app.element('cashRegisterForm').elements;
+  const saved = app.snapshot('cashRegisters[workday.value]');
+  for (const name of ['realCash', 'realMp', 'withdrawal']) assert.equal(fields.namedItem(name).readOnly, true);
+  assert.equal(app.query('#cashRegisterForm [type="submit"]').hidden, true);
+  assert.equal(app.element('editClosing').hidden, false);
+  app.emit('#cashRegisterForm', 'submit');
+  assert.deepEqual(app.snapshot('cashRegisters[workday.value]'), saved);
+  app.click('#editClosing');
+  assert.equal(app.query('#cashRegisterForm [type="submit"]').hidden, false);
+  for (const name of ['realCash', 'realMp', 'withdrawal']) assert.equal(fields.namedItem(name).readOnly, false);
+  app.input('#cashRegisterForm [name="realCash"]', '1500');
+  app.click('#cancelClosingEdit');
+  assert.equal(fields.realCash.value, '1.000');
+  assert.equal(fields.realCash.readOnly, true);
+  assert.deepEqual(app.snapshot('cashRegisters[workday.value]'), saved);
+  app.click('#editClosing');
+  app.submit('cashRegisterForm', { realCash: '1500', realMp: '2000', withdrawal: '200' });
+  assert.equal(fields.realCash.readOnly, true);
+  assert.equal(app.run('cashRegisters["2026-09-04"].initialCash'), 1300);
 });
 
 test('REG-026 - Transferir todo el efectivo resta origen y suma destino', (t) => {

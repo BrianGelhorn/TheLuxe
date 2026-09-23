@@ -120,7 +120,8 @@ function renderSummary() {
   document.getElementById('summaryOperationCount').textContent = `${operationCount} ${operationCount === 1 ? 'servicio' : 'servicios'}`;
   const gross = total.services + total.tips;
   const netIncome = total.commission + total.tips;
-  const grossTicket = operationCount ? gross / operationCount : 0;
+  const ticketCount = operationCount + total.saleCount;
+  const grossTicket = ticketCount ? (gross + total.sales) / ticketCount : 0;
   const netTicket = operationCount ? netIncome / operationCount : 0;
   document.getElementById('summaryAverageTicket').textContent = money.format(grossTicket);
   document.getElementById('summaryAverageTicketNeto').textContent = money.format(netTicket);

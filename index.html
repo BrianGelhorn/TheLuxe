@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=141">
+  <link rel="stylesheet" href="styles.css?v=144">
 </head>
 <body>
   <div class="app-shell">
@@ -38,7 +38,13 @@
         </label>
       </header>
 
+      <div id="openDaysWarning" class="open-days-warning" role="alert" aria-live="assertive" hidden>
+        <strong>Hay jornadas sin cerrar</strong>
+        <span id="openDaysWarningText"></span>
+      </div>
+
       <section id="dailyView" class="view active">
+        <p id="dailyLockFeedback" class="daily-lock-feedback" role="status" hidden>Jornada cerrada: los datos y movimientos de esta jornada están bloqueados.</p>
         <article class="card daily-sheet opening-card">
           <div class="section-heading"><div><span class="step">APERTURA DE JORNADA</span><h2>Cajas iniciales</h2></div><div class="heading-actions"><small id="openingStatus">Pendiente</small><button id="changeCommission" class="secondary-btn" type="button">Cambiar comisión</button></div></div>
           <form id="openingCashForm" class="cash-register-form opening-form">
@@ -115,8 +121,12 @@
             </div>
             <div class="saldos-boxes">
               <div class="saldo-box ticket">
-                <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/></svg><b class="saldo-label">Ticket promedio</b></span>
+                <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/></svg><b class="saldo-label">Ticket promedio general</b></span>
                 <strong class="saldo-value" id="dailyAverageTicket">$ 0</strong>
+                <div class="ticket-breakdown">
+                  <span>Servicios<strong id="dailyServiceTicket">$ 0</strong></span>
+                  <span>Ventas<strong id="dailySalesTicket">$ 0</strong></span>
+                </div>
               </div>
               <div class="saldo-box cash">
                 <span class="saldo-head"><svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.2"/><path d="M6.5 12h.01M17.5 12h.01"/></svg><b class="saldo-label">Efectivo</b></span>
@@ -144,12 +154,17 @@
             <label class="field"><span>Retiro al final del día</span><div class="money-input"><b>$</b><input name="withdrawal" type="text" inputmode="numeric" value="0" required></div></label>
             <button class="primary-btn compact-btn" type="submit">Guardar cierre</button>
           </form>
+          <div class="closing-edit-actions" hidden>
+            <button id="editClosing" class="secondary-btn" type="button">Modificar cierre</button>
+            <button id="cancelClosingEdit" class="secondary-btn" type="button" hidden>Cancelar</button>
+          </div>
           <p class="next-opening">Caja inicial calculada para el día siguiente: <strong id="nextOpeningCash">$ 0 efectivo</strong> · <strong id="nextOpeningMp">$ 0 MP</strong></p>
         </article>
         </div>
       </section>
 
       <section id="salesView" class="view">
+        <p id="salesLockFeedback" class="daily-lock-feedback" role="status" hidden>Jornada cerrada: los datos y movimientos de esta jornada están bloqueados.</p>
         <article class="card daily-sheet sales-card">
           <div class="section-heading">
             <div><span class="step">VENTAS DEL DÍA</span><h2>Productos vendidos</h2></div>
@@ -262,9 +277,9 @@
             <div class="net-card"><span class="net-card-label">Ingreso neto</span><strong class="metric-value" id="summaryCommission">$ 0</strong></div>
           </article>
           <article class="metric accounting-metric">
-            <div class="accounting-head"><div class="metric-title"><span>Ticket promedio</span><button class="info-tip" type="button" aria-label="Cómo se calcula el ticket promedio" data-tip="Bruto: facturado ÷ servicios. Neto: (comisión + propinas) ÷ servicios.">?</button></div></div>
+            <div class="accounting-head"><div class="metric-title"><span>Ticket promedio</span><button class="info-tip" type="button" aria-label="Cómo se calcula el ticket promedio" data-tip="Bruto: cobrado ÷ (servicios + ventas). Neto: (comisión + propinas) ÷ servicios.">?</button></div></div>
             <div class="accounting-detail"><small class="accounting-note">Bruto<strong id="summaryAverageTicket">$ 0</strong></small></div>
-            <div class="net-card"><span class="net-card-label">Neto</span><strong class="metric-value" id="summaryAverageTicketNeto">$ 0</strong></div>
+            <div class="net-card"><span class="net-card-label">Neto de barberos</span><strong class="metric-value" id="summaryAverageTicketNeto">$ 0</strong></div>
           </article>
         </div>
         <div class="metrics summary-metrics" role="group" aria-label="Movimientos del período">
@@ -487,9 +502,9 @@
     </main>
   </div>
   <script src="logic.js?v=7"></script>
-  <script src="reports.js?v=21"></script>
+  <script src="reports.js?v=22"></script>
   <script src="dialogs.js?v=2"></script>
-  <script src="inventory.js?v=2"></script>
-  <script src="script.js?v=72"></script>
+  <script src="inventory.js?v=3"></script>
+  <script src="script.js?v=77"></script>
 </body>
 </html>

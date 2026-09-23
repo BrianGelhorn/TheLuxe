@@ -14,8 +14,9 @@ Barberia usa el periodo inclusivo (semana, mes o anio) y el medio de pago.
 Ignora barbero y tipos de servicio, incluso si no hay servicios seleccionados:
 asi no se comparan ingresos parciales contra gastos globales. Las ventas y sus
 unidades se filtran por fecha y medio. No se usa la jornada activa como rango.
-Barberos conserva bruto = servicios + propinas, neto = comision + propinas,
-y ambos tickets por cantidad de servicios, sin ventas.
+Barberos conserva bruto = servicios + propinas y neto = comision + propinas.
+El ticket bruto suma ventas al importe y al conteo de operaciones cuando no
+se filtra un barbero; el ticket neto de barberos sigue siendo por servicio.
 
 ## Formulas de Barberia
 

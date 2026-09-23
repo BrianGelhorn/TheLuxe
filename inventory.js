@@ -68,8 +68,9 @@ function renderInventory() {
   const selected = stockMovementForm.elements.stockProduct.value;
   stockMovementForm.elements.stockProduct.innerHTML = '<option value="">Seleccionar producto</option>' + active.filter((product) => product.startDate <= date).map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)} (${escapeHtml(product.unit)})</option>`).join('');
   stockMovementForm.elements.stockProduct.value = selected;
-  stockMovementForm.querySelector('button[type="submit"]').disabled = inventoryReadError || !active.some((product) => product.startDate <= date) || !date || date > today();
-  document.getElementById('saveStockProduct').disabled = inventoryReadError;
+  const locked = typeof dailyOperationsLocked === 'function' && dailyOperationsLocked();
+  stockMovementForm.querySelector('button[type="submit"]').disabled = locked || inventoryReadError || !active.some((product) => product.startDate <= date) || !date || date > today();
+  document.getElementById('saveStockProduct').disabled = locked || inventoryReadError;
   document.getElementById('stockRows').innerHTML = active.map((product) => {
     const day = inventorySummary(product, inventory.movements, date);
     const current = inventorySummary(product, inventory.movements, today()).stock;
@@ -80,11 +81,11 @@ function renderInventory() {
   const products = new Map(inventory.products.map((product) => [product.id, product]));
   document.getElementById('stockMovementRows').innerHTML = rows.map((row) => {
     const product = products.get(row.productId);
-    return `<tr${row.cancelled ? ' class="stock-cancelled"' : ''}><td>${escapeHtml(row.time)}</td><td>${escapeHtml(product.name)}</td><td>${row.type === 'entrada' ? 'Ingreso' : 'Consumo'}${row.cancelled ? ' · Anulado' : ''}</td><td>${integer.format(row.quantity)} ${escapeHtml(product.unit)}</td><td>${escapeHtml(row.notes || '—')}</td><td><button class="stock-action" type="button" data-stock-toggle="${escapeHtml(row.id)}" ${inventoryReadError ? 'disabled' : ''}>${row.cancelled ? 'Restaurar' : 'Anular'}</button></td></tr>`;
+     return `<tr${row.cancelled ? ' class="stock-cancelled"' : ''}><td>${escapeHtml(row.time)}</td><td>${escapeHtml(product.name)}</td><td>${row.type === 'entrada' ? 'Ingreso' : 'Consumo'}${row.cancelled ? ' · Anulado' : ''}</td><td>${integer.format(row.quantity)} ${escapeHtml(product.unit)}</td><td>${escapeHtml(row.notes || '—')}</td><td><button class="stock-action" type="button" data-stock-toggle="${escapeHtml(row.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>${row.cancelled ? 'Restaurar' : 'Anular'}</button></td></tr>`;
   }).join('');
   document.getElementById('stockMovementCount').textContent = String(rows.filter((row) => !row.cancelled).length);
   document.getElementById('stockMovementsEmpty').hidden = rows.length > 0;
-  document.getElementById('stockConfigList').innerHTML = inventory.products.map((product) => `<div class="config-item${product.active ? '' : ' stock-archived'}"><span>${escapeHtml(product.name)}<small>${integer.format(inventorySummary(product, inventory.movements, today()).stock)} ${escapeHtml(product.unit)}${product.active ? '' : ' · Archivado'}</small></span><span class="config-actions"><button type="button" data-stock-edit="${escapeHtml(product.id)}" ${inventoryReadError ? 'disabled' : ''}>Editar</button><button type="button" data-stock-archive="${escapeHtml(product.id)}" ${inventoryReadError ? 'disabled' : ''}>${product.active ? 'Archivar' : 'Activar'}</button></span></div>`).join('') || '<p class="stock-hint">Todavía no agregaste productos para controlar.</p>';
+   document.getElementById('stockConfigList').innerHTML = inventory.products.map((product) => `<div class="config-item${product.active ? '' : ' stock-archived'}"><span>${escapeHtml(product.name)}<small>${integer.format(inventorySummary(product, inventory.movements, today()).stock)} ${escapeHtml(product.unit)}${product.active ? '' : ' · Archivado'}</small></span><span class="config-actions"><button type="button" data-stock-edit="${escapeHtml(product.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>Editar</button><button type="button" data-stock-archive="${escapeHtml(product.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>${product.active ? 'Archivar' : 'Activar'}</button></span></div>`).join('') || '<p class="stock-hint">Todavía no agregaste productos para controlar.</p>';
   const editing = inventory.products.find((product) => product.id === stockProductForm.elements.stockId.value);
   document.getElementById('stockInitialDate').textContent = editing ? `Stock inicial registrado el ${editing.startDate}. Para cambiar existencias, cargá un ingreso o consumo.` : `Stock inicial al ${date || 'día seleccionado'}. Cantidades enteras en la unidad elegida.`;
 }
@@ -93,6 +94,7 @@ function initInventory() {
   loadInventory();
   stockProductForm.addEventListener('submit', (event) => {
     event.preventDefault();
+    if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
     if (!stockProductForm.reportValidity()) return;
     const fields = stockProductForm.elements;
     const existing = inventory.products.find((product) => product.id === fields.stockId.value);
@@ -113,6 +115,7 @@ function initInventory() {
   });
   document.getElementById('cancelStockProduct').addEventListener('click', () => { resetStockProductForm(); renderInventory(); });
   document.getElementById('stockConfigList').addEventListener('click', (event) => {
+    if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
     const button = event.target.closest('[data-stock-edit], [data-stock-archive]');
     if (!button) return;
     const product = inventory.products.find((item) => item.id === (button.dataset.stockEdit || button.dataset.stockArchive));
@@ -138,6 +141,7 @@ function initInventory() {
   });
   stockMovementForm.addEventListener('submit', (event) => {
     event.preventDefault();
+    if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
     if (!stockMovementForm.reportValidity()) return;
     const fields = stockMovementForm.elements;
     const product = inventory.products.find((item) => item.id === fields.stockProduct.value && item.active);
@@ -150,6 +154,7 @@ function initInventory() {
     stockMessage(`${row.type === 'entrada' ? 'Ingreso' : 'Consumo'} registrado: ${integer.format(row.quantity)} ${product.unit} de ${product.name}.`);
   });
   document.getElementById('stockMovementRows').addEventListener('click', (event) => {
+    if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
     const button = event.target.closest('[data-stock-toggle]');
     if (!button) return;
     const row = inventory.movements.find((item) => item.id === button.dataset.stockToggle);

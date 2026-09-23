@@ -286,6 +286,8 @@ test('TXN-019 - La venta en efectivo suma el total y cuenta una operacion', (t) 
   balances(app, 3750, 0);
   assert.equal(app.element('dailySalesCount').textContent, '1 venta');
   assert.equal(app.element('dailyAverageTicket').textContent, app.money(3750));
+  assert.equal(app.element('dailyServiceTicket').textContent, app.money(0));
+  assert.equal(app.element('dailySalesTicket').textContent, app.money(3750));
   assert.equal(app.element('dailyCommission').textContent, app.money(0));
   assert.equal(app.element('salesGrandTotal').textContent, app.money(3750));
 });
@@ -643,11 +645,25 @@ test('TXN-047 - La caja suma cobros y resta adelantos gastos y transferencias', 
   balances(app, 2850, 4900);
   for (const [id, amount] of Object.entries({
     dailyCollected: 5400, dailyServices: 3900, dailyTips: 300, dailySalesTotal: 1200,
-    dailyInvoiced: 5100, dailyCommission: 1950, dailyNet: 3150, dailyAverageTicket: 1020,
+    dailyInvoiced: 5100, dailyCommission: 1950, dailyNet: 3150, dailyAverageTicket: 1080,
+    dailyServiceTicket: 1400, dailySalesTicket: 600,
     dailyServicesCash: 1500, dailyServicesMp: 2400, dailyTipsCash: 300, dailyTipsMp: 0,
   })) assert.equal(app.element(id).textContent, app.money(amount), id);
   assert.equal(app.element('dailyCount').textContent, '3 cortes');
   assert.equal(app.element('dailySalesCount').textContent, '2 ventas');
+});
+
+test('TXN-050 - El ticket diario cuenta ventas y no unidades, aun sin servicios', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  app.run('sales[0].quantity = 3; render()');
+  assert.equal(app.element('dailyAverageTicket').textContent, app.money(1080));
+  assert.equal(app.element('dailySalesTicket').textContent, app.money(600));
+  app.run('entries = []; render()');
+  assert.equal(app.element('dailyAverageTicket').textContent, app.money(600));
+  assert.equal(app.element('dailyServiceTicket').textContent, app.money(0));
+  app.run('sales = []; render()');
+  for (const id of ['dailyAverageTicket', 'dailyServiceTicket', 'dailySalesTicket']) assert.equal(app.element(id).textContent, app.money(0));
 });
 
 test('TXN-048 - Cambiar jornada aisla todos los movimientos y contadores', (t) => {

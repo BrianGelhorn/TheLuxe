@@ -44,6 +44,8 @@ const expenseDetailDialog = document.getElementById('expenseDetailDialog');
 const openingCashForm = document.getElementById('openingCashForm');
 const cashRegisterForm = document.getElementById('cashRegisterForm');
 const transferForm = document.getElementById('transferForm');
+const dailyView = document.getElementById('dailyView');
+const salesView = document.getElementById('salesView');
 const commissionDialog = document.getElementById('commissionDialog');
 const dailyCommissionForm = document.getElementById('dailyCommissionForm');
 const serviceConfigForm = document.getElementById('serviceConfigForm');
@@ -76,8 +78,34 @@ let selectedAdvanceId = null;
 let editingExpenseId = null;
 let selectedExpenseId = null;
 let editingOpening = false;
+let editingClosing = false;
 let reorderingBarbers = false;
 let pendingBarberOrder = [];
+
+function dailyOperationsLocked() {
+  const register = cashRegisters[workday.value] || {};
+  return 'realCash' in register && 'realMp' in register && !editingClosing;
+}
+
+function applyDailyLock(opened, closed) {
+  const locked = dailyOperationsLocked();
+  for (const view of [dailyView, salesView]) {
+    view.classList.toggle('daily-locked', locked);
+    view.setAttribute('aria-disabled', String(locked));
+    view.querySelectorAll('button, input, select, textarea').forEach((control) => {
+      if (locked && !control.closest('#cashRegisterForm, .closing-edit-actions')) control.disabled = true;
+    });
+  }
+  document.getElementById('dailyLockFeedback').hidden = !locked;
+  document.getElementById('salesLockFeedback').hidden = !locked;
+  ['realCash', 'realMp', 'withdrawal'].forEach((name) => {
+    cashRegisterForm.elements[name].disabled = closed && !editingClosing;
+    cashRegisterForm.elements[name].readOnly = closed && !editingClosing;
+  });
+  cashRegisterForm.querySelector('[type="submit"]').disabled = !opened;
+  document.getElementById('editClosing').disabled = false;
+  document.getElementById('cancelClosingEdit').disabled = false;
+}
 
 workday.value = today();
 document.getElementById('summaryDate').value = today().slice(0, 7);
@@ -258,6 +286,22 @@ function previousClosedRegister(date) {
   return previousDate ? { date: previousDate, register: cashRegisters[previousDate] } : null;
 }
 
+function openRegisterDates() {
+  return Object.entries(cashRegisters)
+    .filter(([date, register]) => isDayOpen(date) && !('realCash' in register && 'realMp' in register))
+    .map(([date]) => date)
+    .sort();
+}
+
+function renderOpenDaysWarning() {
+  const dates = openRegisterDates();
+  const formatDate = (date) => new Intl.DateTimeFormat('es-AR').format(new Date(`${date}T12:00:00`));
+  document.getElementById('openDaysWarning').hidden = dates.length === 0;
+  document.getElementById('openDaysWarningText').textContent = dates.length
+    ? `${dates.map(formatDate).join(', ')}. Cerrá cada jornada antes de continuar.`
+    : '';
+}
+
 function shiftDate(date, days) {
   const value = new Date(`${date}T12:00:00`);
   value.setDate(value.getDate() + days);
@@ -361,7 +405,9 @@ function render() {
   document.getElementById('dailySalesMp').textContent = money.format(salePaymentTotal(daySales, 'Mercado Pago'));
   document.getElementById('dailyCount').textContent = `${list.length} ${list.length === 1 ? 'corte' : 'cortes'}`;
   document.getElementById('dailySalesCount').textContent = `${daySales.length} ${daySales.length === 1 ? 'venta' : 'ventas'}`;
-  document.getElementById('dailyAverageTicket').textContent = money.format(operationCount ? revenue.invoiced / operationCount : 0);
+  document.getElementById('dailyAverageTicket').textContent = money.format(operationCount ? revenue.collected / operationCount : 0);
+  document.getElementById('dailyServiceTicket').textContent = money.format(list.length ? revenue.services / list.length : 0);
+  document.getElementById('dailySalesTicket').textContent = money.format(daySales.length ? revenue.sales / daySales.length : 0);
   const cashBalance = dayBalance('Efectivo', list, daySales, dayAdvances, dayExpenses, dayTransfers);
   const mpBalance = dayBalance('Mercado Pago', list, daySales, dayAdvances, dayExpenses, dayTransfers);
   document.getElementById('cashTotal').textContent = money.format(cashBalance);
@@ -384,6 +430,16 @@ function render() {
   inheritedMpHint.textContent = previousClosing ? `Tomado del cierre de la jornada ${previousClosing.date}` : '';
   ['realCash', 'realMp', 'withdrawal'].forEach((name) => { cashRegisterForm.elements[name].value = name in register ? formatAmount(register[name]) : name === 'withdrawal' ? '0' : ''; });
   renderClosingDifferences(cashBalance, mpBalance);
+  const closed = 'realCash' in register && 'realMp' in register;
+  ['realCash', 'realMp', 'withdrawal'].forEach((name) => { cashRegisterForm.elements[name].readOnly = closed && !editingClosing; });
+  cashRegisterForm.querySelector('[type="submit"]').hidden = closed && !editingClosing;
+  cashRegisterForm.classList.toggle('is-editing', closed && editingClosing);
+  const closingActions = document.querySelector('.closing-edit-actions');
+  closingActions.hidden = !closed;
+  document.getElementById('editClosing').hidden = editingClosing;
+  document.getElementById('cancelClosingEdit').hidden = !editingClosing;
+  document.getElementById('closingStatus').textContent = closed ? (editingClosing ? 'Modificando cierre' : 'Cierre guardado') : 'Pendiente';
+  document.getElementById('closingStatus').classList.toggle('editing', closed && editingClosing);
   const openingStatus = document.getElementById('openingStatus');
   openingStatus.textContent = opened ? 'Jornada iniciada' : 'Pendiente';
   openingStatus.classList.toggle('open', opened);
@@ -397,7 +453,9 @@ function render() {
   openingCashForm.elements.editDescription.required = opened && editingOpening;
   ['addSale', 'addAdvance', 'addExpense'].forEach((id) => { document.getElementById(id).disabled = !opened; });
   transferForm.querySelector('button').disabled = !opened;
-  cashRegisterForm.querySelector('button').disabled = !opened;
+  cashRegisterForm.querySelector('[type="submit"]').disabled = !opened && !closed;
+  applyDailyLock(opened, closed);
+  renderOpenDaysWarning();
   renderSummary();
 }
 
@@ -515,6 +573,7 @@ function openEditDialog(id) {
 }
 
 document.getElementById('barberColumns').addEventListener('click', (event) => {
+  if (dailyOperationsLocked()) return;
   if (reorderingBarbers) {
     if (event.target.closest('.barber-payment-control')) event.preventDefault();
     return;
@@ -537,6 +596,7 @@ document.getElementById('barberColumns').addEventListener('click', (event) => {
 });
 
 document.getElementById('barberColumns').addEventListener('input', (event) => {
+  if (dailyOperationsLocked()) return;
   const input = event.target.closest('[data-payment-amount]');
   if (!input || reorderingBarbers) return;
   const column = input.closest('[data-barber-column]');
@@ -570,6 +630,7 @@ function setBarberOrderMode(enabled) {
 }
 
 document.getElementById('reorderBarbers').addEventListener('click', () => {
+  if (dailyOperationsLocked()) return;
   if (!reorderingBarbers) return setBarberOrderMode(true);
   const order = [...document.querySelectorAll('[data-barber-column]')].map((column) => column.dataset.barberColumn);
   if (order.length !== barbers.length || order.some((barber) => !barbers.includes(barber))) return;
@@ -647,18 +708,21 @@ document.getElementById('summaryPaymentFilter').addEventListener('change', rende
 
 document.getElementById('addSale').addEventListener('click', () => openSaleDialog());
 ['click', 'keydown'].forEach((type) => document.getElementById('salesRows').addEventListener(type, (event) => {
+  if (dailyOperationsLocked()) return;
   if (type === 'keydown' && event.key !== 'Enter') return;
   const row = event.target.closest('[data-sale]');
   if (row) openSaleDetail(row.dataset.sale);
 }));
 document.getElementById('addAdvance').addEventListener('click', () => openAdvanceDialog());
 ['click', 'keydown'].forEach((type) => document.getElementById('advanceRows').addEventListener(type, (event) => {
+  if (dailyOperationsLocked()) return;
   if (type === 'keydown' && event.key !== 'Enter') return;
   const row = event.target.closest('[data-advance]');
   if (row) openAdvanceDetail(row.dataset.advance);
 }));
 document.getElementById('addExpense').addEventListener('click', () => openExpenseDialog());
 ['click', 'keydown'].forEach((type) => document.getElementById('expenseRows').addEventListener(type, (event) => {
+  if (dailyOperationsLocked()) return;
   if (type === 'keydown' && event.key !== 'Enter') return;
   const row = event.target.closest('[data-expense]');
   if (row) openExpenseDetail(row.dataset.expense);
@@ -668,6 +732,7 @@ document.getElementById('addExpense').addEventListener('click', () => openExpens
 transferForm.elements.from.addEventListener('change', () => transferForm.elements.amount.setCustomValidity(''));
 transferForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (dailyOperationsLocked()) return;
   const values = Object.fromEntries(new FormData(transferForm));
   if (!isDayOpen(workday.value) || !['Efectivo', 'Mercado Pago'].includes(values.from)) return;
   values.to = values.from === 'Efectivo' ? 'Mercado Pago' : 'Efectivo';
@@ -692,6 +757,7 @@ document.getElementById('transferRows').addEventListener('click', (event) => {
 
 saleForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (dailyOperationsLocked()) return;
   const values = Object.fromEntries(new FormData(saleForm));
   const quantity = Number(values.quantity);
   const unitPrice = parseAmount(values.unitPrice);
@@ -707,6 +773,7 @@ saleForm.addEventListener('submit', (event) => {
 
 advanceForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (dailyOperationsLocked()) return;
   const values = Object.fromEntries(new FormData(advanceForm));
   advanceForm.elements.amount.setCustomValidity(parseAmount(values.amount) > 0 ? '' : 'El importe debe ser mayor que cero.');
   if (!advanceForm.reportValidity()) return;
@@ -720,6 +787,7 @@ advanceForm.addEventListener('submit', (event) => {
 
 expenseForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (dailyOperationsLocked()) return;
   const values = Object.fromEntries(new FormData(expenseForm));
   expenseForm.elements.amount.setCustomValidity(parseAmount(values.amount) > 0 ? '' : 'El importe debe ser mayor que cero.');
   if (!expenseForm.reportValidity()) return;
@@ -733,6 +801,7 @@ expenseForm.addEventListener('submit', (event) => {
 
 openingCashForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (dailyOperationsLocked()) return;
   const values = Object.fromEntries(new FormData(openingCashForm));
   const current = cashRegisters[workday.value] || {};
   const initialCash = parseAmount(values.initialCash);
@@ -756,6 +825,8 @@ openingCashForm.addEventListener('submit', (event) => {
 
 cashRegisterForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  const register = cashRegisters[workday.value] || {};
+  if ('realCash' in register && 'realMp' in register && !editingClosing) return;
   const values = Object.fromEntries(new FormData(cashRegisterForm));
   const realCash = parseAmount(values.realCash);
   const withdrawal = parseAmount(values.withdrawal);
@@ -771,9 +842,16 @@ cashRegisterForm.addEventListener('submit', (event) => {
   }
   saveCashRegisters();
   initializeOpening(nextDate);
+  editingClosing = false;
   render();
 });
 [cashRegisterForm.elements.realCash, cashRegisterForm.elements.realMp, cashRegisterForm.elements.withdrawal].forEach((input) => input.addEventListener('input', () => renderClosingDifferences()));
+document.getElementById('editClosing').addEventListener('click', () => { editingClosing = true; render(); });
+document.getElementById('cancelClosingEdit').addEventListener('click', () => {
+  editingClosing = false;
+  cashRegisterForm.elements.withdrawal.setCustomValidity('');
+  render();
+});
 
 serviceInput.addEventListener('change', (event) => {
   amountInput.value = prices[event.target.value] ? formatAmount(prices[event.target.value]) : '';
@@ -826,6 +904,8 @@ document.getElementById('cancelOpeningEdit').addEventListener('click', () => {
 });
 workday.addEventListener('change', () => {
   editingOpening = false;
+  editingClosing = false;
+  cashRegisterForm.elements.withdrawal.setCustomValidity('');
   render();
 });
 document.getElementById('closeDialog').addEventListener('click', () => dialog.close());
