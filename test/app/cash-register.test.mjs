@@ -396,6 +396,20 @@ test('REG-037 - Advierte jornadas abiertas y limpia la advertencia cuando todas 
   assert.equal(app.element('openDaysWarning').hidden, true);
 });
 
+test('REG-038 - Una jornada cerrada rechaza operaciones aunque se dispare el handler', (t) => {
+  const app = createApp(t);
+  app.submit('cashRegisterForm', { realCash: '1000', realMp: '2000', withdrawal: '100' });
+  const before = app.snapshot('({ entries, sales, advances, expenses, transfers, inventory })');
+  for (const [selector, type] of [
+    ['#barberColumns', 'click'], ['#barberColumns', 'input'], ['#reorderBarbers', 'click'],
+    ['#addSale', 'click'], ['#salesRows', 'click'], ['#addAdvance', 'click'], ['#advanceRows', 'click'],
+    ['#addExpense', 'click'], ['#expenseRows', 'click'], ['#transferForm', 'submit'], ['#transferRows', 'click'],
+    ['#saleForm', 'submit'], ['#advanceForm', 'submit'], ['#expenseForm', 'submit'], ['#openingCashForm', 'submit'],
+    ['#stockProductForm', 'submit'], ['#stockConfigList', 'click'], ['#stockMovementForm', 'submit'], ['#stockMovementRows', 'click'],
+  ]) app.emit(selector, type);
+  assert.deepEqual(app.snapshot('({ entries, sales, advances, expenses, transfers, inventory })'), before);
+});
+
 test('REG-026 - Transferir todo el efectivo resta origen y suma destino', (t) => {
   const app = createApp(t);
   app.financialFixture();

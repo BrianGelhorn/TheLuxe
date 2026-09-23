@@ -713,21 +713,21 @@ document.getElementById('summaryServiceOptions').addEventListener('change', () =
 document.getElementById('summaryBarberFilter').addEventListener('change', renderSummary);
 document.getElementById('summaryPaymentFilter').addEventListener('change', renderSummary);
 
-document.getElementById('addSale').addEventListener('click', () => openSaleDialog());
+document.getElementById('addSale').addEventListener('click', () => { if (!dailyOperationsLocked()) openSaleDialog(); });
 ['click', 'keydown'].forEach((type) => document.getElementById('salesRows').addEventListener(type, (event) => {
   if (dailyOperationsLocked()) return;
   if (type === 'keydown' && event.key !== 'Enter') return;
   const row = event.target.closest('[data-sale]');
   if (row) openSaleDetail(row.dataset.sale);
 }));
-document.getElementById('addAdvance').addEventListener('click', () => openAdvanceDialog());
+document.getElementById('addAdvance').addEventListener('click', () => { if (!dailyOperationsLocked()) openAdvanceDialog(); });
 ['click', 'keydown'].forEach((type) => document.getElementById('advanceRows').addEventListener(type, (event) => {
   if (dailyOperationsLocked()) return;
   if (type === 'keydown' && event.key !== 'Enter') return;
   const row = event.target.closest('[data-advance]');
   if (row) openAdvanceDetail(row.dataset.advance);
 }));
-document.getElementById('addExpense').addEventListener('click', () => openExpenseDialog());
+document.getElementById('addExpense').addEventListener('click', () => { if (!dailyOperationsLocked()) openExpenseDialog(); });
 ['click', 'keydown'].forEach((type) => document.getElementById('expenseRows').addEventListener(type, (event) => {
   if (dailyOperationsLocked()) return;
   if (type === 'keydown' && event.key !== 'Enter') return;
@@ -755,6 +755,7 @@ transferForm.addEventListener('submit', (event) => {
   render();
 });
 document.getElementById('transferRows').addEventListener('click', (event) => {
+  if (dailyOperationsLocked()) return;
   const button = event.target.closest('[data-delete-transfer]');
   if (!button || !confirm('¿Eliminar este movimiento entre medios?')) return;
   transfers = transfers.filter((transfer) => transfer.id !== button.dataset.deleteTransfer);
