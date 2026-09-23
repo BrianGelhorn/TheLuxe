@@ -302,7 +302,7 @@ function openRegisterDates() {
 
 function renderOpenDaysWarning() {
   const dates = openRegisterDates();
-  const formatDate = (date) => new Intl.DateTimeFormat('es-AR').format(new Date(`${date}T12:00:00`));
+  const formatDate = (date) => new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(`${date}T12:00:00`));
   document.getElementById('openDaysWarning').hidden = dates.length === 0;
   document.getElementById('openDaysWarningText').textContent = dates.length
     ? `${dates.map(formatDate).join(', ')}. Cerrá cada jornada antes de continuar.`
