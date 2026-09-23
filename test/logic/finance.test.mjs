@@ -74,6 +74,13 @@ test('FIN-026 - Las ventas usan el total guardado sin multiplicarlo por cantidad
   assert.equal(logic.salePaymentTotal(sales, 'Mercado Pago'), 700);
 });
 
+test('FIN-086 - Las ventas mixtas distribuyen el total entre ambos medios', () => {
+  const logic = loadLogic();
+  const sales = [{ payment: 'Ambos', total: 1800, cashAmount: '700', mpAmount: '1100' }];
+  assert.equal(logic.salePaymentTotal(sales, 'Efectivo'), 700);
+  assert.equal(logic.salePaymentTotal(sales, 'Mercado Pago'), 1100);
+});
+
 for (const [id, description, method] of [
   ['FIN-027', 'Los adelantos convierten importes escritos antes de sumar', 'advancePaymentTotal'],
   ['FIN-028', 'Los gastos convierten importes escritos antes de sumar', 'expensePaymentTotal'],

@@ -407,6 +407,17 @@ test('RPT-012 - No hay divisiones por cero ni filas viejas en un reporte vacio',
   assert.equal(app.element('summaryOperationCount').textContent, '0 servicios');
 });
 
+test('RPT-036 - La tabla de ventas desglosa efectivo y MP cuando el pago es mixto', (t) => {
+  const app = createApp(t);
+  app.run('renderSales([{ id: "mixed", time: "12:00", product: "Pomada", quantity: 1, unitPrice: 1800, total: 1800, payment: "Ambos", cashAmount: 700, mpAmount: 1100 }])');
+  const payment = app.element('salesRows').rows[0].cells[5];
+  assert.match(payment.textContent, /Ambos/);
+  assert.match(payment.textContent, /Efectivo: \$\s*700/);
+  assert.match(payment.textContent, /MP: \$\s*1\.100/);
+  assert.match(payment.querySelector('.cash-price').textContent, /Efectivo: .*700/);
+  assert.match(payment.querySelector('.mp-price').textContent, /MP: .*1\.100/);
+});
+
 for (const [id, collection, renderer, rows, totals, field] of [
   ['RPT-013', 'sales', 'renderSales', 'salesRows', 'sales', 'total'],
   ['RPT-014', 'advances', 'renderAdvances', 'advanceRows', 'advances', 'amount'],

@@ -2,7 +2,9 @@
   const parseAmount = (value) => Number(String(value || '').replace(/\D/g, ''));
 
   function salePaymentTotal(list, type) {
-    return list.reduce((sum, sale) => sum + (sale.payment === type ? Number(sale.total) : 0), 0);
+    return list.reduce((sum, sale) => sum + (sale.payment === 'Ambos'
+      ? Number(type === 'Efectivo' ? sale.cashAmount : sale.mpAmount)
+      : sale.payment === type ? Number(sale.total) : 0), 0);
   }
 
   function advancePaymentTotal(list, type) {
@@ -107,19 +109,19 @@
 
   function summarize(cuts, sales, advances, expenses = [], payment = 'Ambas', commissionAt = () => 0) {
     const matchesPayment = (item) => payment === 'Ambas' || item.payment === payment;
-    sales = sales.filter(matchesPayment);
+    sales = sales.filter((sale) => payment === 'Ambas' || sale.payment === payment || sale.payment === 'Ambos');
     advances = advances.filter(matchesPayment);
     expenses = expenses.filter(matchesPayment);
     const services = payment === 'Ambas' ? cuts.reduce((sum, cut) => sum + Number(cut.amount), 0) : cutValueByPayment(cuts, payment, 'amount');
     const tips = payment === 'Ambas' ? cuts.reduce((sum, cut) => sum + Number(cut.tip || 0), 0) : cutValueByPayment(cuts, payment, 'tip');
-    const salesTotal = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
+    const salesTotal = payment === 'Ambas' ? sales.reduce((sum, sale) => sum + Number(sale.total), 0) : salePaymentTotal(sales, payment);
     const advancesTotal = advances.reduce((sum, advance) => sum + Number(advance.amount), 0);
     const expensesTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
     const commissionCuts = cuts.map((cut) => ({ ...cut, commission: Number(cut.commissionAmount ?? Number(cut.amount) * (cut.commissionRate ?? commissionAt(cut.date)) / 100) }));
     const commission = payment === 'Ambas' ? commissionCuts.reduce((sum, cut) => sum + cut.commission, 0) : cutValueByPayment(commissionCuts, payment, 'commission');
     const cutCount = payment === 'Ambas' ? cuts.length : cuts.filter((cut) => dominantPayment(cut) === payment).length;
     return {
-      cuts: cutCount, saleCount: sales.length, services, sales: salesTotal, tips, commission, advances: advancesTotal, expenses: expensesTotal,
+      cuts: cutCount, saleCount: payment === 'Ambas' ? sales.length : sales.filter((sale) => dominantPayment(sale) === payment).length, services, sales: salesTotal, tips, commission, advances: advancesTotal, expenses: expensesTotal,
       invoiced: services + salesTotal, balance: services + salesTotal - commission,
       cash: paymentTotal(cuts, 'Efectivo') + salePaymentTotal(sales, 'Efectivo') - advancePaymentTotal(advances, 'Efectivo') - expensePaymentTotal(expenses, 'Efectivo'),
       mp: paymentTotal(cuts, 'Mercado Pago') + salePaymentTotal(sales, 'Mercado Pago') - advancePaymentTotal(advances, 'Mercado Pago') - expensePaymentTotal(expenses, 'Mercado Pago'),

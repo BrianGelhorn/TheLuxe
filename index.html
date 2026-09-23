@@ -433,7 +433,11 @@
             <label class="field"><span>Producto</span><select id="saleProduct" name="product" required></select></label>
             <label class="field"><span>Cantidad</span><input name="quantity" type="number" min="1" value="1" required></label>
             <label class="field"><span>Precio unitario</span><div class="money-input"><b>$</b><input name="unitPrice" type="text" inputmode="numeric" required></div></label>
-            <label class="field"><span>Medio de pago</span><select name="payment" required><option>Efectivo</option><option>Mercado Pago</option></select></label>
+            <label class="field"><span>Medio de pago</span><select id="salePayment" name="payment" required><option>Efectivo</option><option>Mercado Pago</option><option>Ambos</option></select></label>
+            <div id="saleSplitPayment" class="split-payment full-width" hidden>
+              <label class="field"><span>Importe en efectivo</span><div class="money-input"><b>$</b><input id="saleCashAmount" name="cashAmount" type="text" inputmode="numeric"></div></label>
+              <label class="field"><span>Importe en Mercado Pago</span><div class="money-input"><b>$</b><input id="saleMpAmount" name="mpAmount" type="text" inputmode="numeric"></div></label>
+            </div>
             <label class="field"><span>Importe total</span><div id="saleTotalPreview" class="total-preview">$ 0</div></label>
             <label class="field full-width"><span>Notas <small>(opcional)</small></span><textarea name="notes" rows="3"></textarea></label>
             <button class="primary-btn" type="submit">Guardar venta <span>→</span></button>

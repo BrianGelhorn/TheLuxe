@@ -35,6 +35,10 @@ const notesInput = form.elements.notes;
 const saleForm = document.getElementById('saleForm');
 const saleDialog = document.getElementById('saleDialog');
 const saleDetailDialog = document.getElementById('saleDetailDialog');
+const salePaymentInput = saleForm.elements.payment;
+const saleSplitPayment = document.getElementById('saleSplitPayment');
+const saleCashAmountInput = saleForm.elements.cashAmount;
+const saleMpAmountInput = saleForm.elements.mpAmount;
 const advanceForm = document.getElementById('advanceForm');
 const advanceDialog = document.getElementById('advanceDialog');
 const advanceDetailDialog = document.getElementById('advanceDetailDialog');
@@ -381,6 +385,14 @@ function toggleSplitPayment() {
   cashAmountInput.required = split;
   mpAmountInput.required = split;
   cashAmountInput.setCustomValidity('');
+}
+
+function toggleSaleSplitPayment() {
+  const split = salePaymentInput.value === 'Ambos';
+  saleSplitPayment.hidden = !split;
+  saleCashAmountInput.required = split;
+  saleMpAmountInput.required = split;
+  saleCashAmountInput.setCustomValidity('');
 }
 
 function render() {
@@ -734,7 +746,10 @@ document.getElementById('addExpense').addEventListener('click', () => { if (!dai
   const row = event.target.closest('[data-expense]');
   if (row) openExpenseDetail(row.dataset.expense);
 }));
-[saleForm.elements.quantity, saleForm.elements.unitPrice].forEach((input) => input.addEventListener('input', updateSaleTotal));
+[saleForm.elements.quantity, saleForm.elements.unitPrice].forEach((input) => input.addEventListener('input', () => {
+  updateSaleTotal();
+  saleCashAmountInput.setCustomValidity('');
+}));
 
 transferForm.elements.from.addEventListener('change', () => transferForm.elements.amount.setCustomValidity(''));
 transferForm.addEventListener('submit', (event) => {
@@ -769,9 +784,21 @@ saleForm.addEventListener('submit', (event) => {
   const values = Object.fromEntries(new FormData(saleForm));
   const quantity = Number(values.quantity);
   const unitPrice = parseAmount(values.unitPrice);
+  const total = quantity * unitPrice;
+  const cashAmount = parseAmount(values.cashAmount);
+  const mpAmount = parseAmount(values.mpAmount);
   saleForm.elements.unitPrice.setCustomValidity(unitPrice > 0 ? '' : 'El precio debe ser mayor que cero.');
+  saleCashAmountInput.setCustomValidity('');
+  if (values.payment === 'Ambos' && cashAmount + mpAmount !== total) {
+    saleCashAmountInput.setCustomValidity('La suma debe coincidir con el importe total de la venta.');
+  }
   if (!saleForm.reportValidity()) return;
-  const sale = { ...values, quantity, unitPrice, total: quantity * unitPrice, date: workday.value, id: editingSaleId || crypto.randomUUID() };
+  const sale = { ...values, quantity, unitPrice, total, date: workday.value, id: editingSaleId || crypto.randomUUID() };
+  if (values.payment === 'Ambos') Object.assign(sale, { cashAmount, mpAmount });
+  else {
+    delete sale.cashAmount;
+    delete sale.mpAmount;
+  }
   sales = editingSaleId ? sales.map((item) => item.id === editingSaleId ? sale : item) : [...sales, sale];
   saveSales();
   editingSaleId = null;
@@ -871,6 +898,8 @@ saleForm.elements.product.addEventListener('change', (event) => {
   saleForm.elements.unitPrice.setCustomValidity('');
   updateSaleTotal();
 });
+salePaymentInput.addEventListener('change', toggleSaleSplitPayment);
+[saleCashAmountInput, saleMpAmountInput].forEach((input) => input.addEventListener('input', () => saleCashAmountInput.setCustomValidity('')));
 paymentInput.addEventListener('change', toggleSplitPayment);
 [amountInput, tipInput, cashAmountInput, mpAmountInput].forEach((input) => input.addEventListener('input', () => cashAmountInput.setCustomValidity('')));
 

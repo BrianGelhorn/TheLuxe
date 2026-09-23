@@ -14,6 +14,9 @@ function openSaleDialog(id = null) {
   saleForm.elements.quantity.value = sale?.quantity || 1;
   saleForm.elements.unitPrice.value = sale ? formatAmount(sale.unitPrice) : '';
   saleForm.elements.payment.value = sale?.payment || 'Efectivo';
+  saleForm.elements.cashAmount.value = sale ? formatAmount(sale.cashAmount) : '';
+  saleForm.elements.mpAmount.value = sale ? formatAmount(sale.mpAmount) : '';
+  toggleSaleSplitPayment();
   saleForm.elements.notes.value = sale?.notes || '';
   document.getElementById('saleFormMode').textContent = sale ? 'MODIFICAR VENTA' : 'NUEVA VENTA';
   updateSaleTotal();
@@ -29,7 +32,12 @@ function openSaleDetail(id) {
   document.getElementById('saleDetail').innerHTML = [
     ['Hora', sale.time], ['Producto', sale.product], ['Cantidad', sale.quantity],
     ['Precio unitario', money.format(sale.unitPrice)], ['Importe total', money.format(sale.total)],
-    ['Medio de pago', sale.payment], ['Notas', sale.notes || 'Sin notas'],
+    ['Medio de pago', sale.payment],
+    ...(sale.payment === 'Ambos' ? [
+      ['En efectivo', money.format(Number(sale.cashAmount))],
+      ['En Mercado Pago', money.format(Number(sale.mpAmount))],
+    ] : []),
+    ['Notas', sale.notes || 'Sin notas'],
   ].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
   saleDetailDialog.showModal();
 }

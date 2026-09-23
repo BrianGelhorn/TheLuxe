@@ -1,9 +1,12 @@
 function renderSales(list) {
+  const paymentLabel = (sale) => sale.payment === 'Ambos'
+    ? `<span>Ambos</span><small class="sale-payment-breakdown"><span class="cash-price">Efectivo: ${money.format(Number(sale.cashAmount))}</span><span class="mp-price">MP: ${money.format(Number(sale.mpAmount))}</span></small>`
+    : escapeHtml(sale.payment === 'Mercado Pago' ? 'MP' : sale.payment);
   document.getElementById('salesRows').innerHTML = list.sort((a, b) => a.time.localeCompare(b.time)).map((sale) => `
     <tr data-sale="${escapeHtml(sale.id)}" tabindex="0">
       <td>${escapeHtml(sale.time)}</td><td>${escapeHtml(sale.product)}</td><td>${sale.quantity}</td>
       <td>${money.format(sale.unitPrice)}</td><td>${money.format(sale.total)}</td>
-      <td>${escapeHtml(sale.payment === 'Mercado Pago' ? 'MP' : sale.payment)}</td>
+      <td>${paymentLabel(sale)}</td>
       <td>${escapeHtml(sale.notes || '—')}</td>
     </tr>`).join('');
   document.getElementById('salesEmpty').hidden = list.length > 0;
@@ -81,6 +84,7 @@ function renderSummary() {
   document.getElementById('summaryServiceField').hidden = shopMode;
   const payment = document.getElementById('summaryPaymentFilter').value;
   const matchesPayment = (item) => payment === 'Ambas' || item.payment === payment;
+  const matchesSalePayment = (sale) => matchesPayment(sale) || sale.payment === 'Ambos';
   // Local-wide result always ignores service and barber filters.
   const shopCuts = entries.filter(inRange);
   const shopSales = sales.filter(inRange);
@@ -98,7 +102,7 @@ function renderSummary() {
   document.getElementById('shopExpenses').textContent = money.format(shop.expenses);
   document.getElementById('shopBalance').textContent = money.format(shop.invoiced - shop.commission - shop.expenses);
   document.getElementById('shopSaleCount').textContent = String(shop.saleCount);
-  document.getElementById('shopSaleQuantity').textContent = String(shopSales.filter(matchesPayment).reduce((sum, sale) => sum + Number(sale.quantity || 0), 0));
+  document.getElementById('shopSaleQuantity').textContent = String(shopSales.filter(matchesSalePayment).reduce((sum, sale) => sum + Number(sale.quantity || 0), 0));
   for (const [id, concepts] of [
     ['shopRevenueRows', [['Servicios sin propinas', 'services'], ['Ventas de productos', 'sales'], ['Facturado sin propinas', 'invoiced'], ['Propinas', 'tips'], ['Total facturado con propinas', 'collected']]],
     ['shopMovementRows', [['Gastos', 'expenses'], ['Adelantos', 'advances'], ['Retiros', 'withdrawals']]],
@@ -110,7 +114,7 @@ function renderSummary() {
     }).join('');
   }
   const periodCuts = entries.filter((cut) => inRange(cut) && (shopMode || selectedServices.includes(cut.service)) && (!selectedBarber || cut.barber === selectedBarber) && (payment === 'Ambas' || cut.payment === payment || cut.payment === 'Ambos'));
-  const periodSales = selectedBarber ? [] : sales.filter((sale) => inRange(sale) && matchesPayment(sale));
+  const periodSales = selectedBarber ? [] : sales.filter((sale) => inRange(sale) && matchesSalePayment(sale));
   const periodAdvances = advances.filter((advance) => inRange(advance) && (!selectedBarber || advance.barber === selectedBarber) && matchesPayment(advance));
   const periodExpenses = selectedBarber ? [] : expenses.filter((expense) => inRange(expense) && matchesPayment(expense));
   const total = summarize(periodCuts, periodSales, periodAdvances, periodExpenses, payment, defaultCommission);

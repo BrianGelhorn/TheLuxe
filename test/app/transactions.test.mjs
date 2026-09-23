@@ -303,6 +303,35 @@ test('TXN-020 - La venta por MP suma cantidad por precio solo a MP', (t) => {
   assert.equal(app.element('dailyNet').textContent, app.money(1800));
 });
 
+test('TXN-051 - La venta mixta guarda ambos importes y actualiza caja y detalle', (t) => {
+  const app = createApp(t);
+  app.click('#addSale');
+  app.setForm('saleForm', { product: 'Shampoo', quantity: '2', unitPrice: '900', payment: 'Ambos', cashAmount: '700', mpAmount: '1100' });
+  app.emit('#salePayment', 'change');
+  app.submit('saleForm');
+  assert.deepEqual(app.snapshot('sales[0]'), {
+    id: 'test-id-1', time: '12:00', product: 'Shampoo', quantity: 2, unitPrice: 900,
+    payment: 'Ambos', cashAmount: 700, mpAmount: 1100, total: 1800, date: '2026-09-03', notes: '',
+  });
+  balances(app, 700, 1100);
+  app.click('[data-sale]');
+  assert.match(app.element('saleDetail').textContent, /\$\s*700/);
+  assert.match(app.element('saleDetail').textContent, /\$\s*1\.100/);
+});
+
+test('TXN-052 - Una suma mixta de venta incorrecta se rechaza y se puede corregir', (t) => {
+  const app = createApp(t);
+  app.click('#addSale');
+  app.setForm('saleForm', { product: 'Pomada', quantity: '1', unitPrice: '1000', payment: 'Ambos', cashAmount: '400', mpAmount: '500' });
+  app.emit('#salePayment', 'change');
+  app.submit('saleForm');
+  assert.equal(app.run('sales.length'), 0);
+  assert.match(app.element('saleCashAmount').validationMessage, /La suma debe coincidir/);
+  app.input('#saleCashAmount', '500');
+  app.submit('saleForm');
+  balances(app, 500, 500);
+});
+
 test('TXN-021 - Editar venta revierte el total anterior y conserva su identidad', (t) => {
   const app = createApp(t);
   app.financialFixture();
