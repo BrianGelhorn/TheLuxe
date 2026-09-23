@@ -385,6 +385,17 @@ test('REG-036 - El cierre guardado queda bloqueado hasta modificarlo y cancelar 
   assert.equal(app.run('cashRegisters["2026-09-04"].initialCash'), 1300);
 });
 
+test('REG-037 - Advierte jornadas abiertas y limpia la advertencia cuando todas cierran', (t) => {
+  const app = createApp(t);
+  assert.equal(app.element('openDaysWarning').hidden, false);
+  assert.match(app.element('openDaysWarningText').textContent, /03\/09\/2026/);
+  app.run('cashRegisters = {"2026-09-01": {opened: true, initialCash: 0, initialMp: 0, realCash: 0, realMp: 0}, "2026-09-02": {}, "2026-09-03": {opened: true, initialCash: 0, initialMp: 0}}; render()');
+  assert.equal(app.element('openDaysWarning').hidden, false);
+  assert.match(app.element('openDaysWarningText').textContent, /03\/09\/2026/);
+  app.run('cashRegisters = {"2026-09-03": {opened: true, initialCash: 0, initialMp: 0, realCash: 0, realMp: 0}}; render()');
+  assert.equal(app.element('openDaysWarning').hidden, true);
+});
+
 test('REG-026 - Transferir todo el efectivo resta origen y suma destino', (t) => {
   const app = createApp(t);
   app.financialFixture();
