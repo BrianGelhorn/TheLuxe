@@ -1,0 +1,9 @@
+.git
+.github
+.openai
+dist
+node_modules
+test
+docs
+*.xlsm
+*.docx

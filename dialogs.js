@@ -5,12 +5,15 @@ function updateSaleTotal() {
 }
 
 function openSaleDialog(id = null) {
+  populateSelectors();
   saleForm.reset();
   saleForm.elements.unitPrice.setCustomValidity('');
+  saleForm.elements.product.setCustomValidity('');
   editingSaleId = id;
   const sale = sales.find((item) => item.id === id);
   saleForm.elements.time.value = sale?.time || nowTime();
-  saleForm.elements.product.value = sale?.product || '';
+  const matches = inventory.products.filter((product) => product.active && product.saleEnabled && product.name === sale?.product);
+  saleForm.elements.product.value = sale?.productId || (matches.length === 1 ? matches[0].id : '');
   saleForm.elements.quantity.value = sale?.quantity || 1;
   saleForm.elements.unitPrice.value = sale ? formatAmount(sale.unitPrice) : '';
   saleForm.elements.payment.value = sale?.payment || 'Efectivo';
@@ -28,6 +31,7 @@ function openSaleDetail(id) {
   const sale = sales.find((item) => item.id === id);
   if (!sale) return;
   selectedSaleId = id;
+  document.getElementById('saleDeleteStockError').hidden = true;
   document.getElementById('saleDetailTitle').textContent = sale.product;
   document.getElementById('saleDetail').innerHTML = [
     ['Hora', sale.time], ['Producto', sale.product], ['Cantidad', sale.quantity],

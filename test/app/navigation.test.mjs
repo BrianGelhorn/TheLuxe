@@ -138,7 +138,7 @@ test('NAV-010 - Elegir un precio de catalogo limpia errores de cero al reabrir f
   const app = createApp(t);
   for (const [add, form, field, select, value, close] of [
     ['[data-barber="Mateo"]', 'cutForm', 'amount', '#service', 'Barba', 'closeDialog'],
-    ['#addSale', 'saleForm', 'unitPrice', '#saleProduct', 'Pomada', 'closeSaleDialog'],
+    ['#addSale', 'saleForm', 'unitPrice', '#saleProduct', 'pomada', 'closeSaleDialog'],
   ]) {
     app.click(add);
     app.query(select).value = value;

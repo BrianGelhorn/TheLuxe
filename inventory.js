@@ -1,10 +1,67 @@
 const inventoryStorageKey = 'theluxe-inventory-v1';
-let inventory = { version: 1, products: [], movements: [] };
+const emptyInventory = () => ({ version: 2, products: [{ id: 'pomada', name: 'Pomada', saleEnabled: true, stockEnabled: false, salePrice: 12000, active: true }, { id: 'shampoo', name: 'Shampoo', saleEnabled: true, stockEnabled: false, salePrice: 9000, active: true }], movements: [] });
+let inventory = emptyInventory();
 let inventorySnapshot = null;
 let inventoryReadError = false;
 let stockEditingSnapshot = null;
 const stockProductForm = document.getElementById('stockProductForm');
 const stockMovementForm = document.getElementById('stockMovementForm');
+
+function stockDemoInventory() {
+  const date = (offset) => {
+    const value = new Date(`${today()}T12:00:00`);
+    value.setDate(value.getDate() + offset);
+    return isoDate(value);
+  };
+  const startDate = date(-14);
+  return {
+    version: 2,
+    products: [
+      { id: 'demo-navajas', name: 'Navajas', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 50, unitCost: 100, initialUnitCost: 100, packageSize: 50, packageCost: 5000, packageLabel: 'caja', startDate, active: true },
+      { id: 'demo-guantes', name: 'Guantes', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 30, unitCost: 300, initialUnitCost: 300, startDate, active: true },
+      { id: 'demo-toallas', name: 'Toallas descartables', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 80, unitCost: 120, initialUnitCost: 120, packageSize: 100, packageCost: 12000, packageLabel: 'caja', startDate, active: true },
+    ],
+    movements: [
+      { id: 'demo-m1', productId: 'demo-navajas', date: date(-6), time: '09:00', type: 'entrada', quantity: 50, notes: 'Compra de 1 caja', cancelled: false, unitCost: 100, cost: 5000 },
+      { id: 'demo-m2', productId: 'demo-navajas', date: date(-5), time: '18:00', type: 'consumo', quantity: 7, notes: 'Uso diario', cancelled: false },
+      { id: 'demo-m3', productId: 'demo-guantes', date: date(-4), time: '09:15', type: 'entrada', quantity: 20, notes: 'Reposición', cancelled: false },
+      { id: 'demo-m4', productId: 'demo-toallas', date: date(-3), time: '10:00', type: 'entrada', quantity: 100, notes: 'Compra de 1 caja', cancelled: false },
+      { id: 'demo-m5', productId: 'demo-navajas', date: date(-2), time: '18:10', type: 'consumo', quantity: 10, notes: 'Uso diario', cancelled: false },
+      { id: 'demo-m6', productId: 'demo-guantes', date: date(-2), time: '18:15', type: 'consumo', quantity: 6, notes: 'Uso diario', cancelled: false },
+      { id: 'demo-m7', productId: 'demo-toallas', date: date(-1), time: '18:20', type: 'consumo', quantity: 15, notes: 'Uso diario', cancelled: false },
+      { id: 'demo-m8', productId: 'demo-navajas', date: date(0), time: '11:00', type: 'consumo', quantity: 5, notes: 'Uso de prueba', cancelled: false },
+      { id: 'demo-m9', productId: 'demo-guantes', date: date(0), time: '11:05', type: 'consumo', quantity: 3, notes: 'Uso de prueba', cancelled: false },
+      { id: 'demo-m10', productId: 'demo-toallas', date: date(0), time: '11:10', type: 'consumo', quantity: 25, notes: 'Uso de prueba', cancelled: false },
+    ],
+  };
+}
+
+function updateStockProductCostPreview() {
+  const fields = stockProductForm.elements;
+  const packaged = fields.packageLabel.value === 'caja';
+  document.getElementById('stockPackageSizeField').hidden = !packaged;
+  fields.packageSize.disabled = !packaged;
+  document.getElementById('stockPurchasePriceLabel').textContent = packaged ? 'Precio de caja' : 'Precio unitario';
+  const size = packaged ? Number(fields.packageSize.value) : 1;
+  const cost = parseAmount(fields.unitCost.value);
+  const unit = fields.stockUnit.value;
+  document.getElementById('stockUnitCostPreview').textContent = Number.isSafeInteger(size) && size > 0 && Number.isSafeInteger(cost) && cost > 0
+    ? packaged ? `1 caja = ${integer.format(size)} ${unit} · ${unitMoney.format(cost / size)} por ${unit === 'unidades' ? 'unidad' : unit}` : `${unitMoney.format(cost)} por ${unit === 'unidades' ? 'unidad' : unit}`
+    : 'Completá el contenido y el precio para calcular el costo proporcional.';
+}
+
+function updateStockMovementConversion() {
+  const fields = stockMovementForm.elements;
+  const product = inventory.products.find((item) => item.id === fields.stockProduct.value);
+  const packages = product && fields.stockType.value === 'entrada' && Number(product.packageSize) > 1;
+  const consumption = fields.stockType.value === 'consumo';
+  document.getElementById('stockMovementBarberField').hidden = !consumption;
+  fields.stockBarber.disabled = !consumption;
+  document.getElementById('stockQuantityLabel').textContent = packages ? 'Cantidad de cajas' : product ? `Cantidad (${product.unit})` : 'Cantidad';
+  document.getElementById('stockConversionPreview').textContent = packages
+    ? `1 caja suma ${integer.format(product.packageSize)} ${product.unit} al stock.`
+    : product ? `Se registra en ${product.unit}.` : '';
+}
 
 function stockMessage(message, error = false) {
   ['stockMessage', 'stockConfigMessage'].forEach((id) => {
@@ -18,9 +75,11 @@ function stockMessage(message, error = false) {
 function loadInventory() {
   try {
     const raw = localStorage.getItem(inventoryStorageKey);
-    const next = raw === null ? { version: 1, products: [], movements: [] } : JSON.parse(raw);
+    const next = raw === null ? emptyInventory() : JSON.parse(raw);
     if (inventoryError(next)) throw new Error('Inventario inválido');
-    inventory = next;
+    const migrated = next.version === 1 ? migrateInventory(next) : next;
+    if (inventoryError(migrated)) throw new Error('Inventario inválido');
+    inventory = migrated;
     inventorySnapshot = raw;
     inventoryReadError = false;
     return true;
@@ -58,60 +117,187 @@ function resetStockProductForm() {
   stockProductForm.elements.stockId.value = '';
   stockProductForm.elements.initialStock.disabled = false;
   stockProductForm.elements.stockUnit.disabled = false;
+  stockProductForm.elements.unitCost.setCustomValidity('');
+  stockProductForm.elements.salePrice.setCustomValidity('');
+  stockMovementForm.elements.stockQuantity.setCustomValidity('');
   document.getElementById('saveStockProduct').textContent = 'Agregar producto';
   document.getElementById('cancelStockProduct').hidden = true;
+  updateStockProductCostPreview();
+  updateProductFields();
+}
+
+function updateProductFields() {
+  const fields = stockProductForm.elements;
+  const sale = fields.saleEnabled.checked;
+  const stock = fields.stockEnabled.checked;
+  document.getElementById('salePriceField').hidden = !sale;
+  document.getElementById('stockProductFields').hidden = !stock;
+  fields.salePrice.disabled = !sale;
+  [...document.querySelectorAll('#stockProductFields input, #stockProductFields select')].forEach((field) => { field.disabled = !stock || (field.name === 'packageSize' && fields.packageLabel.value !== 'caja'); });
+  if (stock && inventory.products.some((product) => product.id === fields.stockId.value && product.stockEnabled)) {
+    fields.stockUnit.disabled = true;
+    fields.initialStock.disabled = true;
+  }
+  updateStockProductCostPreview();
+}
+
+function migrateInventory(state) {
+  const products = state.products.map((product) => ({ ...product, unitCost: product.unitCost ?? 0, saleEnabled: false, stockEnabled: true }));
+  for (const sale of [{ id: 'pomada', name: 'Pomada', salePrice: 12000 }, { id: 'shampoo', name: 'Shampoo', salePrice: 9000 }]) {
+    const current = products.find((product) => searchText(product.name) === searchText(sale.name));
+    // A legacy ml/g stock item cannot also be sold: automatic discounts are units only.
+    if (current?.unit === 'unidades') Object.assign(current, { saleEnabled: true, salePrice: sale.salePrice });
+    else if (!current) {
+      let id = sale.id;
+      for (let suffix = 1; products.some((product) => product.id === id); suffix++) id = `${sale.id}-venta-${suffix}`;
+      products.push({ ...sale, id, saleEnabled: true, stockEnabled: false, active: true });
+    }
+  }
+  return { version: 2, products, movements: state.movements.map((row) => ({ ...row })) };
+}
+
+function saleProduct(sale) {
+  if (!sale) return null;
+  if (sale.productId) return inventory.products.find((product) => product.id === sale.productId) || null;
+  const matches = inventory.products.filter((product) => product.name === sale.product);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function saveSaleInventory(sale, previous = null) {
+  const sourceId = sale?.id || previous?.id;
+  const current = inventory.movements.find((row) => row.source === 'sale' && row.sourceId === sourceId);
+  const product = saleProduct(sale);
+  const consumes = sale && product?.stockEnabled;
+  const base = consumes ? { id: current?.id || crypto.randomUUID(), productId: product.id, date: sale.date, time: sale.time, type: 'consumo', quantity: sale.quantity, notes: '', cancelled: false, source: 'sale', sourceId } : null;
+  const sameConsumption = current && current.productId === base?.productId && current.date === base.date && current.quantity === base.quantity;
+  const movement = base ? { ...base, ...(sameConsumption && current.cost !== undefined ? { cost: current.cost } : { cost: inventoryMovementCost(product, inventory.movements, base) }) } : current ? { ...current, cancelled: true } : null;
+  const movements = current ? inventory.movements.map((row) => row.id === current.id ? movement : row) : movement ? [...inventory.movements, movement] : inventory.movements;
+  return saveInventory({ ...inventory, movements });
 }
 
 function renderInventory() {
   const date = workday.value;
-  const active = inventory.products.filter((product) => product.active);
+  const barberFilter = document.getElementById('stockBarberFilter');
+  const selectedBarber = barberFilter.value;
+  const knownBarbers = new Map(config.barbers.map((barber) => [barber.id, barber.name]));
+  for (const row of inventory.movements) if (row.barberId && !knownBarbers.has(row.barberId)) knownBarbers.set(row.barberId, row.barberName);
+  barberFilter.innerHTML = '<option value="">Todos los barberos</option>' + [...knownBarbers].map(([id, name]) => `<option value="${escapeHtml(id)}">${escapeHtml(name)}</option>`).join('');
+  barberFilter.value = selectedBarber;
+  document.getElementById('stockBarberNote').hidden = !barberFilter.value;
+  const selectedRecorder = stockMovementForm.elements.stockBarber.value;
+  stockMovementForm.elements.stockBarber.innerHTML = '<option value="">Sin asignar</option>' + config.barbers.filter((barber) => barber.active).map((barber) => `<option value="${escapeHtml(barber.id)}">${escapeHtml(barber.name)}</option>`).join('');
+  stockMovementForm.elements.stockBarber.value = selectedRecorder;
+  const active = inventory.products.filter((product) => product.active && product.stockEnabled);
   const selected = stockMovementForm.elements.stockProduct.value;
   stockMovementForm.elements.stockProduct.innerHTML = '<option value="">Seleccionar producto</option>' + active.filter((product) => product.startDate <= date).map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)} (${escapeHtml(product.unit)})</option>`).join('');
   stockMovementForm.elements.stockProduct.value = selected;
+  updateStockMovementConversion();
   const locked = typeof dailyOperationsLocked === 'function' && dailyOperationsLocked();
   stockMovementForm.querySelector('button[type="submit"]').disabled = locked || inventoryReadError || !active.some((product) => product.startDate <= date) || !date || date > today();
   document.getElementById('saveStockProduct').disabled = locked || inventoryReadError;
-  document.getElementById('stockRows').innerHTML = active.map((product) => {
+  const missingPrices = inventory.products.filter((product) => product.active && product.stockEnabled && !inventoryUnitCost(product));
+  document.getElementById('stockPriceWarning').hidden = missingPrices.length === 0;
+  document.getElementById('stockPriceWarningText').textContent = missingPrices.length ? `${missingPrices.length} ${missingPrices.length === 1 ? 'producto no tiene' : 'productos no tienen'} costo unitario. Los valores monetarios están incompletos.` : '';
+  const products = new Map(inventory.products.map((product) => [product.id, product]));
+  const valuations = new Map(inventory.products.filter((product) => product.stockEnabled).map((product) => [product.id, inventoryValuation(product, inventory.movements, date)]));
+  const movementCost = (row) => row.cost ?? valuations.get(row.productId)?.costs.get(row.id) ?? row.quantity * inventoryUnitCost(products.get(row.productId));
+  const costs = inventoryCostSummary(inventory.products, inventory.movements, date, today());
+  if (barberFilter.value) costs.consumed = inventory.movements.filter((row) => row.date === date && row.type === 'consumo' && !row.cancelled && row.barberId === barberFilter.value).reduce((sum, row) => sum + movementCost(row), 0);
+  document.getElementById('stockConsumedValue').textContent = money.format(costs.consumed);
+  document.getElementById('stockIncomingValue').textContent = money.format(costs.incoming);
+  document.getElementById('stockCurrentValue').textContent = money.format(costs.stock);
+  const stockRows = (products) => products.map((product) => {
     const day = inventorySummary(product, inventory.movements, date);
     const current = inventorySummary(product, inventory.movements, today()).stock;
-    return `<tr><td>${escapeHtml(product.name)}<small>${escapeHtml(product.unit)}</small></td><td class="${current === 0 ? 'stock-empty-value' : 'stock-available'}">${integer.format(current)}${current === 0 ? '<small>Sin stock</small>' : ''}</td><td>${integer.format(day.incoming)}</td><td>${integer.format(day.consumed)}</td></tr>`;
+    const unitCost = inventoryUnitCost(product);
+    const valuation = valuations.get(product.id);
+    const price = unitCost ? unitMoney.format(unitCost) : '<span class="stock-missing-price">Sin precio</span>';
+    const consumed = barberFilter.value ? inventory.movements.filter((row) => row.productId === product.id && row.date === date && !row.cancelled && row.type === 'consumo' && row.barberId === barberFilter.value).reduce((sum, row) => sum + row.quantity, 0) : day.consumed;
+    return `<tr><td>${escapeHtml(product.name)}<small>${escapeHtml(product.unit)}</small></td><td>${price}<small>por ${product.unit === 'unidades' ? 'unidad' : escapeHtml(product.unit)}</small></td><td class="${current === 0 ? 'stock-empty-value' : 'stock-available'}">${integer.format(current)}<small>${escapeHtml(product.unit)}${current === 0 ? ' · Sin stock' : ''}</small></td><td>${integer.format(day.incoming)}<small>${escapeHtml(product.unit)}</small></td><td>${integer.format(consumed)}<small>${escapeHtml(product.unit)}</small></td><td>${money.format(barberFilter.value ? inventory.movements.filter((row) => row.productId === product.id && row.date === date && !row.cancelled && row.type === 'consumo' && row.barberId === barberFilter.value).reduce((sum, row) => sum + movementCost(row), 0) : valuation.consumed)}</td></tr>`;
   }).join('');
+  const saleProducts = active.filter((product) => product.saleEnabled);
+  const supplies = active.filter((product) => !product.saleEnabled);
+  document.getElementById('stockRows').innerHTML = (saleProducts.length ? '<tr class="stock-group"><th colspan="6">Productos de venta</th></tr>' + stockRows(saleProducts) : '') + (supplies.length ? '<tr class="stock-group"><th colspan="6">Insumos de barbería</th></tr>' + stockRows(supplies) : '');
   document.getElementById('stockEmpty').hidden = active.length > 0;
-  const rows = inventory.movements.filter((row) => row.date === date).slice().reverse();
-  const products = new Map(inventory.products.map((product) => [product.id, product]));
+  const rows = inventory.movements.filter((row) => row.date === date && (!barberFilter.value || row.type === 'entrada' || row.barberId === barberFilter.value)).slice().reverse();
   document.getElementById('stockMovementRows').innerHTML = rows.map((row) => {
     const product = products.get(row.productId);
-     return `<tr${row.cancelled ? ' class="stock-cancelled"' : ''}><td>${escapeHtml(row.time)}</td><td>${escapeHtml(product.name)}</td><td>${row.type === 'entrada' ? 'Ingreso' : 'Consumo'}${row.cancelled ? ' · Anulado' : ''}</td><td>${integer.format(row.quantity)} ${escapeHtml(product.unit)}</td><td>${escapeHtml(row.notes || '—')}</td><td><button class="stock-action" type="button" data-stock-toggle="${escapeHtml(row.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>${row.cancelled ? 'Restaurar' : 'Anular'}</button></td></tr>`;
+      return `<tr${row.cancelled ? ' class="stock-cancelled"' : ''}><td>${escapeHtml(row.time)}</td><td>${escapeHtml(product.name)}</td><td>${row.type === 'entrada' ? 'Reposición' : 'Consumo'}${row.source === 'sale' ? ' · Venta' : ''}${row.cancelled ? ' · Anulado' : ''}</td><td>${integer.format(row.quantity)} ${escapeHtml(product.unit)}</td><td>${escapeHtml(row.barberId ? knownBarbers.get(row.barberId) || row.barberName : 'Sin asignar')}</td><td>${escapeHtml(row.notes || '—')}</td><td>${money.format(movementCost(row))}</td><td><button class="stock-action" type="button" data-stock-toggle="${escapeHtml(row.id)}" ${inventoryReadError || locked || row.source === 'sale' ? 'disabled' : ''}>${row.source === 'sale' ? 'Desde venta' : row.cancelled ? 'Restaurar' : 'Anular'}</button></td></tr>`;
   }).join('');
   document.getElementById('stockMovementCount').textContent = String(rows.filter((row) => !row.cancelled).length);
   document.getElementById('stockMovementsEmpty').hidden = rows.length > 0;
-   document.getElementById('stockConfigList').innerHTML = inventory.products.map((product) => `<div class="config-item${product.active ? '' : ' stock-archived'}"><span>${escapeHtml(product.name)}<small>${integer.format(inventorySummary(product, inventory.movements, today()).stock)} ${escapeHtml(product.unit)}${product.active ? '' : ' · Archivado'}</small></span><span class="config-actions"><button type="button" data-stock-edit="${escapeHtml(product.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>Editar</button><button type="button" data-stock-archive="${escapeHtml(product.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>${product.active ? 'Archivar' : 'Activar'}</button></span></div>`).join('') || '<p class="stock-hint">Todavía no agregaste productos para controlar.</p>';
+   document.getElementById('stockConfigList').innerHTML = inventory.products.map((product) => {
+      const unitCost = inventoryUnitCost(product);
+      const packageDetail = product.packageSize ? ` · 1 ${escapeHtml(product.packageLabel)} = ${integer.format(product.packageSize)} ${escapeHtml(product.unit)} por ${money.format(product.packageCost)}` : '';
+      const stockDetail = product.stockEnabled ? `Stock ${integer.format(inventorySummary(product, inventory.movements, today()).stock)} ${escapeHtml(product.unit)} · ${unitCost ? `${unitMoney.format(unitCost)} por ${product.unit === 'unidades' ? 'unidad' : escapeHtml(product.unit)}` : 'Sin precio'}${packageDetail}` : '';
+      const saleDetail = product.saleEnabled ? `Precio de venta ${money.format(product.salePrice)}` : '';
+      const type = product.saleEnabled ? product.stockEnabled ? 'Venta e insumo' : 'Venta' : 'Insumo';
+      return `<div class="config-item${product.active ? '' : ' stock-archived'}"><span>${escapeHtml(product.name)}<small><strong class="stock-product-type">${type}</strong> · ${[saleDetail, stockDetail].filter(Boolean).join(' · ')}${product.active ? '' : ' · Archivado'}</small></span><span class="config-actions"><button type="button" data-stock-edit="${escapeHtml(product.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>Editar</button><button type="button" data-stock-archive="${escapeHtml(product.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>${product.active ? 'Archivar' : 'Activar'}</button></span></div>`;
+    }).join('') || '<p class="stock-hint">Todavía no agregaste productos.</p>';
   const editing = inventory.products.find((product) => product.id === stockProductForm.elements.stockId.value);
-  document.getElementById('stockInitialDate').textContent = editing ? `Stock inicial registrado el ${editing.startDate}. Para cambiar existencias, cargá un ingreso o consumo.` : `Stock inicial al ${date || 'día seleccionado'}. Cantidades enteras en la unidad elegida.`;
+  document.getElementById('stockInitialDate').textContent = editing?.stockEnabled ? `Cantidad inicial registrada el ${editing.startDate}. Los cambios se hacen con reposiciones o consumos.` : `Cantidad inicial al ${date || 'día seleccionado'}, expresada en la unidad elegida.`;
 }
 
 function initInventory() {
   loadInventory();
+  updateProductFields();
+  populateSelectors();
+  document.getElementById('loadStockDemo').addEventListener('click', () => {
+    const demo = stockDemoInventory();
+    const existingNames = new Set(inventory.products.map((product) => searchText(product.name)));
+    const existingIds = new Set(inventory.products.map((product) => product.id));
+    const products = demo.products.filter((product) => !existingNames.has(searchText(product.name)) && !existingIds.has(product.id));
+    if (!products.length) return stockMessage('Los productos de ejemplo ya están cargados. No se modificó el inventario ni las ventas.');
+    const productIds = new Set(products.map((product) => product.id));
+    const movements = [...inventory.movements, ...demo.movements.filter((row) => productIds.has(row.productId))];
+    if (!saveInventory({ ...inventory, products: [...inventory.products, ...products], movements })) return;
+    resetStockProductForm();
+    renderInventory();
+    stockMessage('Productos de ejemplo agregados. El inventario y las ventas existentes se conservaron.');
+    document.querySelector('.nav-item[data-view="summaryView"]').click();
+    document.getElementById('summaryPeriod').value = 'month';
+    updateSummaryReference();
+    renderSummary();
+  });
   stockProductForm.addEventListener('submit', (event) => {
     event.preventDefault();
+    updateStockProductCostPreview();
     if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
     if (!stockProductForm.reportValidity()) return;
     const fields = stockProductForm.elements;
     const existing = inventory.products.find((product) => product.id === fields.stockId.value);
-    if (!existing && (!workday.value || workday.value > today())) return stockMessage('Elegí una jornada de hoy o anterior para registrar el stock inicial.', true);
+    if (!existing && stockProductForm.elements.stockEnabled.checked && (!workday.value || workday.value > today())) return stockMessage('Elegí una jornada de hoy o anterior para registrar el stock inicial.', true);
     if (fields.stockId.value && !existing) return stockMessage('El producto ya no está disponible. Cancelá la edición y revisá el listado.', true);
     if (existing && stockEditingSnapshot && JSON.stringify(existing) !== stockEditingSnapshot) return stockMessage('El producto cambió en otra pestaña. Cancelá la edición y volvé a abrirlo antes de guardar.', true);
+    const saleEnabled = fields.saleEnabled.checked;
+    const stockEnabled = fields.stockEnabled.checked;
+    if (existing?.stockEnabled && !stockEnabled && inventory.movements.some((row) => row.productId === existing.id)) return stockMessage('No podés apagar stock porque tiene movimientos.', true);
+    if (existing?.saleEnabled && !saleEnabled && sales.some((sale) => sale.productId === existing.id || !sale.productId && sale.product === existing.name)) return stockMessage('No podés apagar venta porque tiene ventas.', true);
+    fields.saleEnabled.setCustomValidity(saleEnabled || stockEnabled ? '' : 'Marcá venta, stock o ambos.');
+    fields.stockUnit.setCustomValidity(saleEnabled && stockEnabled && fields.stockUnit.value !== 'unidades' ? 'El descuento automático solo está disponible para unidades; no convertimos ml ni g.' : '');
+    const packageSize = fields.packageLabel.value === 'caja' ? Number(fields.packageSize.value) : 1;
+    const packageCost = parseAmount(fields.unitCost.value);
+    const salePrice = parseAmount(fields.salePrice.value);
+    fields.unitCost.setCustomValidity(!stockEnabled || Number.isSafeInteger(packageCost) && packageCost > 0 && packageCost <= 1000000000 ? '' : 'El precio de compra debe ser mayor que cero y de hasta 1.000.000.000.');
+    fields.salePrice.setCustomValidity(!saleEnabled || Number.isSafeInteger(salePrice) && salePrice > 0 ? '' : 'El precio de venta debe ser mayor que cero.');
+    if (!stockProductForm.reportValidity()) return;
     const product = {
       id: existing?.id || crypto.randomUUID(), name: fields.stockName.value.trim(),
-      unit: existing?.unit || fields.stockUnit.value,
-      initialStock: existing?.initialStock ?? Number(fields.initialStock.value),
-      startDate: existing?.startDate || workday.value, active: existing?.active ?? true,
+      saleEnabled, stockEnabled, active: existing?.active ?? true,
+      ...(saleEnabled ? { salePrice } : {}),
+      ...(stockEnabled ? { unit: existing?.unit || fields.stockUnit.value, initialStock: existing?.initialStock ?? Number(fields.initialStock.value), ...(existing ? existing.initialUnitCost === undefined ? {} : { initialUnitCost: existing.initialUnitCost } : { initialUnitCost: packageCost / packageSize }), unitCost: packageCost / packageSize, startDate: existing?.startDate || workday.value } : {}),
     };
+    if (stockEnabled && packageSize > 1) Object.assign(product, { packageSize, packageCost, packageLabel: fields.packageLabel.value.trim() || 'presentación' });
+    const priceChanged = existing?.stockEnabled && inventoryUnitCost(existing) !== inventoryUnitCost(product);
+    const lastDate = inventory.movements.reduce((date, row) => row.productId === existing?.id && row.date > date ? row.date : date, existing?.startDate || workday.value);
+    const historicalCosts = priceChanged ? inventoryValuation(existing, inventory.movements, lastDate).costs : null;
+    const movements = priceChanged ? inventory.movements.map((row) => row.productId === existing.id && row.cost === undefined ? { ...row, ...(row.type === 'entrada' ? { unitCost: row.unitCost ?? inventoryUnitCost(existing) } : {}), cost: historicalCosts.get(row.id) ?? row.quantity * inventoryUnitCost(existing) } : row) : inventory.movements;
+    if (priceChanged) product.initialUnitCost = existing.initialUnitCost ?? inventoryUnitCost(existing);
     const products = existing ? inventory.products.map((item) => item.id === existing.id ? product : item) : [...inventory.products, product];
-    if (!saveInventory({ ...inventory, products })) return;
+    if (!saveInventory({ ...inventory, products, movements })) return;
     resetStockProductForm();
     renderInventory();
-    stockMessage(existing ? 'Producto actualizado.' : 'Producto agregado al control de stock.');
+    stockMessage(existing ? 'Producto actualizado.' : 'Producto agregado.');
   });
   document.getElementById('cancelStockProduct').addEventListener('click', () => { resetStockProductForm(); renderInventory(); });
   document.getElementById('stockConfigList').addEventListener('click', (event) => {
@@ -130,28 +316,54 @@ function initInventory() {
     stockProductForm.elements.stockId.value = product.id;
     stockEditingSnapshot = JSON.stringify(product);
     stockProductForm.elements.stockName.value = product.name;
-    stockProductForm.elements.stockUnit.value = product.unit;
+    stockProductForm.elements.saleEnabled.checked = product.saleEnabled;
+    stockProductForm.elements.stockEnabled.checked = product.stockEnabled;
+    stockProductForm.elements.salePrice.value = formatAmount(product.salePrice || '');
+    stockProductForm.elements.stockUnit.value = product.unit || 'unidades';
     stockProductForm.elements.stockUnit.disabled = true;
     stockProductForm.elements.initialStock.value = product.initialStock;
     stockProductForm.elements.initialStock.disabled = true;
-    document.getElementById('saveStockProduct').textContent = 'Guardar nombre';
+    stockProductForm.elements.packageLabel.value = product.packageLabel || 'unidad';
+    stockProductForm.elements.packageSize.value = String(product.packageSize || 1);
+    stockProductForm.elements.unitCost.value = formatAmount(product.packageCost ?? product.unitCost ?? 0);
+    document.getElementById('saveStockProduct').textContent = 'Guardar producto';
     document.getElementById('cancelStockProduct').hidden = false;
     renderInventory();
+    updateStockProductCostPreview();
+    updateProductFields();
     stockProductForm.elements.stockName.focus();
+  });
+  ['input', 'change'].forEach((type) => stockProductForm.addEventListener(type, (event) => {
+    if (['saleEnabled', 'stockEnabled'].includes(event.target.name)) updateProductFields();
+    if (['packageLabel', 'packageSize', 'unitCost', 'stockUnit'].includes(event.target.name)) updateStockProductCostPreview();
+  }));
+  stockMovementForm.addEventListener('change', updateStockMovementConversion);
+  document.getElementById('stockBarberFilter').addEventListener('change', renderInventory);
+  stockMovementForm.elements.stockQuantity.addEventListener('input', () => {
+    stockMovementForm.elements.stockQuantity.setCustomValidity('');
+    updateStockMovementConversion();
   });
   stockMovementForm.addEventListener('submit', (event) => {
     event.preventDefault();
     if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
     if (!stockMovementForm.reportValidity()) return;
     const fields = stockMovementForm.elements;
-    const product = inventory.products.find((item) => item.id === fields.stockProduct.value && item.active);
+    const product = inventory.products.find((item) => item.id === fields.stockProduct.value && item.active && item.stockEnabled);
     if (!product || !workday.value || workday.value > today()) return stockMessage('Elegí un producto activo y una jornada de hoy o anterior.', true);
-    const row = { id: crypto.randomUUID(), productId: product.id, date: workday.value, time: nowTime(), type: fields.stockType.value, quantity: Number(fields.stockQuantity.value), notes: fields.stockNotes.value.trim(), cancelled: false };
+    const barber = fields.stockType.value === 'consumo' && fields.stockBarber.value ? config.barbers.find((item) => item.id === fields.stockBarber.value && item.active) : null;
+    if (fields.stockType.value === 'consumo' && fields.stockBarber.value && !barber) return stockMessage('Elegí un barbero activo o dejá el consumo sin asignar.', true);
+    const enteredQuantity = Number(fields.stockQuantity.value);
+    const quantity = fields.stockType.value === 'entrada' ? enteredQuantity * Number(product.packageSize || 1) : enteredQuantity;
+    fields.stockQuantity.setCustomValidity(Number.isSafeInteger(quantity) && quantity <= 1000000000 ? '' : 'La cantidad convertida no puede superar 1.000.000.000 de unidades.');
+    if (!stockMovementForm.reportValidity()) return;
+    const row = { id: crypto.randomUUID(), productId: product.id, date: workday.value, time: nowTime(), type: fields.stockType.value, quantity, notes: fields.stockNotes.value.trim(), cancelled: false, ...(barber ? { barberId: barber.id, barberName: barber.name } : {}) };
+    row.cost = row.type === 'entrada' ? quantity * inventoryUnitCost(product) : inventoryMovementCost(product, inventory.movements, row);
+    if (row.type === 'entrada') row.unitCost = inventoryUnitCost(product);
     if (!saveInventory({ ...inventory, movements: [...inventory.movements, row] })) return;
     fields.stockQuantity.value = '1';
     fields.stockNotes.value = '';
     renderInventory();
-    stockMessage(`${row.type === 'entrada' ? 'Ingreso' : 'Consumo'} registrado: ${integer.format(row.quantity)} ${product.unit} de ${product.name}.`);
+    stockMessage(`${row.type === 'entrada' ? 'Reposición registrada' : 'Consumo registrado'}: ${integer.format(row.quantity)} ${product.unit} de ${product.name}${row.type === 'entrada' && product.packageSize ? ` (${integer.format(enteredQuantity)} ${product.packageLabel})` : ''}.`);
   });
   document.getElementById('stockMovementRows').addEventListener('click', (event) => {
     if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
@@ -159,6 +371,7 @@ function initInventory() {
     if (!button) return;
     const row = inventory.movements.find((item) => item.id === button.dataset.stockToggle);
     if (!row) return;
+    if (row.source === 'sale') return stockMessage('Los consumos creados por ventas se ajustan desde la venta.', true);
     const movements = inventory.movements.map((item) => item.id === row.id ? { ...item, cancelled: !item.cancelled } : item);
     if (!saveInventory({ ...inventory, movements })) return;
     renderInventory();

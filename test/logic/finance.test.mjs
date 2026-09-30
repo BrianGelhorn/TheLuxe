@@ -74,6 +74,39 @@ test('FIN-026 - Las ventas usan el total guardado sin multiplicarlo por cantidad
   assert.equal(logic.salePaymentTotal(sales, 'Mercado Pago'), 700);
 });
 
+test('FIN-087 - El acuerdo descuenta adelantos una vez y asigna comisión antes que propina', () => {
+  const settlement = loadLogic().barberSettlement(
+    [{ amount: 1000, tip: 300, commissionRate: 50 }],
+    [{ payment: 'Efectivo', amount: 200 }, { payment: 'Mercado Pago', amount: 400 }],
+    { status: 'Mixto', cashAmount: 150, mpAmount: 200 },
+  );
+  assert.deepEqual({ ...settlement }, {
+    commission: 500, tips: 300, gross: 800, advance: 600, advanceExcess: 0, due: 200,
+    paidCash: 150, paidMp: 200, commissionPaid: 500, commissionPaidCash: 200, commissionPaidMp: 300,
+  });
+});
+
+test('FIN-089 - Adelanto excedente compara contra comisión y propinas juntas', () => {
+  const settlement = loadLogic().barberSettlement([{ amount: 1000, tip: 100, commissionRate: 50 }], [{ payment: 'Efectivo', amount: 650 }], { status: 'No pago' });
+  assert.equal(settlement.due, 0);
+  assert.equal(settlement.advanceExcess, 50);
+});
+
+test('FIN-090 - El acuerdo sin tasa guardada conserva el fallback de comisión cero', () => {
+  const settlement = loadLogic().barberSettlement([{ amount: 1000, tip: 50, date: '2026-09-03' }]);
+  assert.equal(settlement.commission, 0);
+  assert.equal(settlement.due, 50);
+});
+
+test('FIN-088 - El pago simple entrega solo el saldo y no usa importes mixtos retenidos', () => {
+  const settlement = loadLogic().barberSettlement(
+    [{ amount: 1000, tip: 100, commissionRate: 50 }],
+    [{ payment: 'Efectivo', amount: 200 }],
+    { status: 'Mercado Pago', cashAmount: 999, mpAmount: 999 },
+  );
+  assert.deepEqual([settlement.gross, settlement.due, settlement.paidCash, settlement.paidMp, settlement.commissionPaid], [600, 400, 0, 400, 500]);
+});
+
 test('FIN-086 - Las ventas mixtas distribuyen el total entre ambos medios', () => {
   const logic = loadLogic();
   const sales = [{ payment: 'Ambos', total: 1800, cashAmount: '700', mpAmount: '1100' }];

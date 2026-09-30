@@ -8,21 +8,36 @@ import { fileURLToPath } from 'node:url';
 execFileSync(process.execPath, ['build.mjs'], { cwd: fileURLToPath(root) });
 const worker = (await import(new URL('dist/server/index.js', root))).default;
 
-test('HTTP-011 - Vercel publica solo los archivos de la web desde la carpeta generada', () => {
-  const { outputDirectory, buildCommand, framework } = JSON.parse(read('vercel.json'));
-  assert.equal(buildCommand, 'npm run build');
-  assert.equal(framework, null);
-  const files = ['index.html', 'styles.css', ...scripts];
+test('HTTP-011 - Docker publica solo archivos web y escucha en la PC', () => {
+  const outputDirectory = 'dist/client';
+  assert.match(read('Dockerfile'), /COPY --from=build \/app\/dist\/client\/ \/usr\/share\/nginx\/html\//);
+  assert.match(read('compose.yaml'), /127\.0\.0\.1:8000:8000/);
+  const files = ['index.html', 'styles.css', 'version.json', ...scripts];
   assert.deepEqual(readdirSync(new URL(`${outputDirectory}/`, root)).sort(), files.sort());
-  for (const file of files) assert.equal(read(`${outputDirectory}/${file}`), read(file));
+  for (const file of files.filter((item) => !['index.html', 'version.json'].includes(item))) assert.equal(read(`${outputDirectory}/${file}`), read(file));
+  const { version, commit } = JSON.parse(read(`${outputDirectory}/version.json`));
+  assert.match(version, /^[a-f0-9]{64}$/);
+  assert.equal(commit, process.env.SOURCE_COMMIT || null);
+  assert.equal(read(`${outputDirectory}/index.html`), read('index.html')
+    .replace(/((?:href|src)=")(styles\.css|logic\.js|inventory\.js|script\.js|reports\.js|dialogs\.js)(?:\?[^\"]*)?"/g, (_, prefix, file) => `${prefix}${file}?v=${version}"`)
+    .replace('</head>', `  <meta name="theluxe-build" content="${version}">\n</head>`));
+  assert.match(read('nginx.conf'), /location = \/version\.json \{[\s\S]*?Cache-Control "no-store, max-age=0"/);
 });
 
 test('HTTP-001 - El build sirve el HTML actual y no una copia vieja', async () => {
   const response = await worker.fetch(new Request('http://local/'));
   assert.equal(response.status, 200);
-  assert.equal(await response.text(), read('index.html'));
+  assert.equal(await response.text(), read('dist/client/index.html'));
   assert.match(response.headers.get('Content-Type'), /text\/html/);
   assert.equal(response.headers.get('Cache-Control'), 'no-cache');
+});
+
+test('HTTP-012 - La versión desplegada no queda cacheada', async () => {
+  const response = await worker.fetch(new Request('http://local/version.json?t=123'));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.deepEqual(JSON.parse(await response.text()), JSON.parse(read('dist/client/version.json')));
+  assert.equal((await worker.fetch(new Request('http://local/version.json', { method: 'HEAD' }))).headers.get('Cache-Control'), 'no-store');
 });
 
 for (const [index, file] of ['styles.css', ...scripts].entries()) {

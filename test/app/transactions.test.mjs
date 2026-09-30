@@ -260,7 +260,7 @@ test('TXN-018 - El producto y los inputs recalculan cantidad por precio', (t) =>
   const app = createApp(t);
   app.click('#addSale');
   assert.equal(app.element('saleForm').elements.quantity.value, '1');
-  app.setForm('saleForm', { product: 'Pomada' });
+  app.setForm('saleForm', { product: 'pomada' });
   app.emit('#saleProduct', 'change');
   assert.equal(app.element('saleForm').elements.unitPrice.value, '12.000');
   assert.equal(app.element('saleTotalPreview').textContent, app.money(12000));
@@ -277,9 +277,9 @@ test('TXN-018 - El producto y los inputs recalculan cantidad por precio', (t) =>
 test('TXN-019 - La venta en efectivo suma el total y cuenta una operacion', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  app.submit('saleForm', { product: 'Pomada', quantity: '3', unitPrice: '1.250', notes: 'Tres unidades' });
+  app.submit('saleForm', { product: 'pomada', quantity: '3', unitPrice: '1.250', notes: 'Tres unidades' });
   assert.deepEqual(app.snapshot('sales.map(({ id, ...sale }) => sale)'), [{
-    time: '12:00', product: 'Pomada', quantity: 3, unitPrice: 1250, payment: 'Efectivo',
+    time: '12:00', productId: 'pomada', product: 'Pomada', quantity: 3, unitPrice: 1250, payment: 'Efectivo',
     notes: 'Tres unidades', total: 3750, date: '2026-09-03',
   }]);
   assert.equal(app.element('saleDialog').open, false);
@@ -295,7 +295,7 @@ test('TXN-019 - La venta en efectivo suma el total y cuenta una operacion', (t) 
 test('TXN-020 - La venta por MP suma cantidad por precio solo a MP', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  app.submit('saleForm', { product: 'Shampoo', quantity: '2', unitPrice: '900', payment: 'Mercado Pago' });
+  app.submit('saleForm', { product: 'shampoo', quantity: '2', unitPrice: '900', payment: 'Mercado Pago' });
   balances(app, 0, 1800);
   assert.equal(app.run('sales[0].total'), 1800);
   assert.equal(app.element('salesCashTotal').textContent, app.money(0));
@@ -306,11 +306,11 @@ test('TXN-020 - La venta por MP suma cantidad por precio solo a MP', (t) => {
 test('TXN-051 - La venta mixta guarda ambos importes y actualiza caja y detalle', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  app.setForm('saleForm', { product: 'Shampoo', quantity: '2', unitPrice: '900', payment: 'Ambos', cashAmount: '700', mpAmount: '1100' });
+  app.setForm('saleForm', { product: 'shampoo', quantity: '2', unitPrice: '900', payment: 'Ambos', cashAmount: '700', mpAmount: '1100' });
   app.emit('#salePayment', 'change');
   app.submit('saleForm');
   assert.deepEqual(app.snapshot('sales[0]'), {
-    id: 'test-id-1', time: '12:00', product: 'Shampoo', quantity: 2, unitPrice: 900,
+    id: 'test-id-1', time: '12:00', productId: 'shampoo', product: 'Shampoo', quantity: 2, unitPrice: 900,
     payment: 'Ambos', cashAmount: 700, mpAmount: 1100, total: 1800, date: '2026-09-03', notes: '',
   });
   balances(app, 700, 1100);
@@ -322,7 +322,7 @@ test('TXN-051 - La venta mixta guarda ambos importes y actualiza caja y detalle'
 test('TXN-052 - Una suma mixta de venta incorrecta se rechaza y se puede corregir', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  app.setForm('saleForm', { product: 'Pomada', quantity: '1', unitPrice: '1000', payment: 'Ambos', cashAmount: '400', mpAmount: '500' });
+  app.setForm('saleForm', { product: 'pomada', quantity: '1', unitPrice: '1000', payment: 'Ambos', cashAmount: '400', mpAmount: '500' });
   app.emit('#salePayment', 'change');
   app.submit('saleForm');
   assert.equal(app.run('sales.length'), 0);
@@ -346,7 +346,7 @@ test('TXN-021 - Editar venta revierte el total anterior y conserva su identidad'
   app.submit('saleForm', { payment: 'Mercado Pago', notes: 'Cuatro' });
   assert.equal(app.run('sales.length'), 2);
   assert.deepEqual(app.snapshot('sales.find(({ id }) => id === "s1")'), {
-    id: 's1', date: '2026-09-03', time: '10:00', product: 'Pomada', quantity: 4,
+    id: 's1', date: '2026-09-03', time: '10:00', productId: 'pomada', product: 'Pomada', quantity: 4,
     unitPrice: 750, total: 3000, payment: 'Mercado Pago', notes: 'Cuatro',
   });
   balances(app, 2350, 7900);
@@ -369,7 +369,7 @@ test('TXN-022 - Cancelar la eliminacion de venta conserva su total', (t) => {
 test('TXN-023 - Eliminar venta resta todas las unidades vendidas', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  app.submit('saleForm', { product: 'Pomada', quantity: '3', unitPrice: '1250', payment: 'Mercado Pago' });
+  app.submit('saleForm', { product: 'pomada', quantity: '3', unitPrice: '1250', payment: 'Mercado Pago' });
   balances(app, 0, 3750);
   app.click('[data-sale]');
   app.click('#deleteSale');
@@ -386,7 +386,7 @@ test('TXN-024 - Cerrar alta y edicion de venta no guarda el borrador', (t) => {
   app.financialFixture();
   const before = app.snapshot('sales');
   app.click('#addSale');
-  app.setForm('saleForm', { product: 'Pomada', unitPrice: '999', quantity: '9' });
+  app.setForm('saleForm', { product: 'pomada', unitPrice: '999', quantity: '9' });
   app.click('#closeSaleDialog');
   app.click('[data-sale="s1"]');
   app.click('#editSale');
@@ -403,7 +403,7 @@ test('TXN-024 - Cerrar alta y edicion de venta no guarda el borrador', (t) => {
 test('TXN-025 - La cantidad de venta vacia es invalida por required', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  assert.equal(app.submit('saleForm', { product: 'Pomada', unitPrice: '100', quantity: '' }), false);
+  assert.equal(app.submit('saleForm', { product: 'pomada', unitPrice: '100', quantity: '' }), false);
   assert.equal(app.element('saleForm').elements.quantity.validity.valueMissing, true);
   assert.equal(app.run('sales.length'), 0);
 });
@@ -411,7 +411,7 @@ test('TXN-025 - La cantidad de venta vacia es invalida por required', (t) => {
 test('TXN-026 - La cantidad cero de venta es invalida por minimo', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  assert.equal(app.submit('saleForm', { product: 'Pomada', unitPrice: '100', quantity: '0' }), false);
+  assert.equal(app.submit('saleForm', { product: 'pomada', unitPrice: '100', quantity: '0' }), false);
   assert.equal(app.element('saleForm').elements.quantity.validity.rangeUnderflow, true);
   assert.equal(app.run('sales.length'), 0);
 });
@@ -419,7 +419,7 @@ test('TXN-026 - La cantidad cero de venta es invalida por minimo', (t) => {
 test('TXN-027 - La cantidad negativa de venta no llega al handler', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  assert.equal(app.submit('saleForm', { product: 'Pomada', unitPrice: '100', quantity: '-2' }), false);
+  assert.equal(app.submit('saleForm', { product: 'pomada', unitPrice: '100', quantity: '-2' }), false);
   assert.equal(app.element('saleForm').elements.quantity.validity.rangeUnderflow, true);
   assert.equal(app.run('sales.length'), 0);
 });
@@ -427,7 +427,7 @@ test('TXN-027 - La cantidad negativa de venta no llega al handler', (t) => {
 test('TXN-028 - La cantidad fraccionaria de venta es invalida por paso', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  assert.equal(app.submit('saleForm', { product: 'Pomada', unitPrice: '100', quantity: '1.5' }), false);
+  assert.equal(app.submit('saleForm', { product: 'pomada', unitPrice: '100', quantity: '1.5' }), false);
   assert.equal(app.element('saleForm').elements.quantity.validity.stepMismatch, true);
   assert.equal(app.run('sales.length'), 0);
 });
@@ -435,7 +435,7 @@ test('TXN-028 - La cantidad fraccionaria de venta es invalida por paso', (t) => 
 test('TXN-029 - La venta exige hora producto precio y medio nativos', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  const valid = { time: '11:00', product: 'Pomada', unitPrice: '100', payment: 'Efectivo' };
+  const valid = { time: '11:00', product: 'pomada', unitPrice: '100', payment: 'Efectivo' };
   for (const name of Object.keys(valid)) {
     app.setForm('saleForm', { ...valid, [name]: '' });
     assert.equal(app.submit('saleForm'), false, name);
@@ -447,13 +447,46 @@ test('TXN-029 - La venta exige hora producto precio y medio nativos', (t) => {
 test('TXN-030 - El precio cero de venta se rechaza y un peso es valido', (t) => {
   const app = createApp(t);
   app.click('#addSale');
-  app.submit('saleForm', { product: 'Pomada', unitPrice: '0', quantity: '2' });
+  app.submit('saleForm', { product: 'pomada', unitPrice: '0', quantity: '2' });
   assert.equal(app.run('sales.length'), 0);
   assert.equal(app.element('saleForm').elements.unitPrice.validity.customError, true);
   app.input('#saleForm [name="unitPrice"]', '1');
   assert.equal(app.element('saleForm').elements.unitPrice.validity.customError, false);
   app.submit('saleForm');
   balances(app, 2, 0);
+});
+
+test('TXN-054 - Una venta con stock descuenta, edita y revierte por productId', (t) => {
+  const app = createApp(t);
+  app.seed({ inventory: { version: 2, products: [{ id: 'gel', name: 'Gel', saleEnabled: true, stockEnabled: true, salePrice: 1000, unit: 'unidades', initialStock: 5, unitCost: 400, startDate: '2026-09-01', active: true }], movements: [] } });
+  app.render();
+  app.click('#addSale');
+  app.setForm('saleForm', { product: 'gel', quantity: '2' });
+  app.emit('#saleProduct', 'change');
+  assert.equal(app.element('saleForm').elements.unitPrice.value, '1.000');
+  app.submit('saleForm');
+  assert.deepEqual(app.snapshot('inventory.movements.map(({ productId, quantity, source, sourceId, cancelled }) => ({ productId, quantity, source, sourceId, cancelled }))'), [{ productId: 'gel', quantity: 2, source: 'sale', sourceId: 'test-id-1', cancelled: false }]);
+  app.click('[data-sale]');
+  app.click('#editSale');
+  app.submit('saleForm', { quantity: '3' });
+  assert.deepEqual(app.snapshot('inventory.movements.map(({ quantity, cancelled }) => ({ quantity, cancelled }))'), [{ quantity: 3, cancelled: false }]);
+  app.click('[data-sale]');
+  app.click('#deleteSale');
+  assert.deepEqual(app.snapshot('inventory.movements.map(({ quantity, cancelled }) => ({ quantity, cancelled }))'), [{ quantity: 3, cancelled: true }]);
+});
+
+test('TXN-055 - Un conflicto de inventario conserva la venta y el borrador', (t) => {
+  const app = createApp(t);
+  app.seed({ sales: [{ id: 's1', date: '2026-09-03', time: '10:00', product: 'Pomada', quantity: 1, unitPrice: 500, payment: 'Efectivo', total: 500 }] });
+  app.render();
+  app.click('[data-sale="s1"]');
+  app.click('#editSale');
+  app.input('#saleForm [name="quantity"]', '2');
+  app.window.localStorage.setItem('theluxe-inventory-v1', JSON.stringify(app.snapshot('inventory')));
+  app.submit('saleForm');
+  assert.deepEqual(app.snapshot('sales'), [{ id: 's1', date: '2026-09-03', time: '10:00', product: 'Pomada', quantity: 1, unitPrice: 500, payment: 'Efectivo', total: 500 }]);
+  assert.equal(app.element('saleDialog').open, true);
+  assert.equal(app.element('saleForm').elements.quantity.value, '2');
 });
 
 test('TXN-031 - El adelanto en efectivo resta sin modificar ingresos ni comision', (t) => {
@@ -732,7 +765,7 @@ test('TXN-049 - Las altas usan la jornada seleccionada y no la fecha actual', (t
   app.click('[data-barber="Mateo"]');
   app.submit('cutForm', { service: 'Barba', amount: '100', tip: '10' });
   app.click('#addSale');
-  app.submit('saleForm', { product: 'Pomada', quantity: '2', unitPrice: '50', payment: 'Mercado Pago' });
+  app.submit('saleForm', { product: 'pomada', quantity: '2', unitPrice: '50', payment: 'Mercado Pago' });
   app.click('#addAdvance');
   app.submit('advanceForm', { barber: 'Mateo', amount: '20' });
   app.click('#addExpense');

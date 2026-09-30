@@ -46,6 +46,9 @@ button { color: inherit; }
 .open-days-warning { display: flex; align-items: baseline; gap: 8px; margin: -8px 0 18px; padding: 11px 14px; border: 1px solid #7d4b42; border-radius: 9px; background: #2a1715; color: #f0c0a9; font-size: .82rem; }
 .open-days-warning[hidden] { display: none; }
 .open-days-warning strong { color: #f0a29b; }
+.update-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: -8px 0 18px; padding: 12px 14px; border: 1px solid #6e5936; border-radius: 9px; background: var(--gold-soft); font-size: .82rem; }
+.update-notice[hidden] { display: none; }
+.update-notice small { flex-basis: 100%; color: var(--muted); }
 .eyebrow, .step { color: var(--gold); font-size: .72rem; font-weight: 700; letter-spacing: .18em; }
 .eyebrow { margin: 0 0 8px; }
 h1, h2 { font-family: Manrope, sans-serif; }
@@ -174,7 +177,13 @@ textarea { resize: vertical; }
 .checkbox-options input { width: auto; accent-color: var(--gold); }
 .summary-highlights { grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .summary-section-heading { margin-top: 24px; }
-.shop-summary { margin-top: 24px; border-top: 1px solid #50432d; }
+.shop-summary, .stock-report { margin-top: 24px; border-top: 1px solid #50432d; }
+.shop-expense-categories { margin-top: 24px; }
+.product-margin-report { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); }
+.product-margin-report[hidden] { display: none; }
+.product-margin-report .summary-metrics[hidden] { display: none; }
+.summary-history.barber-mode .history-expense, .summary-history.barber-mode .history-withdrawal { display: none; }
+.summary-history.shop-mode .history-advance { display: none; }
 #summaryView .daily-sheet { overflow: visible; }
 #summaryView .section-heading { margin-bottom: 16px; }
 #summaryView .metric-title { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -238,12 +247,12 @@ textarea { resize: vertical; }
 #salesView .transfer-form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 #salesView .transfer-form .primary-btn { grid-column: auto; width: auto; }
 #stockView.active { display: block; }
-#stockView > .inventory-card { display: flex; flex-direction: column; min-width: 0; height: 32rem; margin-top: 0; padding: 18px; }
+#stockView > .inventory-card { min-width: 0; margin-top: 0; padding: 18px; }
 #stockView .section-heading { flex: 0 0 auto; min-height: 64px; gap: 12px; margin-bottom: 12px; }
 #stockView .section-heading > div { min-width: 0; }
 #stockView .section-heading .compact-btn { min-width: 0; flex-shrink: 0; padding: 10px 12px; font-size: .8rem; }
 #stockView .section-heading h2 { margin: 6px 0 0; font-size: 1.12rem; }
-#stockView .movement-body { flex: 1 1 0; min-height: 0; min-width: 0; overflow-x: clip; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
+#stockView .movement-body { min-width: 0; overflow: visible; }
 #stockView .movement-body:focus-visible { outline: 1px solid var(--gold); outline-offset: -2px; }
 #stockView .inventory-card > .stock-hint { flex: 0 0 auto; margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
 #stockView .sales-table th, #stockView .sales-table td { padding: 9px 10px; }
@@ -260,7 +269,47 @@ textarea { resize: vertical; }
 .movement-history .sales-table-wrap { margin-top: 8px; }
 .movement-history td small, .stock-table td small, .stock-config-list small { display: block; margin-top: 3px; color: var(--muted); font-size: .72rem; }
 .stock-hint { display: block; margin: 0 0 12px; color: var(--muted); font-size: .76rem; line-height: 1.5; }
-.stock-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 10px; margin-bottom: 14px; }
+.stock-hint[hidden] { display: none; }
+.stock-barber-filter { width: calc((100% - 10px) / 2); margin: 12px 0 6px; }
+#stockMovementBarberField[hidden] { display: none; }
+.stock-price-warning { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid #7d4b42; border-radius: 9px; background: #2a1715; color: #f0c0a9; font-size: .78rem; }
+.stock-price-warning[hidden] { display: none; }
+.stock-price-warning .secondary-btn { flex: 0 0 auto; }
+.stock-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 2px 0 12px; }
+.stock-summary span { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--muted); font-size: .74rem; }
+.stock-summary strong { display: block; margin-top: 5px; color: var(--gold); font: 800 1.05rem Manrope, sans-serif; overflow-wrap: anywhere; }
+.stock-list-title { margin: 18px 0 6px; font: 700 .95rem Manrope, sans-serif; }
+.stock-missing-price { color: #f0a29b; font-weight: 700; }
+.stock-report-count, .stock-report-note { color: var(--muted); font-size: .76rem; line-height: 1.5; }
+.stock-report-note { display: block; margin: 10px 0 12px; }
+.stock-report-note[hidden] { display: none; }
+.stock-chart-warning { margin-top: -6px; color: var(--gold); }
+.stock-report-details { margin-top: 14px; }
+.stock-report .summary-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stock-chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 8px; }
+.stock-chart-heading h3 { margin: 0; font: 700 .95rem Manrope, sans-serif; }
+.stock-chart-direction { color: var(--muted); font-size: .72rem; }
+.stock-chart-controls { position: relative; z-index: 10; display: grid; grid-template-columns: minmax(150px, .6fr) minmax(220px, 1fr); gap: 10px; max-width: 520px; margin-bottom: 8px; }
+.stock-chart-controls .checkbox-dropdown, .stock-chart-controls select { width: 100%; }
+.stock-chart-legend { display: flex; flex-wrap: wrap; gap: 7px 14px; margin: 10px 0 6px; color: var(--text); font-size: .72rem; }
+.stock-chart-product { display: inline-flex; align-items: center; gap: 5px; }
+.stock-chart-product i { width: 9px; height: 9px; border-radius: 2px; background: var(--series-color); }
+.stock-chart-product small { color: var(--muted); font-size: .66rem; }
+.stock-chart-container { position: relative; overflow-x: auto; }
+.stock-chart-container[hidden] { display: none; }
+.stock-chart-scale { position: absolute; z-index: 1; top: 13px; bottom: 11px; left: 9px; display: flex; flex-direction: column; justify-content: space-between; width: 58px; color: var(--muted); font-size: .62rem; pointer-events: none; }
+.stock-chart { display: grid; grid-template-columns: repeat(var(--stock-chart-columns), minmax(26px, 1fr)); gap: 3px; min-width: max(100%, calc(var(--stock-chart-columns) * 30px + 76px)); height: 290px; padding: 12px 10px 10px 70px; border: 1px solid var(--line); border-radius: 10px; background: #121212; box-sizing: border-box; }
+.stock-chart-column { display: grid; grid-template-rows: minmax(0, 1fr) 22px minmax(0, 1fr); min-width: 0; height: 100%; }
+.stock-chart-bars { display: flex; justify-content: center; gap: 2px; min-height: 0; }
+.stock-chart-bars.incoming { align-items: flex-end; border-bottom: 1px solid #404040; }
+.stock-chart-bars.consumed { align-items: flex-start; }
+.stock-chart-bar { flex: 1 1 0; max-width: 14px; min-width: 2px; min-height: 0; background: var(--series-color); opacity: .9; }
+.stock-chart-bar.incoming { border-radius: 3px 3px 0 0; }
+.stock-chart-bar.consumed { border-radius: 0 0 3px 3px; }
+.stock-chart-bar.has-value { min-height: 2px; }
+.stock-chart-column > small { align-self: center; overflow: hidden; color: var(--muted); font-size: .62rem; text-align: center; text-overflow: clip; }
+.stock-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 10px; margin-bottom: 14px; }
+.stock-form > .field:nth-child(5) { grid-column: 1 / -1; }
 .stock-form .primary-btn { grid-column: 1 / -1; justify-self: end; }
 .inventory-card .section-heading { gap: 12px; flex-wrap: wrap; }
 .inventory-card .secondary-btn { padding: 8px 10px; font-size: .75rem; }
@@ -270,13 +319,26 @@ textarea { resize: vertical; }
 .stock-empty-value { color: #f0a29b; font-weight: 700; }
 .stock-cancelled { color: var(--muted); }
 .stock-action { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--text); cursor: pointer; font-size: .75rem; }
-.stock-config-card { grid-column: 1 / -1; }
-.stock-product-form { display: grid; grid-template-columns: minmax(180px, 2fr) minmax(120px, 1fr) minmax(120px, 1fr) auto auto; align-items: end; gap: 10px; margin-bottom: 10px; }
-.stock-product-form .primary-btn { grid-column: auto; min-width: 0; }
+.stock-config-card { grid-column: auto; }
+.stock-product-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-bottom: 10px; }
+.stock-product-options > span, .stock-product-fields-title { color: #c7c3bc; font-size: .84rem; font-weight: 600; }
+.stock-product-options > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+.stock-product-options label { display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); cursor: pointer; font-size: .82rem; }
+.stock-product-options input { width: auto; padding: 0; accent-color: var(--gold); }
+.stock-product-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 12px; }
+.stock-product-fields[hidden] { display: none; }
+.stock-product-fields-title { grid-column: 1 / -1; padding-top: 12px; border-top: 1px solid var(--line); }
+.stock-product-fields .stock-unit-cost-preview, .stock-product-fields .stock-hint { grid-column: 1 / -1; margin: 0; }
+.stock-group th { padding-top: 18px; color: var(--gold); text-align: left; }
+.stock-field-help { display: block; min-height: 1.2em; margin-top: 4px; color: var(--muted); font-size: .68rem; line-height: 1.3; }
+.stock-unit-cost-preview { margin: 0 0 8px; color: var(--gold); font-size: .78rem; }
+.stock-product-actions { display: flex; grid-column: 1 / -1; justify-content: flex-end; gap: 10px; min-height: 39px; }
+.stock-product-form .primary-btn { grid-column: auto; width: auto; min-width: 0; }
 .stock-product-form .secondary-btn[hidden] { display: none; }
 .stock-config-list.config-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 14px; background: transparent; }
 .stock-config-list .config-item { gap: 12px; }
 .stock-config-list .config-item > span:first-child { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.stock-config-list .stock-product-type { color: var(--gold); font-weight: 700; }
 .stock-config-list .config-actions { flex-shrink: 0; }
 .stock-archived { color: var(--muted); }
 .stock-message { margin: 10px 0; color: #88b993; font-size: .8rem; }
@@ -285,7 +347,8 @@ textarea { resize: vertical; }
 .cash-register-form { display: grid; grid-template-columns: repeat(4, 1fr) auto; align-items: end; gap: 14px; }
 .cash-register-form[hidden] { display: none; }
 .closing-card { border-color: #6e5936; }
-.closing-form { grid-template-columns: repeat(3, minmax(180px, 1fr)) auto; margin-top: 18px; }
+.closing-form { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
+.closing-form .primary-btn { grid-column: 1 / -1; justify-self: end; }
 .closing-form input[readonly] { background: var(--surface); cursor: default; }
 .closing-edit-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .closing-edit-actions[hidden] { display: none; }
@@ -311,6 +374,15 @@ textarea { resize: vertical; }
 #openingStatus.open { color: #62a976; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 .config-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.config-update { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; width: fit-content; max-width: min(100%, 30rem); margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: .74rem; }
+.config-update > span:first-child { margin-right: 4px; font-weight: 700; }
+.config-update button { width: auto; min-height: 38px; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .74rem; }
+.config-update button:hover { border-color: var(--line); background: var(--surface-2); }
+.config-update button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.config-update #configApplyUpdate { border-color: #6e5936; background: var(--gold-soft); color: var(--gold); }
+.config-update #configApplyUpdate:hover { background: #302516; }
+.config-update [hidden] { display: none; }
+#configUpdateStatus { flex-basis: 100%; line-height: 1.4; }
 .config-form { display: grid; grid-template-columns: 1fr 140px auto; gap: 10px; margin-top: 20px; }
 .config-list { display: grid; gap: 1px; margin-top: 18px; background: var(--line); }
 .config-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface-2); }
@@ -462,7 +534,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .cash-register-form { grid-template-columns: repeat(2, 1fr); }
   .closing-comparison { grid-template-columns: repeat(2, 1fr); }
   .transfer-balances { text-align: left; }
-  #salesView .transfer-form, .stock-product-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #salesView .transfer-form, .stock-product-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stock-config-list.config-list { grid-template-columns: 1fr; }
   .transfer-card .section-heading { flex-wrap: wrap; gap: 12px; }
   #salesView.active { grid-template-columns: 1fr; }
@@ -480,6 +552,9 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .summary-primary { grid-column: 1 / -1; }
   .summary-highlights > .metric { grid-column: 1 / -1; }
   .metrics.summary-metrics { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .stock-report .summary-metrics { grid-template-columns: minmax(0, 1fr); }
+  .stock-chart-controls { grid-template-columns: minmax(0, 1fr); max-width: none; }
+  .stock-chart-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
   .summary-metrics .summary-secondary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: baseline; }
   .summary-metrics .summary-secondary + .summary-secondary { border-left: 0; border-top: 1px solid var(--line); }
   .summary-secondary strong { text-align: right; }
@@ -498,10 +573,14 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .closing-comparison { grid-template-columns: 1fr 1fr; }
   .transfer-balances { gap: 8px; }
   #salesView .transfer-form, .stock-form, .stock-product-form { grid-template-columns: 1fr; }
+  .stock-product-fields { grid-template-columns: 1fr; }
+  .stock-barber-filter { width: 100%; }
   #salesView .section-heading { flex-wrap: wrap; }
   #salesView .transfer-form .primary-btn { width: 100%; }
   #stockView > .inventory-card { height: auto; min-height: 0; }
   #stockView .section-heading { flex-wrap: wrap; }
+  .stock-price-warning { align-items: stretch; flex-direction: column; }
+  .stock-summary { grid-template-columns: 1fr; }
   .movement-summary { justify-content: space-between; gap: 8px; }
   .opening-saved { align-items: stretch; flex-direction: column; gap: 12px; }
   .opening-actions { grid-column: 1; }

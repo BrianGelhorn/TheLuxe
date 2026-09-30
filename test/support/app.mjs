@@ -6,8 +6,9 @@ import { read, root, scripts, financialFixture } from './logic.mjs';
 
 // Real HTML/forms/events, without network or layout. Only browser APIs absent in
 // jsdom (modal presentation, scrolling, cloning) and nondeterminism are replaced.
-export function createApp(t, { clean = true, storage = {}, now = '2026-09-03T12:00:00' } = {}) {
-  const dom = new JSDOM(read('index.html'), { url: 'http://127.0.0.1:8000/', runScripts: 'outside-only' });
+export function createApp(t, { clean = true, storage = {}, now = '2026-09-03T12:00:00', buildVersion = '' } = {}) {
+  const html = read('index.html');
+  const dom = new JSDOM(buildVersion ? html.replace('</head>', `<meta name="theluxe-build" content="${buildVersion}"></head>`) : html, { url: 'http://127.0.0.1:8000/', runScripts: 'outside-only' });
   t?.after(() => dom.window.close());
   const { window } = dom;
   const context = dom.getInternalVMContext();

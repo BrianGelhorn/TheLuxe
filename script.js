@@ -1,6 +1,5 @@
 const defaultConfig = {
   services: [{ id: 'corte', name: 'Corte clásico', price: 15000 }, { id: 'corte-barba', name: 'Corte + barba', price: 22000 }, { id: 'barba', name: 'Barba', price: 10000 }, { id: 'diseno', name: 'Diseño', price: 18000 }],
-  products: [{ id: 'pomada', name: 'Pomada', price: 12000 }, { id: 'shampoo', name: 'Shampoo', price: 9000 }],
   barbers: ['Mateo', 'Julián', 'Nicolás', 'Tomás', 'Franco', 'Agustín', 'Lucas', 'Bruno', 'Santino'].map((name) => ({ id: name, name, active: true })),
   expenseCategories: [{ id: 'otros', name: 'Otros' }],
   commission: 50,
@@ -11,6 +10,7 @@ let config = structuredClone(defaultConfig);
 let barbers = config.barbers.filter(({ active }) => active !== false).map(({ name }) => name);
 let prices = Object.fromEntries(config.services.map(({ name, price }) => [name, price]));
 const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+const unitMoney = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const integer = new Intl.NumberFormat('es-AR');
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const nowTime = () => new Date().toTimeString().slice(0, 5);
@@ -56,12 +56,11 @@ const stockView = document.getElementById('stockView');
 const commissionDialog = document.getElementById('commissionDialog');
 const dailyCommissionForm = document.getElementById('dailyCommissionForm');
 const serviceConfigForm = document.getElementById('serviceConfigForm');
-const productConfigForm = document.getElementById('productConfigForm');
 const barberConfigForm = document.getElementById('barberConfigForm');
 const commissionForm = document.getElementById('commissionForm');
-const configDialogs = { services: document.getElementById('serviceConfigDialog'), products: document.getElementById('productConfigDialog'), barbers: document.getElementById('barberConfigDialog'), expenseCategories: document.getElementById('expenseCategoryConfigDialog') };
-const configForms = { services: serviceConfigForm, products: productConfigForm, barbers: barberConfigForm, expenseCategories: expenseCategoryConfigForm };
-const configLabels = { services: 'SERVICIO', products: 'PRODUCTO', barbers: 'BARBERO', expenseCategories: 'CATEGORÍA' };
+const configDialogs = { services: document.getElementById('serviceConfigDialog'), barbers: document.getElementById('barberConfigDialog'), expenseCategories: document.getElementById('expenseCategoryConfigDialog') };
+const configForms = { services: serviceConfigForm, barbers: barberConfigForm, expenseCategories: expenseCategoryConfigForm };
+const configLabels = { services: 'SERVICIO', barbers: 'BARBERO', expenseCategories: 'CATEGORÍA' };
 const demoCutCounts = [3, 2, 4, 1, 3, 2, 4, 2, 3];
 let entries = barbers.flatMap((barber, barberIndex) => Array.from({ length: demoCutCounts[barberIndex] }, (_, cutIndex) => {
   const service = config.services[(barberIndex + cutIndex) % config.services.length];
@@ -96,6 +95,8 @@ function dailyOperationsLocked() {
   return 'realCash' in register && 'realMp' in register && !editingClosing;
 }
 
+const closingInput = (name) => cashRegisterForm.elements[name] || cashRegisterForm.elements.namedItem(name);
+
 function applyDailyLock(opened, closed) {
   const locked = dailyOperationsLocked();
   for (const view of [dailyView, salesView, stockView]) {
@@ -115,9 +116,11 @@ function applyDailyLock(opened, closed) {
   document.getElementById('dailyLockFeedback').hidden = !locked;
   document.getElementById('salesLockFeedback').hidden = !locked;
   document.getElementById('stockLockFeedback').hidden = !locked;
-  ['realCash', 'realMp', 'withdrawal'].forEach((name) => {
-    cashRegisterForm.elements[name].disabled = closed && !editingClosing;
-    cashRegisterForm.elements[name].readOnly = closed && !editingClosing;
+  ['realCash', 'realMp', 'withdrawal', 'withdrawalMp'].forEach((name) => {
+    const input = closingInput(name);
+    if (!input) return;
+    input.disabled = closed && !editingClosing;
+    input.readOnly = closed && !editingClosing;
   });
   cashRegisterForm.querySelector('[type="submit"]').disabled = !opened;
   document.getElementById('editClosing').disabled = false;
@@ -172,12 +175,15 @@ function populateSelectors() {
   const shopMode = barberFilter.selectedOptions[0]?.dataset.scope === 'shop';
   serviceInput.innerHTML = '<option value="">Seleccionar servicio</option>' + config.services.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
   document.getElementById('summaryServiceOptions').innerHTML = config.services.map(({ name }) => `<label><input type="checkbox" value="${escapeHtml(name)}" ${allServices || selectedServices.has(name) ? 'checked' : ''}> ${escapeHtml(name)}</label>`).join('');
-  barberFilter.innerHTML = '<option value="">Todos los barberos</option><option value="__shop__" data-scope="shop">Barbería</option>' + config.barbers.map(({ name }) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  const historicalBarbers = new Map(inventory.movements.filter((row) => row.barberId && !config.barbers.some((barber) => barber.id === row.barberId)).map((row) => [row.barberId, row.barberName]));
+  barberFilter.innerHTML = '<option value="">Todos los barberos</option><option value="__shop__" data-scope="shop">Barbería</option>' + config.barbers.map(({ name }) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('') + [...historicalBarbers].map(([id, name]) => `<option value="__stock__${escapeHtml(id)}" data-stock-id="${escapeHtml(id)}">${escapeHtml(name)} (solo stock histórico)</option>`).join('');
   // Identify the local option by scope, not by a value that could be a barber name.
   const selectedIndex = [...barberFilter.options].findIndex((option) => shopMode ? option.dataset.scope === 'shop' : option.dataset.scope !== 'shop' && option.value === selectedBarber);
   barberFilter.selectedIndex = selectedIndex < 0 ? 0 : selectedIndex;
   updateServiceFilterLabel();
-  document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + config.products.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
+  const selectedProduct = saleForm.elements.product.value;
+  document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + inventory.products.filter((product) => product.active && product.saleEnabled).map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join('');
+  saleForm.elements.product.value = selectedProduct;
   advanceForm.elements.barber.innerHTML = '<option value="">Seleccionar barbero</option>' + config.barbers.filter(({ active }) => active !== false).map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
   expenseForm.elements.category.innerHTML = '<option value="">Sin categoría</option>' + config.expenseCategories.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
 }
@@ -185,7 +191,6 @@ function populateSelectors() {
 function renderConfig() {
   const list = (type, price = false) => config[type].map((item) => `<div class="config-item"><span>${escapeHtml(item.name)}${price ? ` · ${money.format(item.price)}` : ''}</span><span class="config-actions"><button type="button" data-config-edit="${type}" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="${type}" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
   document.getElementById('serviceConfigList').innerHTML = list('services', true);
-  document.getElementById('productConfigList').innerHTML = list('products', true);
   document.getElementById('expenseCategoryConfigList').innerHTML = list('expenseCategories');
   document.getElementById('barberConfigList').innerHTML = config.barbers.map((item) => `<div class="config-item" data-name="${escapeHtml(item.name)}"><span>${escapeHtml(item.name)}</span><span class="config-actions"><label class="config-active"><input type="checkbox" data-config-active="barbers" data-id="${escapeHtml(item.id)}" ${item.active !== false ? 'checked' : ''}> Activo</label><button type="button" data-config-edit="barbers" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="barbers" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
   filterBarberConfig();
@@ -203,7 +208,7 @@ function saveCatalog(type, formElement) {
   const duplicate = config[type].some((item) => item.id !== values.id && item.name.toLowerCase() === values.name.trim().toLowerCase());
   formElement.elements.name.setCustomValidity(duplicate ? 'Ya existe un elemento con ese nombre.' : '');
   if (!formElement.reportValidity()) return;
-  const priced = ['services', 'products'].includes(type);
+  const priced = type === 'services';
   const item = { id: values.id || crypto.randomUUID(), name: values.name.trim(), ...(priced ? { price: parseAmount(values.price) } : type === 'barbers' ? { active: existing?.active !== false } : {}) };
   if (priced && item.price <= 0) {
     formElement.elements.price.setCustomValidity('El precio debe ser mayor que cero.');
@@ -211,7 +216,6 @@ function saveCatalog(type, formElement) {
   }
   if (existing && existing.name !== item.name) {
     if (type === 'services') entries = entries.map((entry) => entry.service === existing?.name ? { ...entry, service: item.name } : entry);
-    if (type === 'products') sales = sales.map((sale) => sale.product === existing?.name ? { ...sale, product: item.name } : sale);
     if (type === 'barbers') {
       entries = entries.map((entry) => entry.barber === existing?.name ? { ...entry, barber: item.name } : entry);
       advances = advances.map((advance) => advance.barber === existing?.name ? { ...advance, barber: item.name } : advance);
@@ -228,7 +232,6 @@ function saveCatalog(type, formElement) {
 
 function configInUse(type, name) {
   if (type === 'services') return entries.some((entry) => entry.service === name);
-  if (type === 'products') return sales.some((sale) => sale.product === name);
   if (type === 'expenseCategories') return expenses.some((expense) => expense.category === name);
   return entries.some((entry) => entry.barber === name) || advances.some((advance) => advance.barber === name)
     || Object.keys(barberPayments).some((date) => {
@@ -241,10 +244,10 @@ function openConfigDialog(type, item = null) {
   const formElement = configForms[type];
   formElement.reset();
   formElement.elements.name.setCustomValidity('');
-  if (['services', 'products'].includes(type)) formElement.elements.price.setCustomValidity('');
+  if (type === 'services') formElement.elements.price.setCustomValidity('');
   formElement.elements.id.value = item?.id || '';
   formElement.elements.name.value = item?.name || '';
-  if (['services', 'products'].includes(type)) formElement.elements.price.value = item ? formatAmount(item.price) : '';
+  if (type === 'services') formElement.elements.price.value = item ? formatAmount(item.price) : '';
   document.getElementById(`${type === 'expenseCategories' ? 'expenseCategory' : type.slice(0, -1)}ConfigMode`).textContent = item ? `MODIFICAR ${configLabels[type]}` : `NUEVO ${configLabels[type]}`;
   configDialogs[type].showModal();
 }
@@ -273,6 +276,23 @@ function selectedOpeningAdjustments() {
   return openingAdjustments.filter((adjustment) => adjustment.date === workday.value);
 }
 
+function unpaidBarbers() {
+  return [...new Set([...selectedEntries().map((entry) => entry.barber), ...selectedAdvances().map((advance) => advance.barber)])]
+    .filter((barber) => {
+      const settlement = barberSettlement(selectedEntries().filter((entry) => entry.barber === barber), selectedAdvances().filter((advance) => advance.barber === barber), barberPaymentRecord(barber), effectiveCommission);
+      return settlement.due > settlement.paidCash + settlement.paidMp;
+    });
+}
+
+function renderClosingUnpaidWarning() {
+  const register = cashRegisters[workday.value] || {};
+  const closed = 'realCash' in register && 'realMp' in register;
+  const unpaid = !closed || editingClosing ? unpaidBarbers() : [];
+  const warning = document.getElementById('closingUnpaidWarning');
+  warning.hidden = !isDayOpen(workday.value) || unpaid.length === 0;
+  warning.textContent = unpaid.length ? `Pagos pendientes: ${unpaid.join(', ')}.` : '';
+}
+
 function barberPaymentRecord(barber, date = workday.value) {
   const record = barberPayments[date]?.[barber];
   if (!record) return { status: 'No pago', cashAmount: '', mpAmount: '' };
@@ -282,6 +302,10 @@ function barberPaymentRecord(barber, date = workday.value) {
 
 function updateBarberPaymentColumn(column, payment) {
   const state = barberPaymentState(payment, Number(column.dataset.paymentDue));
+  if (column.dataset.advanceCovered === 'true' && payment.status === 'No pago') {
+    state.isPaid = true;
+    state.label = 'Cubierto con adelantos';
+  }
   const mixed = state.mixed;
   column.classList.toggle('is-paid', state.isPaid);
   column.classList.toggle('is-payment-incomplete', mixed && !state.isPaid);
@@ -336,10 +360,8 @@ function dayBalance(type, list = selectedEntries(), daySales = selectedSales(), 
   const register = cashRegisters[workday.value] || {};
   const initial = Number(register[type === 'Efectivo' ? 'initialCash' : 'initialMp'] || 0);
   const paid = Object.keys(barberPayments[workday.value] || {}).reduce((sum, barber) => {
-    const payment = barberPaymentRecord(barber);
-    if (payment.status === 'Mixto') return sum + Number(payment[type === 'Efectivo' ? 'cashAmount' : 'mpAmount'] || 0);
-    if (payment.status !== type) return sum;
-    return sum + barberPayout(list.filter((entry) => entry.barber === barber), effectiveCommission).total;
+    const settlement = barberSettlement(list.filter((entry) => entry.barber === barber), dayAdvances.filter((advance) => advance.barber === barber), barberPaymentRecord(barber), effectiveCommission);
+    return sum + (type === 'Efectivo' ? settlement.paidCash : settlement.paidMp);
   }, 0);
   return balance(type, initial, list, daySales, dayAdvances, dayExpenses, dayTransfers) - paid;
 }
@@ -352,6 +374,7 @@ function renderAvailableBalances() {
   document.getElementById('transferCashAvailable').textContent = money.format(cash);
   document.getElementById('transferMpAvailable').textContent = money.format(mp);
   renderClosingDifferences(cash, mp);
+  renderClosingUnpaidWarning();
 }
 
 function renderClosingDifferences(cashTheoretical = dayBalance('Efectivo'), mpTheoretical = dayBalance('Mercado Pago')) {
@@ -359,6 +382,7 @@ function renderClosingDifferences(cashTheoretical = dayBalance('Efectivo'), mpTh
   const cashValue = cashRegisterForm.elements.realCash.value;
   const mpValue = cashRegisterForm.elements.realMp.value;
   const withdrawal = parseAmount(cashRegisterForm.elements.withdrawal.value);
+  const withdrawalMp = parseAmount(closingInput('withdrawalMp')?.value);
   document.getElementById('theoreticalCash').textContent = money.format(cashTheoretical);
   document.getElementById('theoreticalMp').textContent = money.format(mpTheoretical);
   document.getElementById('cashDifference').textContent = cashValue ? money.format(parseAmount(cashValue) - cashTheoretical) : '—';
@@ -367,7 +391,7 @@ function renderClosingDifferences(cashTheoretical = dayBalance('Efectivo'), mpTh
   document.getElementById('closingStatus').textContent = closed ? 'Cierre guardado' : 'Pendiente';
   document.getElementById('closingStatus').classList.toggle('closed', closed);
   document.getElementById('nextOpeningCash').textContent = `${money.format(Math.max(0, parseAmount(cashValue) - withdrawal))} efectivo`;
-  document.getElementById('nextOpeningMp').textContent = `${money.format(parseAmount(mpValue))} MP`;
+  document.getElementById('nextOpeningMp').textContent = `${money.format(Math.max(0, parseAmount(mpValue) - withdrawalMp))} MP`;
 }
 
 function toggleSplitPayment() {
@@ -433,14 +457,19 @@ function render() {
   renderInventory();
   const previousClosing = opened ? null : previousClosedRegister(workday.value);
   openingCashForm.elements.initialCash.value = 'initialCash' in register ? formatAmount(register.initialCash) : previousClosing ? formatAmount(Math.max(0, Number(previousClosing.register.realCash || 0) - Number(previousClosing.register.withdrawal || 0))) : '';
-  openingCashForm.elements.initialMp.value = 'initialMp' in register ? formatAmount(register.initialMp) : previousClosing ? formatAmount(previousClosing.register.realMp) : '';
+  openingCashForm.elements.initialMp.value = 'initialMp' in register ? formatAmount(register.initialMp) : previousClosing ? formatAmount(Math.max(0, Number(previousClosing.register.realMp || 0) - Number(previousClosing.register.withdrawalMp || 0))) : '';
   const inheritedMpHint = document.getElementById('inheritedMpHint');
   inheritedMpHint.hidden = !previousClosing;
   inheritedMpHint.textContent = previousClosing ? `Tomado del cierre de la jornada ${previousClosing.date}` : '';
-  ['realCash', 'realMp', 'withdrawal'].forEach((name) => { cashRegisterForm.elements[name].value = name in register ? formatAmount(register[name]) : name === 'withdrawal' ? '0' : ''; });
+  ['realCash', 'realMp', 'withdrawal', 'withdrawalMp'].forEach((name) => {
+    const input = closingInput(name);
+    if (!input) return;
+    input.value = name in register ? formatAmount(register[name]) : name === 'withdrawal' || name === 'withdrawalMp' ? '0' : '';
+  });
   renderClosingDifferences(cashBalance, mpBalance);
   const closed = 'realCash' in register && 'realMp' in register;
-  ['realCash', 'realMp', 'withdrawal'].forEach((name) => { cashRegisterForm.elements[name].readOnly = closed && !editingClosing; });
+  renderClosingUnpaidWarning();
+  ['realCash', 'realMp', 'withdrawal', 'withdrawalMp'].forEach((name) => { if (closingInput(name)) closingInput(name).readOnly = closed && !editingClosing; });
   cashRegisterForm.querySelector('[type="submit"]').hidden = closed && !editingClosing;
   cashRegisterForm.classList.toggle('is-editing', closed && editingClosing);
   const closingActions = document.querySelector('.closing-edit-actions');
@@ -473,8 +502,13 @@ function barberColumn(barber, list) {
   const total = cuts.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0);
   const payment = barberPaymentRecord(barber);
   const paymentStatus = payment.status;
-  const payout = barberPayout(cuts, effectiveCommission);
-  const paymentState = barberPaymentState(payment, payout.total);
+  const settlement = barberSettlement(cuts, selectedAdvances().filter((advance) => advance.barber === barber), payment, effectiveCommission);
+  const payout = { tips: settlement.tips, commission: settlement.commission, total: settlement.due };
+  const paymentState = barberPaymentState(payment, settlement.due);
+  if (settlement.gross && !settlement.due && payment.status === 'No pago') {
+    paymentState.isPaid = true;
+    paymentState.label = 'Cubierto con adelantos';
+  }
   const paymentMethods = ['No pago', 'Efectivo', 'Mercado Pago', 'Mixto'].map((method) => `<button type="button" class="payment-method-option" data-barber-payment-method="${method}" aria-pressed="${method === paymentStatus}" aria-label="${method} para ${escapeHtml(barber)}" title="${method}" ${reorderingBarbers ? 'disabled' : ''}>${method === 'Mercado Pago' ? 'MP' : method}</button>`).join('');
   const rows = cuts.length ? cuts.map((entry) => `
     <button class="barber-service" type="button" data-cut="${escapeHtml(entry.id)}">
@@ -494,7 +528,7 @@ function barberColumn(barber, list) {
       ${entry.notes ? `<small class="service-note">Nota: ${escapeHtml(entry.notes)}</small>` : ''}
     </button>`).join('') : '<div class="barber-empty">Sin cortes cargados</div>';
   return `
-    <section class="barber-column${paymentState.isPaid ? ' is-paid' : paymentState.mixed ? ' is-payment-incomplete' : ''}" data-payment-due="${payout.total}" data-payment-status="${escapeHtml(paymentStatus)}" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
+    <section class="barber-column${paymentState.isPaid ? ' is-paid' : paymentState.mixed ? ' is-payment-incomplete' : ''}" data-payment-due="${payout.total}" data-advance-covered="${Boolean(settlement.gross && !settlement.due && settlement.advance)}" data-payment-status="${escapeHtml(paymentStatus)}" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
       <header class="barber-column-header">
         <strong>${escapeHtml(barber)}</strong>
         <button class="add-cut" type="button" data-barber="${escapeHtml(barber)}" aria-label="Registrar corte para ${escapeHtml(barber)}" title="Agregar corte" ${isDayOpen(workday.value) ? '' : 'disabled'}>+</button>
@@ -505,8 +539,10 @@ function barberColumn(barber, list) {
        <div class="barber-payout-label">Resumen del barbero</div>
        <dl class="payment-breakdown">
           <div><dt>Propinas</dt><dd>${money.format(payout.tips)}</dd></div>
-          <div title="Suma de los cortes con su comisión aplicada, sin propinas"><dt>Comisión</dt><dd>${money.format(payout.commission)}</dd></div>
-          <div class="payment-amount-due" title="Comisión de los cortes más propinas; no descuenta adelantos"><dt>Total a pagar</dt><dd>${money.format(payout.total)}</dd></div>
+           <div title="Suma de los cortes con su comisión aplicada, sin propinas"><dt>Comisión</dt><dd>${money.format(payout.commission)}</dd></div>
+           ${settlement.advance ? `<div><dt>Adelantos entregados</dt><dd>−${money.format(settlement.advance)}</dd></div>` : ''}
+           ${settlement.advanceExcess ? `<div><dt>Adelanto excedente</dt><dd>${money.format(settlement.advanceExcess)}</dd></div>` : ''}
+          <div class="payment-amount-due" title="Comisión y propinas pendientes luego de adelantos ya egresados de caja"><dt>Total a pagar</dt><dd>${money.format(payout.total)}</dd></div>
         </dl>
         <details class="barber-payment-control">
           <summary class="payment-disclosure" title="Pago del día: ${escapeHtml(paymentState.label)}" ${reorderingBarbers ? 'aria-disabled="true"' : ''}>
@@ -596,6 +632,7 @@ document.getElementById('barberColumns').addEventListener('click', (event) => {
     barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: payment };
     updateBarberPaymentColumn(column, payment);
     renderAvailableBalances();
+    renderSummary();
     if (payment.status === 'Mixto') column.querySelector('[data-payment-amount]').focus({ preventScroll: true });
     return;
   }
@@ -625,6 +662,7 @@ document.getElementById('barberColumns').addEventListener('input', (event) => {
   barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: updated };
   updateBarberPaymentColumn(column, updated);
   renderAvailableBalances();
+  renderSummary();
 });
 
 function setBarberOrderMode(enabled) {
@@ -715,6 +753,8 @@ document.getElementById('summaryServiceOptions').addEventListener('change', () =
 });
 document.getElementById('summaryBarberFilter').addEventListener('change', renderSummary);
 document.getElementById('summaryPaymentFilter').addEventListener('change', renderSummary);
+document.getElementById('stockChartMode').addEventListener('change', renderSummary);
+document.getElementById('stockChartProductOptions').addEventListener('change', renderSummary);
 
 document.getElementById('addSale').addEventListener('click', () => { if (!dailyOperationsLocked()) openSaleDialog(); });
 ['click', 'keydown'].forEach((type) => document.getElementById('salesRows').addEventListener(type, (event) => {
@@ -784,11 +824,21 @@ saleForm.addEventListener('submit', (event) => {
     saleCashAmountInput.setCustomValidity('La suma debe coincidir con el importe total de la venta.');
   }
   if (!saleForm.reportValidity()) return;
-  const sale = { ...values, quantity, unitPrice, total, date: workday.value, id: editingSaleId || crypto.randomUUID() };
+  const product = inventory.products.find((item) => item.id === values.product && item.active && item.saleEnabled);
+  saleForm.elements.product.setCustomValidity(product ? '' : 'Elegí un producto disponible.');
+  if (!saleForm.reportValidity()) return;
+  const sale = { ...values, productId: product.id, product: product.name, quantity, unitPrice, total, date: workday.value, id: editingSaleId || crypto.randomUUID() };
   if (values.payment === 'Ambos') Object.assign(sale, { cashAmount, mpAmount });
   else {
     delete sale.cashAmount;
     delete sale.mpAmount;
+  }
+  const previous = sales.find((item) => item.id === editingSaleId);
+  if (!saveSaleInventory(sale, previous)) {
+    saleForm.elements.product.setCustomValidity(document.getElementById('stockMessage').textContent || 'No se pudo actualizar el stock.');
+    saleForm.reportValidity();
+    render();
+    return;
   }
   sales = editingSaleId ? sales.map((item) => item.id === editingSaleId ? sale : item) : [...sales, sale];
   saveSales();
@@ -856,25 +906,33 @@ cashRegisterForm.addEventListener('submit', (event) => {
   if ('realCash' in register && 'realMp' in register && !editingClosing) return;
   const values = Object.fromEntries(new FormData(cashRegisterForm));
   const realCash = parseAmount(values.realCash);
+  const realMp = parseAmount(values.realMp);
   const withdrawal = parseAmount(values.withdrawal);
+  const withdrawalMp = parseAmount(values.withdrawalMp);
   cashRegisterForm.elements.withdrawal.setCustomValidity(withdrawal > realCash ? 'El retiro no puede superar el efectivo real.' : '');
+  closingInput('withdrawalMp')?.setCustomValidity(withdrawalMp > realMp ? 'El retiro no puede superar el MP real.' : '');
   if (!cashRegisterForm.reportValidity()) return;
-  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), realCash, realMp: parseAmount(values.realMp), withdrawal, closedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  const unpaid = unpaidBarbers();
+  if (unpaid.length && !confirm(`Quedan pagos pendientes de ${unpaid.join(', ')}. Confirmá el cierre de todos modos.`)) return;
+  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), realCash, realMp, withdrawal, withdrawalMp, closedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   saveCashRegisters();
   for (const [date, register] of Object.entries(cashRegisters)) {
     if (register.autoOpened && register.inheritedFrom === workday.value) {
-      cashRegisters[date] = { ...register, initialCash: Math.max(0, realCash - withdrawal), initialMp: parseAmount(values.realMp), updatedAt: new Date().toISOString() };
+      cashRegisters[date] = { ...register, initialCash: Math.max(0, realCash - withdrawal), initialMp: Math.max(0, realMp - withdrawalMp), updatedAt: new Date().toISOString() };
     }
   }
   saveCashRegisters();
   editingClosing = false;
   render();
 });
-[cashRegisterForm.elements.realCash, cashRegisterForm.elements.realMp, cashRegisterForm.elements.withdrawal].forEach((input) => input.addEventListener('input', () => renderClosingDifferences()));
-document.getElementById('editClosing').addEventListener('click', () => { editingClosing = true; render(); });
+[closingInput('realCash'), closingInput('realMp'), closingInput('withdrawal'), closingInput('withdrawalMp')].filter(Boolean).forEach((input) => input.addEventListener('input', () => renderClosingDifferences()));
+document.getElementById('editClosing').addEventListener('click', () => {
+  editingClosing = true;
+  render();
+});
 document.getElementById('cancelClosingEdit').addEventListener('click', () => {
   editingClosing = false;
-  cashRegisterForm.elements.withdrawal.setCustomValidity('');
+  ['withdrawal', 'withdrawalMp'].forEach((name) => closingInput(name)?.setCustomValidity(''));
   render();
 });
 
@@ -883,8 +941,9 @@ serviceInput.addEventListener('change', (event) => {
   amountInput.setCustomValidity('');
 });
 saleForm.elements.product.addEventListener('change', (event) => {
-  const product = config.products.find(({ name }) => name === event.target.value);
-  saleForm.elements.unitPrice.value = product ? formatAmount(product.price) : '';
+  saleForm.elements.product.setCustomValidity('');
+  const product = inventory.products.find((item) => item.id === event.target.value && item.active && item.saleEnabled);
+  saleForm.elements.unitPrice.value = product ? formatAmount(product.salePrice) : '';
   saleForm.elements.unitPrice.setCustomValidity('');
   updateSaleTotal();
 });
@@ -932,7 +991,7 @@ document.getElementById('cancelOpeningEdit').addEventListener('click', () => {
 workday.addEventListener('change', () => {
   editingOpening = false;
   editingClosing = false;
-  cashRegisterForm.elements.withdrawal.setCustomValidity('');
+  ['withdrawal', 'withdrawalMp'].forEach((name) => closingInput(name)?.setCustomValidity(''));
   render();
 });
 document.getElementById('closeDialog').addEventListener('click', () => dialog.close());
@@ -955,7 +1014,15 @@ saleDetailDialog.addEventListener('click', (event) => { if (event.target === sal
 document.getElementById('editSale').addEventListener('click', () => openSaleDialog(selectedSaleId));
 document.getElementById('deleteSale').addEventListener('click', () => {
   if (!selectedSaleId || !confirm('¿Eliminar esta venta?')) return;
-  sales = sales.filter((sale) => sale.id !== selectedSaleId);
+  const sale = sales.find((item) => item.id === selectedSaleId);
+  if (!saveSaleInventory(null, sale)) {
+    const feedback = document.getElementById('saleDeleteStockError');
+    feedback.textContent = document.getElementById('stockMessage').textContent || 'No se pudo devolver el stock; la venta no se eliminó.';
+    feedback.hidden = false;
+    render();
+    return;
+  }
+  sales = sales.filter((item) => item.id !== selectedSaleId);
   saveSales();
   selectedSaleId = null;
   saleDetailDialog.close();
@@ -989,14 +1056,12 @@ document.getElementById('deleteExpense').addEventListener('click', () => {
 });
 
 serviceConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('services', serviceConfigForm); });
-[serviceConfigForm, productConfigForm, barberConfigForm].forEach((catalogForm) => {
+[serviceConfigForm, barberConfigForm].forEach((catalogForm) => {
   catalogForm.elements.name.addEventListener('input', () => catalogForm.elements.name.setCustomValidity(''));
 });
-productConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('products', productConfigForm); });
 barberConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('barbers', barberConfigForm); });
 expenseCategoryConfigForm.addEventListener('submit', (event) => { event.preventDefault(); saveCatalog('expenseCategories', expenseCategoryConfigForm); });
 document.getElementById('addServiceConfig').addEventListener('click', () => openConfigDialog('services'));
-document.getElementById('addProductConfig').addEventListener('click', () => openConfigDialog('products'));
 document.getElementById('addBarberConfig').addEventListener('click', () => openConfigDialog('barbers'));
 document.getElementById('addExpenseCategoryConfig').addEventListener('click', () => openConfigDialog('expenseCategories'));
 document.getElementById('barberConfigSearch').addEventListener('input', filterBarberConfig);
@@ -1052,3 +1117,109 @@ document.getElementById('configView').addEventListener('click', (event) => {
 initInventory();
 renderConfig();
 render();
+
+let mainUpdateAvailable = false;
+const updaterUrl = 'http://127.0.0.1:8001';
+
+async function checkForUpdates() {
+  const current = document.querySelector('meta[name="theluxe-build"]')?.content;
+  if (!/^[a-f0-9]{64}$/.test(current || '')) return 'unavailable';
+  if (typeof window.fetch !== 'function') return 'error';
+  try {
+    const response = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) return 'error';
+    const { version } = await response.json();
+    if (!/^[a-f0-9]{64}$/.test(version)) return 'error';
+    const available = version !== current;
+    document.getElementById('updateNotice').hidden = !available;
+    if (available) {
+      mainUpdateAvailable = false;
+      document.getElementById('reloadUpdate').textContent = 'Recargar';
+      document.getElementById('configApplyUpdate').textContent = 'Recargar';
+    }
+    if (!mainUpdateAvailable) document.getElementById('configApplyUpdate').hidden = !available;
+    const status = document.getElementById('configUpdateStatus');
+    if (available || !status.hidden && !mainUpdateAvailable) {
+      status.hidden = false;
+      status.textContent = available ? 'Actualización instalada. Recargá para usarla.' : 'Ya tenés la última versión publicada.';
+    }
+    return available ? 'available' : 'current';
+  } catch { return 'error'; }
+}
+
+async function updaterStatus() {
+  const response = await fetch(`${updaterUrl}/status`, { cache: 'no-store' });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'No se pudo consultar GitHub main.');
+  return result;
+}
+
+document.getElementById('checkUpdates').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const status = document.getElementById('configUpdateStatus');
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = 'Buscando actualizaciones…';
+  try {
+    const result = await checkForUpdates();
+    if (result === 'available') return;
+    if (result === 'unavailable') { status.textContent = 'Abrí la versión compilada del programa.'; return; }
+    const release = await updaterStatus();
+    if (release.busy) { status.textContent = `Actualizando: ${release.phase}.`; return; }
+    if (release.error) {
+      mainUpdateAvailable = Boolean(release.available);
+      document.getElementById('configApplyUpdate').hidden = !mainUpdateAvailable;
+      status.textContent = `La actualización falló: ${release.error}`;
+      return;
+    }
+    mainUpdateAvailable = release.available;
+    document.getElementById('configApplyUpdate').hidden = !release.available;
+    document.getElementById('configApplyUpdate').textContent = 'Actualizar';
+    status.textContent = release.available ? 'Hay una nueva versión en GitHub main.' : 'Ya tenés la última versión de GitHub main.';
+  } catch (failure) {
+    status.textContent = `No se pudo consultar GitHub. ${String(failure.message || '').slice(0, 200)} Iniciá el actualizador local o revisá la conexión.`;
+  } finally { button.disabled = false; }
+});
+
+async function applyUpdate() {
+  if (!mainUpdateAvailable) {
+    if (confirm('Al recargar se perderán las ventas y los datos financieros de esta sesión. ¿Actualizar igualmente?')) window.location.reload();
+    return;
+  }
+  if (!confirm('Se instalará main y se reiniciará Docker. Al recargar se perderán los datos financieros de esta sesión. ¿Continuar?')) return;
+  const button = document.getElementById('configApplyUpdate');
+  const status = document.getElementById('configUpdateStatus');
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = 'Instalando actualización…';
+  try {
+    const response = await fetch(`${updaterUrl}/update`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok || !result.started) throw new Error(result.error || 'No se pudo iniciar la actualización.');
+    for (let attempt = 0; attempt < 500; attempt++) {
+      await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      if (await checkForUpdates() === 'available') return;
+      const progress = await updaterStatus();
+      if (progress.busy) { status.textContent = `Actualizando: ${progress.phase}.`; continue; }
+      if (progress.error) throw new Error(progress.error);
+      if (!progress.available) {
+        mainUpdateAvailable = false;
+        button.hidden = true;
+        status.textContent = 'Actualización instalada. No hubo cambios en la aplicación.';
+        return;
+      }
+      throw new Error('Docker no está sirviendo la actualización. Intentá buscar de nuevo.');
+    }
+    throw new Error('La actualización tardó demasiado. Revisá Docker e intentá buscar de nuevo.');
+  } catch (error) {
+    status.textContent = `No se pudo actualizar: ${error.message}`;
+  } finally { button.disabled = false; }
+}
+
+document.getElementById('configApplyUpdate').addEventListener('click', () => { void applyUpdate(); });
+document.getElementById('reloadUpdate').addEventListener('click', () => { void applyUpdate(); });
+if (document.querySelector('meta[name="theluxe-build"]')) {
+  void checkForUpdates();
+  window.addEventListener('focus', () => { void checkForUpdates(); });
+  window.setInterval(() => { if (!document.hidden) void checkForUpdates(); }, 5 * 60 * 1000);
+}

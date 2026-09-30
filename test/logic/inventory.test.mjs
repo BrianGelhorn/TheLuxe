@@ -3,7 +3,7 @@ import test from 'node:test';
 import { loadLogic } from '../support/logic.mjs';
 
 const logic = loadLogic();
-const product = (changes = {}) => ({ id: 'navajas', name: 'Navajas', unit: 'unidades', initialStock: 10, startDate: '2026-09-01', active: true, ...changes });
+const product = (changes = {}) => ({ id: 'navajas', name: 'Navajas', unit: 'unidades', initialStock: 10, unitCost: 100, startDate: '2026-09-01', active: true, ...changes });
 const movement = (changes = {}) => ({ id: 'mov-1', productId: 'navajas', date: '2026-09-03', time: '10:00', type: 'entrada', quantity: 1, notes: '', cancelled: false, ...changes });
 const fixture = () => ({ version: 1, products: [product()], movements: [movement()] });
 const summary = (item, rows, date) => structuredClone(logic.inventorySummary(item, rows, date));
@@ -26,6 +26,56 @@ test('STK-002 - Acepta producto y movimiento completos', () => {
   assert.equal(logic.inventoryError(fixture()), '');
 });
 
+test('STK-187 - Responsable opcional solo en consumo manual y compatible con historial anterior', () => {
+  const state = fixture();
+  state.movements[0].type = 'consumo';
+  assert.equal(logic.inventoryError(state), '');
+  state.movements[0].barberId = 'Mateo';
+  state.movements[0].barberName = 'Mateo';
+  assert.equal(logic.inventoryError(state), '');
+  state.movements[0].type = 'entrada';
+  assert.match(logic.inventoryError(state), /movimiento/);
+  state.movements[0].type = 'consumo';
+  state.movements[0].source = 'sale';
+  state.movements[0].sourceId = 'venta-1';
+  assert.match(logic.inventoryError(state), /movimiento/);
+  delete state.movements[0].barberName;
+  assert.match(logic.inventoryError(state), /movimiento/);
+});
+
+test('STK-183 - Acepta productos anteriores sin costo unitario', () => {
+  const state = fixture();
+  delete state.products[0].unitCost;
+  assert.equal(logic.inventoryError(state), '');
+});
+
+test('STK-184 - Rechaza costos unitarios inválidos', () => {
+  for (const value of [-1, 1000000001, '100', null, NaN, Infinity]) checkField('products', 'unitCost', value, false);
+  checkField('products', 'unitCost', 0.5, true);
+});
+
+test('STK-185 - Valoriza uso ingresos y stock con costo cero compatible', () => {
+  const products = [product({ unitCost: 100 }), product({ id: 'legacy', name: 'Legacy', initialStock: 3, unitCost: undefined })];
+  const rows = [movement({ type: 'consumo', quantity: 4 }), movement({ id: 'mov-2', type: 'entrada', quantity: 2 })];
+  assert.deepEqual(structuredClone(logic.inventoryCostSummary(products, rows, '2026-09-03')), { incoming: 200, consumed: 400, stock: 800 });
+});
+
+test('STK-186 - Acepta presentación de compra y exige costo proporcional consistente', () => {
+  const packaged = product({ unitCost: 100, packageSize: 50, packageCost: 5000, packageLabel: 'caja' });
+  const state = { version: 1, products: [packaged], movements: [] };
+  assert.equal(logic.inventoryError(state), '');
+  assert.equal(logic.inventoryUnitCost(packaged), 100);
+  for (const changes of [
+    { packageSize: 1 },
+    { packageCost: 0 },
+    { packageLabel: '' },
+    { unitCost: 99 },
+  ]) assert.match(logic.inventoryError({ ...state, products: [{ ...packaged, ...changes }] }), /costo unitario/);
+  const fractional = product({ unitCost: 100 / 3, packageSize: 3, packageCost: 100, packageLabel: 'caja' });
+  assert.equal(logic.inventoryError({ version: 1, products: [fractional], movements: [] }), '');
+  assert.equal(logic.inventoryCostSummary([fractional], [movement({ type: 'consumo', quantity: 3 })], '2026-09-03').consumed, 100);
+});
+
 test('STK-003 - Rechaza estado nulo', () => {
   assert.match(logic.inventoryError(null), /formato/);
 });
@@ -39,7 +89,7 @@ test('STK-005 - Rechaza objeto sin estructura', () => {
 });
 
 test('STK-006 - Rechaza version futura sin otros errores', () => {
-  assert.match(logic.inventoryError({ ...fixture(), version: 2 }), /formato/);
+  assert.match(logic.inventoryError({ ...fixture(), version: 3 }), /formato/);
 });
 
 test('STK-007 - Rechaza version textual sin coercion', () => {
@@ -862,4 +912,30 @@ test('STK-182 - Validar y resumir no mutan productos ni orden del historial', ()
   assert.equal(logic.inventoryError(state), '');
   assert.deepEqual(summary(state.products[0], state.movements, '2026-09-03'), { stock: 9, incoming: 1, consumed: 0 });
   assert.deepEqual(state, before);
+});
+
+test('STK-188 - FIFO congela consumo, reposición y stock al cambiar precio', () => {
+  const item = product({ initialStock: 2, unitCost: 300, initialUnitCost: 100 });
+  const rows = [
+    movement({ id: 'in', date: '2026-09-02', type: 'entrada', quantity: 2, unitCost: 200, cost: 400 }),
+    movement({ id: 'out', type: 'consumo', quantity: 3, cost: 400 }),
+  ];
+  assert.deepEqual(structuredClone(logic.inventoryCostSummary([item], rows, '2026-09-03')), { incoming: 0, consumed: 400, stock: 200 });
+  item.unitCost = 999;
+  assert.deepEqual(structuredClone(logic.inventoryCostSummary([item], rows, '2026-09-03')), { incoming: 0, consumed: 400, stock: 200 });
+  const next = movement({ id: 'new', date: '2026-09-04', type: 'consumo', quantity: 1 });
+  assert.equal(logic.inventoryMovementCost(item, rows, next), 200);
+  assert.equal(logic.inventoryCostSummary([item], [...rows, { ...next, cost: 200 }], '2026-09-04').stock, 0);
+});
+
+test('STK-189 - Legacy sin snapshot sigue válido y usa el último costo conocido', () => {
+  const item = product();
+  const rows = [movement({ type: 'consumo', quantity: 10 })];
+  assert.equal(logic.inventoryError({ version: 2, products: [{ ...item, saleEnabled: false, stockEnabled: true }], movements: rows }), '');
+  assert.deepEqual(structuredClone(logic.inventoryCostSummary([item], rows, '2026-09-03')), { incoming: 0, consumed: 1000, stock: 0 });
+});
+
+test('STK-190 - Un costo inicial inválido no se usa para valorizar stock', () => {
+  const item = { ...product(), stockEnabled: true, saleEnabled: false, initialUnitCost: -1 };
+  assert.match(logic.inventoryError({ version: 2, products: [item], movements: [] }), /precios/);
 });

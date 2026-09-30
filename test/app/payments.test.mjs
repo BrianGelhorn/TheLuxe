@@ -11,12 +11,11 @@ function balances(app, cash, mp) {
   for (const id of ['mpTotal', 'theoreticalMp', 'transferMpAvailable']) assert.equal(app.element(id).textContent, app.money(mp), id);
 }
 
-test('PAY-001 - El pago mostrado suma comision y propinas sin descontar adelantos', (t) => {
+test('PAY-001 - El pago mostrado descuenta adelantos sin volver a descontarlos de caja', (t) => {
   const app = createApp(t);
   app.financialFixture();
-  assert.equal(app.query(mateo).dataset.paymentDue, '1250');
-  assert.deepEqual([...app.query(`${mateo} .payment-breakdown`).querySelectorAll('dd')].map((node) => node.textContent), [app.money(300), app.money(950), app.money(1250)]);
-  assert.match(app.query(`${mateo} .payment-amount-due`).title, /no descuenta adelantos/);
+  assert.equal(app.query(mateo).dataset.paymentDue, '950');
+  assert.deepEqual([...app.query(`${mateo} .payment-breakdown`).querySelectorAll('dd')].map((node) => node.textContent), [app.money(300), app.money(950), `−${app.money(300)}`, app.money(950)]);
   assert.equal(app.query(`${mateo} [data-payment-label]`).textContent, 'No pago');
   assert.equal(app.query(mateo).classList.contains('is-paid'), false);
   assert.equal(app.query(`${mateo} .payment-inline-split`).hidden, true);
@@ -36,7 +35,7 @@ test('PAY-002 - Un clic en efectivo descuenta el pago completo con propinas', (t
   assert.equal(app.query(`${mateo} [data-barber-payment-method="Efectivo"]`).getAttribute('aria-pressed'), 'true');
   assert.equal(app.run('barberPaymentRecord("Mateo").status'), 'Efectivo');
   assert.deepEqual(app.snapshot('({ advances, expenses, transfers })'), movements);
-  balances(app, 1600, 4900);
+  balances(app, 1900, 4900);
   assert.equal(app.element('dailyCollected').textContent, app.money(5400));
   assert.equal(app.element('dailyInvoiced').textContent, app.money(5100));
   assert.equal(app.element('dailyNet').textContent, app.money(3150));
@@ -49,7 +48,7 @@ test('PAY-003 - Un clic en MP descuenta el pago completo solo de MP', (t) => {
   app.click(`${mateo} [data-barber-payment-method="Mercado Pago"]`);
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
   assert.match(app.query(`${mateo} [data-payment-label]`).textContent, /Pagado.*MP/);
-  balances(app, 2850, 3650);
+  balances(app, 2850, 3950);
 });
 
 test('PAY-004 - Cambiar efectivo por MP libera el medio anterior sin doble descuento', (t) => {
@@ -57,9 +56,9 @@ test('PAY-004 - Cambiar efectivo por MP libera el medio anterior sin doble descu
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
   app.click(`${mateo} [data-barber-payment-method="Mercado Pago"]`);
-  balances(app, 2850, 3650);
+  balances(app, 2850, 3950);
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
-  balances(app, 1600, 4900);
+  balances(app, 1900, 4900);
   assert.equal(app.query(`${mateo} [data-barber-payment-method="Mercado Pago"]`).getAttribute('aria-pressed'), 'false');
 });
 
@@ -84,9 +83,9 @@ test('PAY-006 - Los pagos de dos barberos se descuentan de forma independiente',
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
   app.click(`${lucas} [data-barber-payment-method="Mercado Pago"]`);
-  balances(app, 1600, 3900);
+  balances(app, 1900, 4000);
   app.click(`${lucas} [data-barber-payment-method="No pago"]`);
-  balances(app, 1600, 4900);
+  balances(app, 1900, 4900);
   assert.equal(app.query(mateo).dataset.paymentStatus, 'Efectivo');
   assert.equal(app.query(lucas).dataset.paymentStatus, 'No pago');
 });
@@ -103,7 +102,7 @@ test('PAY-007 - Un mixto parcial descuenta lo ingresado aunque falte pagar', (t)
   assert.match(app.query(`${mateo} [data-payment-label]`).textContent, /Mixto.*Incompleto/);
   assert.equal(app.query(`${mateo} [data-payment-sum]`).textContent, app.money(500));
   assert.equal(app.query(`${mateo} [data-payment-balance-label]`).textContent, 'Falta pagar');
-  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(750));
+  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(450));
   balances(app, 2650, 4600);
 });
 
@@ -116,7 +115,7 @@ test('PAY-008 - Un mixto exacto marca completo y descuenta cada aporte', (t) => 
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
   assert.equal(app.query(mateo).classList.contains('is-payment-incomplete'), false);
   assert.match(app.query(`${mateo} [data-payment-label]`).textContent, /Mixto.*Completo/);
-  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(0));
+  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(300));
   balances(app, 2100, 4400);
 });
 
@@ -129,7 +128,7 @@ test('PAY-009 - Un mixto excesivo descuenta todo y muestra el excedente', (t) =>
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
   assert.equal(app.query(`${mateo} [data-payment-sum]`).textContent, app.money(1500));
   assert.match(app.query(`${mateo} [data-payment-balance-label]`).textContent, /De m.s/);
-  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(250));
+  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(550));
   balances(app, 1550, 4700);
 });
 
@@ -144,7 +143,7 @@ test('PAY-010 - Borrar importes mixtos o ingresar cero devuelve sus descuentos',
   balances(app, 2850, 4700);
   app.input(`${mateo} [data-payment-amount="mpAmount"]`, '0');
   assert.equal(app.run('barberPaymentRecord("Mateo").mpAmount'), 0);
-  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(1250));
+  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(950));
   balances(app, 2850, 4900);
 });
 
@@ -154,9 +153,9 @@ test('PAY-011 - Los medios unicos ignoran importes retenidos y mixto los recuper
   app.seed({ barberPayments: { '2026-09-03': { Mateo: { status: 'Mixto', cashAmount: 300, mpAmount: 200 } } } });
   app.render();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
-  balances(app, 1600, 4900);
+  balances(app, 1900, 4900);
   app.click(`${mateo} [data-barber-payment-method="Mercado Pago"]`);
-  balances(app, 2850, 3650);
+  balances(app, 2850, 3950);
   app.click(`${mateo} [data-barber-payment-method="Mixto"]`);
   assert.equal(app.query(`${mateo} [data-payment-amount="cashAmount"]`).value, '300');
   assert.equal(app.query(`${mateo} [data-payment-amount="mpAmount"]`).value, '200');
@@ -229,7 +228,7 @@ test('PAY-015 - Pagar actualiza diferencias sin borrar el borrador de cierre', (
   const fields = app.element('cashRegisterForm').elements;
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
   assert.deepEqual([fields.realCash.value, fields.realMp.value, fields.withdrawal.value], ['3.000', '5.000', '400']);
-  assert.equal(app.element('cashDifference').textContent, app.money(1400));
+  assert.equal(app.element('cashDifference').textContent, app.money(1100));
   assert.equal(app.element('mpDifference').textContent, app.money(100));
   app.click(`${mateo} [data-barber-payment-method="Mixto"]`);
   app.input(`${mateo} [data-payment-amount="cashAmount"]`, '300');
@@ -250,7 +249,7 @@ test('PAY-016 - Renderizar y repetir el mismo pago no duplica descuentos', (t) =
   for (let index = 0; index < 3; index++) {
     app.render();
     app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
-    balances(app, 1600, 4900);
+    balances(app, 1900, 4900);
   }
   assert.deepEqual(app.snapshot('[entries.length, advances.length, expenses.length, transfers.length]'), [3, 2, 2, 1]);
   assert.deepEqual(app.snapshot('Object.keys(barberPayments[workday.value])'), ['Mateo']);
@@ -262,10 +261,10 @@ test('PAY-017 - Un corte posterior recalcula el pago unico con su nueva propina'
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
   app.click('[data-barber="Mateo"]');
   app.submit('cutForm', { service: 'Barba', amount: '2000', tip: '100', payment: 'Efectivo' });
-  assert.equal(app.query(mateo).dataset.paymentDue, '2350');
+  assert.equal(app.query(mateo).dataset.paymentDue, '2050');
   assert.equal(app.query(mateo).dataset.paymentStatus, 'Efectivo');
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
-  balances(app, 2600, 4900);
+  balances(app, 2900, 4900);
 });
 
 test('PAY-018 - Editar un corte pagado recalcula cobro y descuento una sola vez', (t) => {
@@ -275,11 +274,11 @@ test('PAY-018 - Editar un corte pagado recalcula cobro y descuento una sola vez'
   app.click('[data-cut="a"]');
   app.click('#editCut');
   app.submit('cutForm', { amount: '2000', tip: '100' });
-  assert.equal(app.query(mateo).dataset.paymentDue, '1650');
+  assert.equal(app.query(mateo).dataset.paymentDue, '1350');
   assert.equal(app.run('entries.length'), 3);
-  balances(app, 2100, 4900);
+  balances(app, 2400, 4900);
   app.render();
-  balances(app, 2100, 4900);
+  balances(app, 2400, 4900);
 });
 
 test('PAY-019 - Eliminar un corte pagado elimina tambien su parte del pago unico', (t) => {
@@ -288,9 +287,9 @@ test('PAY-019 - Eliminar un corte pagado elimina tambien su parte del pago unico
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
   app.click('[data-cut="a"]');
   app.click('#deleteCut');
-  assert.equal(app.query(mateo).dataset.paymentDue, '550');
+  assert.equal(app.query(mateo).dataset.paymentDue, '250');
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
-  balances(app, 1100, 4900);
+  balances(app, 1400, 4900);
 });
 
 test('PAY-020 - Un nuevo corte deja mixto incompleto sin cambiar importes entregados', (t) => {
@@ -301,9 +300,9 @@ test('PAY-020 - Un nuevo corte deja mixto incompleto sin cambiar importes entreg
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
   app.click('[data-barber="Mateo"]');
   app.submit('cutForm', { service: 'Barba', amount: '2000' });
-  assert.equal(app.query(mateo).dataset.paymentDue, '2250');
+  assert.equal(app.query(mateo).dataset.paymentDue, '1950');
   assert.equal(app.query(mateo).classList.contains('is-payment-incomplete'), true);
-  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(1000));
+  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(700));
   assert.deepEqual(app.snapshot('barberPaymentRecord("Mateo")'), { status: 'Mixto', cashAmount: 750, mpAmount: 500 });
   balances(app, 4100, 4400);
 });
@@ -315,9 +314,9 @@ test('PAY-021 - Eliminar corte mantiene el mixto entregado y muestra nuevo exced
   app.render();
   app.click('[data-cut="a"]');
   app.click('#deleteCut');
-  assert.equal(app.query(mateo).dataset.paymentDue, '550');
+  assert.equal(app.query(mateo).dataset.paymentDue, '250');
   assert.equal(app.query(`${mateo} [data-payment-sum]`).textContent, app.money(1250));
-  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(700));
+  assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(1000));
   assert.match(app.query(`${mateo} [data-payment-balance-label]`).textContent, /De m.s/);
   balances(app, 900, 4400);
 });
@@ -328,9 +327,9 @@ test('PAY-022 - Cambiar comision diaria recalcula el descuento del pago completo
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
   app.click('#changeCommission');
   app.submit('dailyCommissionForm', { commission: '60' });
-  assert.equal(app.query(mateo).dataset.paymentDue, '1440');
-  assert.equal(app.query(lucas).dataset.paymentDue, '1200');
-  balances(app, 1410, 4900);
+  assert.equal(app.query(mateo).dataset.paymentDue, '1140');
+  assert.equal(app.query(lucas).dataset.paymentDue, '1100');
+  balances(app, 1710, 4900);
 });
 
 test('PAY-023 - Los estados de pago y sus descuentos quedan aislados por jornada', (t) => {
@@ -353,7 +352,7 @@ test('PAY-023 - Los estados de pago y sus descuentos quedan aislados por jornada
   app.emit('#workday', 'change');
   assert.equal(app.query(mateo).dataset.paymentStatus, 'Efectivo');
   assert.equal(app.run('barberPaymentRecord("Mateo", "2026-09-04").status'), 'Mercado Pago');
-  balances(app, 1600, 4900);
+  balances(app, 1900, 4900);
 });
 
 test('PAY-024 - Pagar un barbero sin cortes no descuenta sus adelantos otra vez', (t) => {
@@ -375,7 +374,7 @@ test('PAY-025 - Desactivar un barbero no devuelve el pago ya descontado', (t) =>
   app.click('[data-config-active="barbers"][data-id="Mateo"]');
   assert.equal(app.window.document.querySelector(mateo), null);
   assert.equal(app.run('barberPaymentRecord("Mateo").status'), 'Efectivo');
-  balances(app, 1600, 4900);
+  balances(app, 1900, 4900);
 });
 
 test('PAY-026 - Tras pagar en efectivo una transferencia no puede usar fondos entregados', (t) => {
@@ -383,33 +382,33 @@ test('PAY-026 - Tras pagar en efectivo una transferencia no puede usar fondos en
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
   const before = app.snapshot('transfers');
-  app.submit('transferForm', { from: 'Efectivo', amount: '1601' });
+  app.submit('transferForm', { from: 'Efectivo', amount: '1901' });
   assert.deepEqual(app.snapshot('transfers'), before);
   assert.match(app.element('transferForm').elements.amount.validationMessage, /saldo disponible es insuficiente/);
-  balances(app, 1600, 4900);
+  balances(app, 1900, 4900);
 });
 
 test('PAY-027 - Tras pagar en efectivo se puede transferir exactamente el remanente', (t) => {
   const app = createApp(t);
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
-  app.submit('transferForm', { from: 'Efectivo', amount: '1600' });
-  assert.equal(app.run('transfers.at(-1).amount'), 1600);
-  balances(app, 0, 6500);
+  app.submit('transferForm', { from: 'Efectivo', amount: '1900' });
+  assert.equal(app.run('transfers.at(-1).amount'), 1900);
+  balances(app, 0, 6800);
   app.render();
-  balances(app, 0, 6500);
+  balances(app, 0, 6800);
 });
 
 test('PAY-028 - Tras pagar por MP se rechaza un peso sobre el remanente', (t) => {
   const app = createApp(t);
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Mercado Pago"]`);
-  app.submit('transferForm', { from: 'Mercado Pago', amount: '3651' });
+  app.submit('transferForm', { from: 'Mercado Pago', amount: '3951' });
   assert.equal(app.run('transfers.length'), 1);
   assert.match(app.element('transferForm').elements.amount.validationMessage, /saldo disponible es insuficiente/);
-  app.input('#transferForm [name="amount"]', '3650');
+  app.input('#transferForm [name="amount"]', '3950');
   app.submit('transferForm');
-  balances(app, 6500, 0);
+  balances(app, 6800, 0);
 });
 
 test('PAY-029 - El pago unico descuenta el redondeo mostrado de la suma de cortes', (t) => {
@@ -448,7 +447,7 @@ test('PAY-031 - Guardar cierre tras pago conserva sus importes reales al volver'
   const app = createApp(t);
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
-  app.input('#cashRegisterForm [name="realCash"]', '1600');
+  app.input('#cashRegisterForm [name="realCash"]', '1900');
   app.input('#cashRegisterForm [name="realMp"]', '4900');
   app.input('#cashRegisterForm [name="withdrawal"]', '100');
   assert.equal(app.element('cashDifference').textContent, app.money(0));
@@ -457,13 +456,13 @@ test('PAY-031 - Guardar cierre tras pago conserva sus importes reales al volver'
   app.element('workday').value = '2026-09-04';
   app.emit('#workday', 'change');
   balances(app, 0, 0);
-  assert.deepEqual(['initialCash', 'initialMp'].map((name) => app.element('openingCashForm').elements.namedItem(name).value), ['1.500', '4.900']);
+  assert.deepEqual(['initialCash', 'initialMp'].map((name) => app.element('openingCashForm').elements.namedItem(name).value), ['1.800', '4.900']);
   assert.equal(app.query(mateo).dataset.paymentStatus, 'No pago');
   app.submit('openingCashForm');
-  balances(app, 1500, 4900);
+  balances(app, 1800, 4900);
   app.element('workday').value = '2026-09-03';
   app.emit('#workday', 'change');
-  assert.deepEqual(['realCash', 'realMp', 'withdrawal'].map((name) => app.element('cashRegisterForm').elements.namedItem(name).value), ['1.600', '4.900', '100']);
+  assert.deepEqual(['realCash', 'realMp', 'withdrawal'].map((name) => app.element('cashRegisterForm').elements.namedItem(name).value), ['1.900', '4.900', '100']);
   assert.equal(app.element('cashDifference').textContent, app.money(0));
-  balances(app, 1600, 4900);
+  balances(app, 1900, 4900);
 });

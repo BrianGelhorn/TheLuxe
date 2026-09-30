@@ -33,9 +33,9 @@ function shopRows(app, id, values) {
 }
 
 for (const [id, medium, invoiced, tips, commission, expenses, balance, revenue, movements] of [
-  ['RPT-020', 'Ambas', 5100, 300, 1950, 250, 2900, [[3900, 1500, 2400], [1200, 500, 700], [5100, 2000, 3100], [300, 300, 0], [5400, 2300, 3100]], [[250, 50, 200], [400, 300, 100], [500, 500, 0]]],
-  ['RPT-021', 'Efectivo', 2000, 300, 750, 50, 1200, [[1500, 1500, 0], [500, 500, 0], [2000, 2000, 0], [300, 300, 0], [2300, 2300, 0]], [[50, 50, 0], [300, 300, 0], [500, 500, 0]]],
-  ['RPT-022', 'Mercado Pago', 3100, 0, 1200, 200, 1700, [[2400, 0, 2400], [700, 0, 700], [3100, 0, 3100], [0, 0, 0], [3100, 0, 3100]], [[200, 0, 200], [100, 0, 100], [0, 0, 0]]],
+  ['RPT-020', 'Ambas', 5100, 300, 400, 250, 4450, [[3900, 1500, 2400], [1200, 500, 700], [5100, 2000, 3100], [300, 300, 0], [5400, 2300, 3100]], [[250, 50, 200], [500, 500, 0]]],
+  ['RPT-021', 'Efectivo', 2000, 300, 300, 50, 1650, [[1500, 1500, 0], [500, 500, 0], [2000, 2000, 0], [300, 300, 0], [2300, 2300, 0]], [[50, 50, 0], [500, 500, 0]]],
+  ['RPT-022', 'Mercado Pago', 3100, 0, 100, 200, 2800, [[2400, 0, 2400], [700, 0, 700], [3100, 0, 3100], [0, 0, 0], [3100, 0, 3100]], [[200, 0, 200], [0, 0, 0]]],
 ]) {
   test(`${id} - Barberia separa facturado cobrado balance y movimientos en ${medium}`, (t) => {
     const app = createApp(t);
@@ -54,7 +54,7 @@ for (const [id, medium, invoiced, tips, commission, expenses, balance, revenue, 
     assert.equal(history.cells[2].textContent, app.money(revenue[0][0]));
     assert.equal(history.cells[3].textContent, app.money(revenue[1][0]));
     assert.equal(history.cells[7].textContent, app.money(expenses));
-    assert.equal(history.cells[8].textContent, app.money(movements[2][0]));
+    assert.equal(history.cells[8].textContent, app.money(movements[1][0]));
   });
 }
 
@@ -74,7 +74,7 @@ test('RPT-023 - Cambio ida y vuelta conserva servicios y adapta el historico al 
   assert.equal(app.element('summaryRows').rows[0].cells[3].textContent, app.money(0));
   shopReport(app);
   assert.equal(app.element('summaryServiceField').hidden, true);
-  shopAmounts(app, { Invoiced: 5100, Balance: 2900 });
+  shopAmounts(app, { Invoiced: 5100, Balance: 4450 });
   assert.equal(app.element('summaryRows').rows[0].cells[2].textContent, app.money(3900));
   assert.equal(app.element('summaryRows').rows[0].cells[3].textContent, app.money(1200));
   report(app, 'month', 'Ambas', 'Mateo');
@@ -95,10 +95,10 @@ test('RPT-024 - Adelantos retiros pagos apertura y transferencias no reducen otr
   shopReport(app);
   app.run('advances.push({date:"2026-09-03",payment:"Efectivo",amount:9000}); cashRegisters[workday.value] = {withdrawal:8000,initialCash:99999,initialMp:88888}; barberPayments[workday.value] = {Mateo:"Efectivo"}; transfers.push({date:"2026-09-03",from:"Efectivo",to:"Mercado Pago",amount:7000})');
   app.run('renderSummary()');
-  shopAmounts(app, { Balance: 2900 });
-  shopRows(app, 'shopMovementRows', [[250, 50, 200], [9400, 9300, 100], [8000, 8000, 0]]);
+  shopAmounts(app, { Balance: 3800 });
+  shopRows(app, 'shopMovementRows', [[250, 50, 200], [8000, 8000, 0]]);
   app.run('expenses.push({date:"2026-09-03",payment:"Efectivo",amount:4000}); renderSummary()');
-  shopAmounts(app, { Balance: -1100, Expenses: 4250 });
+  shopAmounts(app, { Balance: -200, Expenses: 4250 });
 });
 
 test('RPT-025 - Barberia mixto dominante MP y empate asignan propina una sola vez', (t) => {
@@ -106,7 +106,7 @@ test('RPT-025 - Barberia mixto dominante MP y empate asignan propina una sola ve
   app.financialFixture();
   app.run('entries = [entries[2]]; sales = []; entries[0].cashAmount = 400; entries[0].mpAmount = 600');
   shopReport(app, 'month', 'Mercado Pago');
-  shopAmounts(app, { Invoiced: 500, Commission: 250, Balance: 50 });
+  shopAmounts(app, { Invoiced: 500, Commission: 0, Balance: 300 });
   shopRows(app, 'shopRevenueRows', [[500, 0, 500], [0, 0, 0], [500, 0, 500], [100, 0, 100], [600, 0, 600]]);
   app.run('entries[0].cashAmount = 500; entries[0].mpAmount = 500');
   shopReport(app);
@@ -121,7 +121,7 @@ test('RPT-026 - Barberia vacia limpia importes conteos y desgloses anteriores', 
   app.emit('#summaryDate', 'change');
   shopAmounts(app, { Invoiced: 0, Commission: 0, Expenses: 0, Balance: 0 });
   shopRows(app, 'shopRevenueRows', Array(5).fill([0, 0, 0]));
-  shopRows(app, 'shopMovementRows', Array(3).fill([0, 0, 0]));
+  shopRows(app, 'shopMovementRows', Array(2).fill([0, 0, 0]));
   assert.equal(app.element('shopSaleCount').textContent, '0');
   assert.equal(app.element('shopSaleQuantity').textContent, '0');
   assert.equal(app.element('summaryRows').rows.length, 0);
@@ -146,9 +146,9 @@ for (const [id, period, reference, dates] of [
     app.element('summaryDate').value = reference;
     app.emit('#summaryDate', 'change');
     if (period === 'week') { app.element('summaryWeek').value = '1'; app.emit('#summaryWeek', 'change'); }
-    shopAmounts(app, { Invoiced: 2400, Commission: 1000, Expenses: 100, Balance: 1300 });
+    shopAmounts(app, { Invoiced: 2400, Commission: 0, Expenses: 100, Balance: 2300 });
     assert.equal(app.element('shopRevenueRows').rows[3].cells[1].textContent, app.money(200));
-    shopRows(app, 'shopMovementRows', [[100, 100, 0], [60, 60, 0], [140, 140, 0]]);
+    shopRows(app, 'shopMovementRows', [[100, 100, 0], [140, 140, 0]]);
     assert.equal(app.element('shopSaleCount').textContent, '2');
     assert.equal(app.element('shopSaleQuantity').textContent, '6');
   });
@@ -180,15 +180,15 @@ test('RPT-032 - Explicaciones en ayudas enfocables conservan etiquetas y conteos
     'Servicios sin propinas', 'Ventas de productos', 'Facturado sin propinas', 'Propinas', 'Total facturado con propinas',
   ]);
   const balance = app.element('shopBalance').closest('article');
-  assert.deepEqual([...balance.querySelectorAll('.accounting-note')].map(node => node.firstChild.textContent), ['Comisiones', 'Gastos operativos']);
+  assert.deepEqual([...balance.querySelectorAll('.accounting-note')].map(node => node.firstChild.textContent), ['Comisión a barberos', 'Gastos operativos']);
   assert.doesNotMatch(balance.textContent, /propinas|generadas/i);
   assert.equal(view.querySelector('#shopTips'), null);
-  assert.deepEqual([...app.element('shopMovementRows').rows].map(row => row.cells[0].textContent), ['Gastos', 'Adelantos', 'Retiros']);
+  assert.deepEqual([...app.element('shopMovementRows').rows].map(row => row.cells[0].textContent), ['Gastos', 'Retiros']);
   const movements = app.element('shopMovementRows').closest('article');
   assert.equal(movements.querySelector('p, small, .metric-sub, .stock-hint'), null);
   assert.doesNotMatch(view.textContent, /no son gastos|no resta|respeta período|no es el balance/i);
   const tips = [...view.querySelectorAll('.info-tip')];
-  assert.equal(tips.length, 9);
+  assert.equal(tips.length, 10);
   for (const tip of tips) {
     assert.equal(tip.tagName, 'BUTTON');
     assert.equal(tip.type, 'button');
@@ -205,12 +205,12 @@ test('RPT-032 - Explicaciones en ayudas enfocables conservan etiquetas y conteos
   }
   app.element('shopScope').focus();
   assert.ok(app.element('shopScope').matches(':focus'));
-  assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Balance del local').dataset.tip, 'Facturado - comisiones - gastos.');
+  assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Balance del local').dataset.tip, 'Facturado - comisiones pagadas - gastos.');
   assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Total facturado').dataset.tip, 'Servicios + ventas.');
   assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Facturado total').dataset.tip, 'Servicios + propinas.');
-  assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Comisión').dataset.tip, 'Comisión + propinas.');
+  assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Comisión a barberos').dataset.tip, 'Comisión + propinas.');
   assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Ticket promedio').dataset.tip, 'Bruto: cobrado ÷ (servicios + ventas). Neto: (comisión + propinas) ÷ servicios.');
-  assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Movimientos').dataset.tip, 'Por medio; retiros solo efectivo.');
+  assert.equal(tips.find(tip => tip.previousElementSibling.textContent === 'Movimientos').dataset.tip, 'Por medio.');
 });
 
 test('RPT-034 - Jerarquia separa facturado resultado y movimientos sin duplicar importes', (t) => {
@@ -222,7 +222,7 @@ test('RPT-034 - Jerarquia separa facturado resultado y movimientos sin duplicar 
   }
   const movements = app.query('.summary-metrics[role="group"]');
   assert.equal(movements.getAttribute('aria-label'), 'Movimientos del período');
-  assert.deepEqual([...movements.querySelectorAll('strong')].map(node => node.id), ['summaryAdvances', 'summaryExpenses', 'summaryWithdrawals']);
+  assert.deepEqual([...movements.querySelectorAll('strong')].map(node => node.id), ['summaryAdvances']);
   const shopMovements = app.element('shopMovementRows').closest('.summary-movements');
   assert.ok(shopMovements);
   assert.equal(shopMovements.parentElement.lastElementChild, shopMovements);
@@ -234,7 +234,7 @@ test('RPT-033 - Ayuda historica conserva formula breve y boton en ambos modos', 
   for (const period of ['month', 'year', 'week']) {
     shopReport(app, period);
     const tip = app.element('summaryHistoryScope');
-    assert.equal(tip.dataset.tip, 'Balance = servicios + ventas - comisiones.');
+    assert.equal(tip.dataset.tip, 'Balance = facturado - comisiones pagadas - gastos.');
     assert.equal(tip.previousElementSibling.id, 'summaryBreakdownTitle');
     assert.equal(app.element('summaryBreakdownTitle').textContent, period === 'year' ? 'Resumen por mes' : 'Resumen por día');
     report(app, period, 'Ambas', 'Mateo');
@@ -251,7 +251,7 @@ test('RPT-031 - Render y configuracion conservan Barberia sin colision con nombr
   shopReport(app);
   app.run('render(); config.barbers.push({id:"collision",name:"__shop__",active:true}, {id:"shop-name",name:"Barbería",active:true}); saveConfig()');
   assert.equal(app.element('summaryBarberFilter').selectedOptions[0].dataset.scope, 'shop');
-  shopAmounts(app, { Invoiced: 5100, Balance: 2900 });
+  shopAmounts(app, { Invoiced: 5100, Balance: 4450 });
   for (const name of ['__shop__', 'Barbería']) {
     const option = [...app.element('summaryBarberFilter').options].find(option => !option.dataset.scope && option.value === name);
     option.selected = true;
@@ -266,9 +266,9 @@ test('RPT-031 - Render y configuracion conservan Barberia sin colision con nombr
 });
 
 for (const [id, medium, values, services, sales, balance] of [
-  ['RPT-001', 'Ambas', { InvoicedCuts: 3900, InvoicedTips: 300, Invoiced: 4200, Commission: 2250, Advances: 400, Expenses: 250, AverageTicket: 1080, InvoicedCutsCash: 1500, InvoicedCutsMp: 2400, InvoicedTipsCash: 300, InvoicedTipsMp: 0, CommissionTips: 300, CommissionAmount: 1950, AverageTicketNeto: 750 }, '3 servicios', 1200, 3150],
-  ['RPT-002', 'Efectivo', { InvoicedCuts: 1500, InvoicedTips: 300, Invoiced: 1800, Commission: 1050, Advances: 300, Expenses: 50, AverageTicket: 2300 / 3, InvoicedCutsCash: 1500, InvoicedCutsMp: 0, InvoicedTipsCash: 300, InvoicedTipsMp: 0, CommissionTips: 300, CommissionAmount: 750, AverageTicketNeto: 525 }, '2 servicios', 500, 1250],
-  ['RPT-003', 'Mercado Pago', { InvoicedCuts: 2400, InvoicedTips: 0, Invoiced: 2400, Commission: 1200, Advances: 100, Expenses: 200, AverageTicket: 1550, InvoicedCutsCash: 0, InvoicedCutsMp: 2400, InvoicedTipsCash: 0, InvoicedTipsMp: 0, CommissionTips: 0, CommissionAmount: 1200, AverageTicketNeto: 1200 }, '1 servicio', 700, 1900],
+  ['RPT-001', 'Ambas', { InvoicedCuts: 3900, InvoicedTips: 300, Invoiced: 4200, Commission: 2250, Advances: 400, Expenses: 0, AverageTicket: 1080, InvoicedCutsCash: 1500, InvoicedCutsMp: 2400, InvoicedTipsCash: 300, InvoicedTipsMp: 0, CommissionTips: 300, CommissionAmount: 1950, AverageTicketNeto: 750 }, '3 servicios', 1200, 3150],
+  ['RPT-002', 'Efectivo', { InvoicedCuts: 1500, InvoicedTips: 300, Invoiced: 1800, Commission: 1050, Advances: 300, Expenses: 0, AverageTicket: 2300 / 3, InvoicedCutsCash: 1500, InvoicedCutsMp: 0, InvoicedTipsCash: 300, InvoicedTipsMp: 0, CommissionTips: 300, CommissionAmount: 750, AverageTicketNeto: 525 }, '2 servicios', 500, 1250],
+  ['RPT-003', 'Mercado Pago', { InvoicedCuts: 2400, InvoicedTips: 0, Invoiced: 2400, Commission: 1200, Advances: 100, Expenses: 0, AverageTicket: 1550, InvoicedCutsCash: 0, InvoicedCutsMp: 2400, InvoicedTipsCash: 0, InvoicedTipsMp: 0, CommissionTips: 0, CommissionAmount: 1200, AverageTicketNeto: 1200 }, '1 servicio', 700, 1900],
 ]) {
   test(`${id} - El reporte de ${medium} suma cada concepto y su ticket promedio`, (t) => {
     const app = createApp(t);
@@ -300,7 +300,7 @@ test('RPT-004 - Filtrar barbero excluye ventas gastos y retiros sin borrar sus a
   app.financialFixture();
   app.run('cashRegisters[workday.value].withdrawal = 500');
   report(app, 'month', 'Ambas', 'Mateo');
-  amounts(app, { Commission: 1250, Advances: 300, Expenses: 0, Withdrawals: 0 });
+  amounts(app, { Commission: 1250, Advances: 300 });
   assert.equal(app.element('summaryOperationCount').textContent, '2 servicios');
   amounts(app, { Invoiced: 2200, InvoicedCuts: 1900, InvoicedTips: 300, CommissionAmount: 950, CommissionTips: 300, AverageTicket: 1100, AverageTicketNeto: 625 });
   assert.equal(app.element('summaryRows').rows[0].cells[3].textContent, app.money(0));
@@ -313,7 +313,7 @@ test('RPT-005 - Quitar todos los servicios conserva ventas gastos y adelantos', 
   report(app);
   app.run('document.querySelectorAll("#summaryServiceOptions input").forEach(input => input.checked = false)');
   app.emit('#summaryServiceOptions', 'change');
-  amounts(app, { InvoicedCuts: 0, Invoiced: 0, InvoicedTips: 0, Commission: 0, Advances: 400, Expenses: 250, AverageTicket: 600, AverageTicketNeto: 0 });
+  amounts(app, { InvoicedCuts: 0, Invoiced: 0, InvoicedTips: 0, Commission: 0, Advances: 400, AverageTicket: 600, AverageTicketNeto: 0 });
   assert.equal(app.element('summaryOperationCount').textContent, '0 servicios');
   assert.equal(app.element('summaryRows').rows[0].cells[3].textContent, app.money(1200));
   assert.equal(app.element('summaryRows').rows[0].cells[9].textContent, app.money(1200));
@@ -349,11 +349,14 @@ test('RPT-007 - Los limites mensuales incluyen ambos extremos y excluyen fechas 
 test('RPT-008 - Un retiro sin operaciones genera fila y se excluye al filtrar MP', (t) => {
   const app = createApp(t);
   app.run('cashRegisters["2026-09-02"] = {withdrawal:400}');
+  shopReport(app);
   report(app);
-  amounts(app, { Withdrawals: 400, Invoiced: 0 });
+  amounts(app, { Invoiced: 0 });
+  assert.equal(app.element('summaryRows').rows.length, 0);
+  shopReport(app);
   assert.equal(app.element('summaryRows').rows[0].cells[8].textContent, app.money(400));
   assert.equal(app.element('summaryEmpty').hidden, true);
-  report(app, 'month', 'Mercado Pago');
+  shopReport(app, 'month', 'Mercado Pago');
   assert.equal(app.element('summaryRows').rows.length, 0);
   assert.equal(app.element('summaryEmpty').hidden, false);
 });
@@ -362,14 +365,14 @@ test('RPT-009 - El reporte anual agrupa operaciones y retiros por mes', (t) => {
   const app = createApp(t);
   app.financialFixture();
   app.run('cashRegisters["2026-01-01"] = {withdrawal:100}; cashRegisters["2026-09-02"] = {withdrawal:200}; cashRegisters["2025-12-31"] = {withdrawal:999}');
-  report(app, 'year');
+  shopReport(app, 'year');
   assert.equal(app.element('summaryDate').type, 'number');
   assert.equal(app.element('summaryRows').rows.length, 2);
   assert.equal(app.element('summaryRows').rows[0].cells[8].textContent, app.money(100));
   assert.equal(app.element('summaryRows').rows[1].cells[8].textContent, app.money(200));
-  amounts(app, { Withdrawals: 300, Invoiced: 4200, AverageTicket: 1080, AverageTicketNeto: 750 });
+  amounts(app, { Invoiced: 4200, AverageTicket: 1080, AverageTicketNeto: 750 });
   assert.equal(app.element('summaryRows').rows[1].cells[3].textContent, app.money(1200));
-  assert.equal(app.element('summaryRows').rows[1].cells[9].textContent, app.money(3150));
+  assert.equal(app.element('summaryRows').rows[1].cells[9].textContent, app.money(4450));
 });
 
 test('RPT-010 - Cambiar semana actualiza rango y excluye ventas de la semana anterior', (t) => {
@@ -416,6 +419,150 @@ test('RPT-036 - La tabla de ventas desglosa efectivo y MP cuando el pago es mixt
   assert.match(payment.textContent, /MP: \$\s*1\.100/);
   assert.match(payment.querySelector('.cash-price').textContent, /Efectivo: .*700/);
   assert.match(payment.querySelector('.mp-price').textContent, /MP: .*1\.100/);
+});
+
+test('RPT-037 - Stock tiene resumen propio por período y producto', (t) => {
+  const inventory = {
+    version: 1,
+    products: [
+      { id: 'navajas', name: 'Navajas', unit: 'unidades', initialStock: 10, unitCost: 100, startDate: '2026-09-01', active: true },
+      { id: 'guantes', name: 'Guantes', unit: 'g', initialStock: 2, unitCost: 500, startDate: '2026-09-03', active: false },
+    ],
+    movements: [
+      { id: 'mov-1', productId: 'navajas', date: '2026-09-03', time: '10:00', type: 'entrada', quantity: 2, notes: '', cancelled: false },
+      { id: 'mov-2', productId: 'navajas', date: '2026-09-03', time: '11:00', type: 'consumo', quantity: 3, notes: '', cancelled: false, barberId: 'Mateo', barberName: 'Mateo' },
+      { id: 'mov-3', productId: 'guantes', date: '2026-09-03', time: '12:00', type: 'consumo', quantity: 1, notes: '', cancelled: false, barberId: 'Julián', barberName: 'Julián' },
+      { id: 'mov-4', productId: 'navajas', date: '2026-09-03', time: '13:00', type: 'consumo', quantity: 9, notes: '', cancelled: true },
+    ],
+  };
+  const app = createApp(t, { storage: { 'theluxe-inventory-v1': JSON.stringify(inventory) } });
+  app.click('[data-view="summaryView"]');
+  app.element('summaryPeriod').value = 'month';
+  app.emit('#summaryPeriod', 'change');
+  assert.equal(app.element('stockReportConsumed').textContent, app.money(800));
+  assert.equal(app.element('stockReportAverage').textContent, app.money(800 / 3));
+  assert.equal(app.element('stockReportIncoming').textContent, app.money(200));
+  assert.equal(app.element('stockReportCurrent').textContent, app.money(1400));
+  assert.equal(app.element('stockReportProductCount').textContent, '2 productos');
+  assert.equal(app.element('stockReportPriceWarning').hidden, true);
+  const rows = [...app.query('#stockReportRows').rows];
+  assert.equal(rows.length, 2);
+  assert.deepEqual([...rows[0].cells].map((cell) => cell.firstChild.textContent), ['Navajas', app.money(100), '9', '2', '3', '1', app.money(900)]);
+  assert.match(rows[1].cells[0].textContent, /Archivado/);
+  assert.equal(rows[1].cells[5].firstChild.textContent, '1');
+  assert.equal(app.element('stockReportChart').hidden, false);
+  assert.equal(app.element('stockReportChartEmpty').hidden, true);
+  assert.equal(app.query('#stockReportChart').querySelectorAll('.stock-chart').length, 1);
+  assert.equal(app.query('#stockChartLegend').querySelectorAll('.stock-chart-product').length, 2);
+  assert.notEqual(app.query('#stockChartLegend').children[0].style.getPropertyValue('--series-color'), app.query('#stockChartLegend').children[1].style.getPropertyValue('--series-color'));
+  let column = app.query('#stockReportChart [aria-label^="03/09"]');
+  assert.equal(column.getAttribute('aria-label'), `03/09: Navajas, reposiciones ${app.money(200)}, consumos ${app.money(300)}; Guantes, reposiciones ${app.money(0)}, consumos ${app.money(500)}`);
+  assert.equal(column.querySelectorAll('[data-product="navajas"].stock-chart-bar.has-value').length, 2);
+  app.element('summaryBarberFilter').value = 'Mateo';
+  app.emit('#summaryBarberFilter', 'change');
+  assert.equal(app.element('stockReportConsumed').textContent, app.money(300));
+  assert.equal(app.element('stockReportIncoming').textContent, app.money(200));
+  assert.equal(app.element('stockReportCurrent').textContent, app.money(1400));
+  assert.equal(app.element('stockReportBarberNote').hidden, false);
+  assert.match(app.query('#stockReportChart [aria-label^="03/09"]').getAttribute('aria-label'), /Guantes, reposiciones .*consumos \$\s*0/);
+  app.element('summaryBarberFilter').value = '';
+  app.emit('#summaryBarberFilter', 'change');
+  assert.equal(app.element('stockReportConsumed').textContent, app.money(800));
+  assert.equal(app.element('stockReportBarberNote').hidden, true);
+  app.element('stockChartMode').value = 'quantity';
+  app.emit('#stockChartMode', 'change');
+  column = app.query('#stockReportChart [aria-label^="03/09"]');
+  assert.equal(column.getAttribute('aria-label'), '03/09: Navajas, reposiciones 2 unidades, consumos 3 unidades; Guantes, reposiciones 0 g, consumos 1 g');
+  assert.equal(app.element('stockChartQuantityNote').hidden, false);
+  const guantes = app.query('#stockChartProductOptions input[value="guantes"]');
+  guantes.checked = false;
+  app.emit(guantes, 'change');
+  assert.equal(app.query('#stockReportChart').querySelectorAll('.stock-chart').length, 1);
+  assert.equal(app.query('#stockReportChart').querySelector('[data-product="guantes"]'), null);
+  assert.equal(app.query('#stockChartLegend').querySelectorAll('.stock-chart-product').length, 1);
+  assert.equal(app.element('stockChartQuantityNote').hidden, true);
+  assert.equal(app.query('#stockChartProductFilter summary').textContent, 'Navajas');
+});
+
+test('RPT-038 - El consumo histórico conserva su filtro aunque el barbero ya no esté configurado', (t) => {
+  const inventory = { version: 2, products: [{ id: 'navajas', name: 'Navajas', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 10, unitCost: 100, startDate: '2026-09-01', active: true }], movements: [
+    { id: 'old', productId: 'navajas', date: '2026-09-03', time: '10:00', type: 'consumo', quantity: 2, notes: '', cancelled: false, barberId: 'antiguo-id', barberName: 'Barbero anterior' },
+    { id: 'new', productId: 'navajas', date: '2026-09-03', time: '11:00', type: 'consumo', quantity: 1, notes: '', cancelled: false, barberId: 'Mateo', barberName: 'Mateo' },
+  ] };
+  const app = createApp(t, { storage: { 'theluxe-inventory-v1': JSON.stringify(inventory) } });
+  app.click('[data-view="summaryView"]');
+  app.element('summaryPeriod').value = 'month';
+  app.emit('#summaryPeriod', 'change');
+  app.element('summaryBarberFilter').value = '__stock__antiguo-id';
+  app.emit('#summaryBarberFilter', 'change');
+  assert.equal(app.element('stockReportConsumed').textContent, app.money(200));
+  assert.equal(app.element('stockReportCurrent').textContent, app.money(700));
+  assert.equal(app.element('stockReportBarberNote').hidden, false);
+  assert.match(app.query('#stockReportChart [aria-label^="03/09"]').getAttribute('aria-label'), /consumos \$\s*200/);
+});
+
+test('RPT-039 - Barbería separa retiro efectivo/MP y gastos por categoría sin afectar el balance', (t) => {
+  const app = createApp(t);
+  app.seed({
+    entries: [{ id: 'cut', date: '2026-09-03', barber: 'Mateo', payment: 'Efectivo', amount: 1000, tip: 0, commissionAmount: 500 }],
+    sales: [], advances: [], transfers: [], barberPayments: {},
+    expenses: [{ date: '2026-09-03', payment: 'Efectivo', amount: 100, category: '' }, { date: '2026-09-03', payment: 'Mercado Pago', amount: 200, category: 'Alquiler' }],
+    cashRegisters: { '2026-09-03': { opened: true, withdrawal: 300, withdrawalMp: 700 } },
+  });
+  shopReport(app);
+  shopAmounts(app, { Balance: 700, Expenses: 300, Commission: 0 });
+  shopRows(app, 'shopMovementRows', [[300, 100, 200], [1000, 300, 700]]);
+  assert.deepEqual([...app.element('shopExpenseCategoryRows').rows].map((row) => [...row.cells].map((cell) => cell.textContent)), [['Alquiler', app.money(200)], ['Sin categoría', app.money(100)]]);
+  assert.equal(app.element('summaryHistory').classList.contains('shop-mode'), true);
+  assert.ok(app.element('summaryRows').rows[0].querySelector('.history-advance'));
+  report(app, 'month', 'Ambas', 'Mateo');
+  assert.equal(app.element('summaryHistory').classList.contains('barber-mode'), true);
+  assert.ok(app.element('summaryHistory').querySelector('.history-expense'));
+});
+
+test('RPT-040 - Margen usa solo venta vinculada con costo histórico conocido', (t) => {
+  const app = createApp(t);
+  app.seed({ sales: [
+    { id: 'known', date: '2026-09-03', payment: 'Efectivo', total: 1000 },
+    { id: 'unknown', date: '2026-09-03', payment: 'Mercado Pago', total: 2000 },
+  ] });
+  app.run('inventory = { products: [], movements: [{ id: "m1", source: "sale", sourceId: "known", date: "2026-09-03", type: "consumo", quantity: 1, cost: 400, cancelled: false }, { id: "m2", source: "sale", sourceId: "unknown", date: "2026-09-03", type: "consumo", quantity: 1, cancelled: false }] }; renderSummary()');
+  shopReport(app);
+  assert.equal(app.element('productMarginReport').hidden, false);
+  assert.equal(app.element('productMarginSales').textContent, app.money(1000));
+  assert.equal(app.element('productMarginCost').textContent, app.money(400));
+  assert.equal(app.element('productMarginValue').textContent, app.money(600));
+  shopReport(app, 'month', 'Mercado Pago');
+  assert.equal(app.element('productMarginReport').hidden, false);
+  assert.equal(app.element('productMarginMetrics').hidden, true);
+  assert.match(app.element('productMarginCoverage').textContent, /0 de 1 ventas/);
+});
+
+test('RPT-041 - Un pago aumenta las comisiones pagadas sin duplicar el adelanto', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  shopReport(app);
+  assert.equal(app.element('shopCommission').textContent, app.money(400));
+  app.click('[data-barber-column="Mateo"] [data-barber-payment-method="Efectivo"]');
+  assert.equal(app.element('shopCommission').textContent, app.money(1050));
+  assert.equal(app.element('shopBalance').textContent, app.money(3800));
+});
+
+test('RPT-042 - El costo de insumos no incluye el costo de productos vendidos', (t) => {
+  const inventory = { version: 2, products: [
+    { id: 'insumo', name: 'Guantes', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 10, unitCost: 100, startDate: '2026-09-01', active: true },
+    { id: 'venta', name: 'Pomada', saleEnabled: true, salePrice: 1500, stockEnabled: true, unit: 'unidades', initialStock: 10, unitCost: 500, startDate: '2026-09-01', active: true },
+  ], movements: [
+    { id: 'i', productId: 'insumo', date: '2026-09-03', time: '10:00', type: 'consumo', quantity: 2, cost: 200, notes: '', cancelled: false, barberId: 'Mateo', barberName: 'Mateo' },
+    { id: 'v', productId: 'venta', date: '2026-09-03', time: '11:00', type: 'consumo', quantity: 1, cost: 500, notes: '', cancelled: false, source: 'sale', sourceId: 'sale-1' },
+  ] };
+  const app = createApp(t, { storage: { 'theluxe-inventory-v1': JSON.stringify(inventory) } });
+  shopReport(app);
+  assert.equal(app.element('stockReportConsumed').textContent, app.money(700));
+  assert.equal(app.element('stockSupplyCost').textContent, app.money(200));
+  report(app, 'month', 'Ambas', 'Mateo');
+  assert.equal(app.element('stockReportConsumed').textContent, app.money(200));
+  assert.equal(app.element('stockSupplyCost').textContent, app.money(200));
 });
 
 for (const [id, collection, renderer, rows, totals, field] of [
@@ -474,7 +621,7 @@ test('RPT-018 - Las tres tarjetas reutilizan el panel diario y etiquetan cada im
   assert.match(app.element('summaryAverageTicketNeto').parentElement.textContent, /^Neto/);
   assert.deepEqual([...highlights.querySelectorAll('tbody th')].map(cell => cell.textContent), ['Servicios', 'Propinas']);
   assert.equal(highlights.querySelector('.collection-sales'), null);
-  assert.deepEqual([...app.query('#summaryView .summary-metrics').querySelectorAll('article > span')].map(span => span.textContent), ['Adelantos', 'Salidas de caja', 'Retiros totales']);
+  assert.deepEqual([...app.query('#summaryView .summary-metrics').querySelectorAll('article > span')].map(span => span.textContent), ['Adelantos']);
   for (const id of ['Services', 'ServicesCash', 'ServicesMp', 'Cuts', 'CashCuts', 'MpCuts', 'Sales', 'SalesCash', 'SalesMp', 'SaleCount', 'Tips', 'Balance', 'InvoicedSales', 'InvoicedSalesCash', 'InvoicedSalesMp']) {
     assert.equal(app.query('#summaryView').querySelector(`#summary${id}`), null, `summary${id} eliminado`);
   }

@@ -47,6 +47,30 @@
     return { tips, commission, total: commission + tips };
   }
 
+  // Advances leave the register when issued; this only reduces the later payout.
+  function barberSettlement(cuts = [], advances = [], payment = {}, commissionAt = () => 0) {
+    const { commission, tips, total: gross } = barberPayout(cuts, commissionAt);
+    const advance = advances.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const due = Math.max(0, gross - advance);
+    const simple = payment.status === 'Efectivo' || payment.status === 'Mercado Pago';
+    const paidCash = simple ? (payment.status === 'Efectivo' ? due : 0) : payment.status === 'Mixto' ? Number(payment.cashAmount || 0) : 0;
+    const paidMp = simple ? (payment.status === 'Mercado Pago' ? due : 0) : payment.status === 'Mixto' ? Number(payment.mpAmount || 0) : 0;
+    let commissionRemaining = commission;
+    const allocate = (amount) => {
+      const paid = Math.min(commissionRemaining, Math.max(0, amount));
+      commissionRemaining -= paid;
+      return paid;
+    };
+    const advanceCash = advances.filter((item) => item.payment === 'Efectivo').reduce((sum, item) => sum + allocate(Number(item.amount || 0)), 0);
+    const advanceMp = advances.filter((item) => item.payment === 'Mercado Pago').reduce((sum, item) => sum + allocate(Number(item.amount || 0)), 0);
+    const commissionPaidCash = advanceCash + allocate(paidCash);
+    const commissionPaidMp = advanceMp + allocate(paidMp);
+    return {
+      commission, tips, gross, advance, advanceExcess: Math.max(0, advance - gross), due,
+      paidCash, paidMp, commissionPaid: commissionPaidCash + commissionPaidMp, commissionPaidCash, commissionPaidMp,
+    };
+  }
+
   function barberPaymentState(payment, totalDue) {
     const mixed = payment.status === 'Mixto';
     const paidAmount = Number(payment.cashAmount || 0) + Number(payment.mpAmount || 0);
@@ -154,15 +178,73 @@
     return { stock, incoming, consumed };
   }
 
+  function inventoryUnitCost(product) {
+    return Number(product?.packageSize ? product.packageCost / product.packageSize : product?.unitCost || 0);
+  }
+
+  function inventoryValuation(product, movements, date) {
+    const rows = movements.filter((row) => row.productId === product.id && !row.cancelled && row.date <= date)
+      .slice().sort((a, b) => a.date.localeCompare(b.date) || (a.type === b.type ? a.time.localeCompare(b.time) || a.id.localeCompare(b.id) : a.type === 'entrada' ? -1 : 1));
+    const lots = product.startDate <= date ? [{ quantity: product.initialStock, cost: Number(product.initialUnitCost ?? inventoryUnitCost(product)) }] : [];
+    const costs = new Map();
+    let incoming = 0;
+    let consumed = 0;
+    for (const row of rows) {
+      if (row.type === 'entrada') {
+        const cost = Number(row.unitCost ?? (row.cost === undefined ? inventoryUnitCost(product) : row.cost / row.quantity));
+        lots.push({ quantity: row.quantity, cost });
+        const value = row.cost ?? row.quantity * cost;
+        costs.set(row.id, value);
+        if (row.date === date) incoming += value;
+        continue;
+      }
+      let remaining = row.quantity;
+      let allocated = 0;
+      for (const lot of lots) {
+        const quantity = Math.min(remaining, lot.quantity);
+        allocated += quantity * lot.cost;
+        lot.quantity -= quantity;
+        remaining -= quantity;
+        if (!remaining) break;
+      }
+      const value = row.cost ?? allocated;
+      costs.set(row.id, value);
+      if (row.date === date) consumed += value;
+    }
+    return { incoming, consumed, stock: lots.reduce((sum, lot) => sum + lot.quantity * lot.cost, 0), costs };
+  }
+
+  function inventoryMovementCost(product, movements, movement) {
+    return inventoryValuation(product, [...movements.filter((row) => row.id !== movement.id), movement], movement.date).costs.get(movement.id) || 0;
+  }
+
+  function inventoryCostSummary(products, movements, date, currentDate = date) {
+    return products.reduce((total, product) => {
+      const day = inventoryValuation(product, movements, date);
+      const current = inventoryValuation(product, movements, currentDate);
+      total.incoming += day.incoming;
+      total.consumed += day.consumed;
+      total.stock += Math.max(0, current.stock);
+      return total;
+    }, { incoming: 0, consumed: 0, stock: 0 });
+  }
+
   function inventoryError(state) {
     const validText = (value, max) => typeof value === 'string' && value.trim().length > 0 && value.length <= max;
     const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
     const validQuantity = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1000000000;
-    if (!state || state.version !== 1 || !Array.isArray(state.products) || !Array.isArray(state.movements)) return 'El inventario guardado no tiene un formato válido.';
+    const validCost = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1000000000;
+    const validSnapshotCost = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+    if (!state || ![1, 2].includes(state.version) || !Array.isArray(state.products) || !Array.isArray(state.movements)) return 'El inventario guardado no tiene un formato válido.';
     const products = new Map();
     const names = new Set();
     for (const item of state.products) {
-      if (!item || !validText(item.id, 80) || products.has(item.id) || !validText(item.name, 80) || !['unidades', 'ml', 'g'].includes(item.unit) || !validQuantity(item.initialStock) || !validDate(item.startDate) || typeof item.active !== 'boolean') return 'Revisá el nombre, la unidad y el stock inicial del producto.';
+      const packaged = item && (item.packageSize !== undefined || item.packageCost !== undefined || item.packageLabel !== undefined);
+      const validPackage = !packaged || (validQuantity(item.packageSize) && item.packageSize > 1 && validQuantity(item.packageCost) && item.packageCost > 0 && validText(item.packageLabel, 40) && item.unitCost === item.packageCost / item.packageSize);
+      const v2 = state.version === 2;
+      const stock = item?.stockEnabled;
+      const sale = item?.saleEnabled;
+      if (!item || !validText(item.id, 80) || products.has(item.id) || !validText(item.name, 80) || (v2 && (typeof sale !== 'boolean' || typeof stock !== 'boolean' || (!sale && !stock))) || (stock !== false && (!['unidades', 'ml', 'g'].includes(item.unit) || !validQuantity(item.initialStock) || !validDate(item.startDate) || (v2 && !validCost(item.unitCost)) || !validPackage)) || (stock === false && (item.unit !== undefined || item.initialStock !== undefined || item.unitCost !== undefined || item.initialUnitCost !== undefined || item.startDate !== undefined || packaged)) || (item.unitCost !== undefined && !validCost(item.unitCost)) || (item.initialUnitCost !== undefined && !validCost(item.initialUnitCost)) || typeof item.active !== 'boolean' || (v2 && sale && (!validCost(item.salePrice) || item.salePrice <= 0)) || (v2 && !sale && item.salePrice !== undefined) || (v2 && sale && stock && item.unit !== 'unidades')) return v2 ? 'Revisá el nombre, las opciones de venta/stock y sus precios.' : 'Revisá el nombre, la unidad, el stock inicial del producto y su costo unitario.';
       const name = item.name.trim().normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('es');
       if (names.has(name)) return 'Ya existe un producto con ese nombre, incluso entre los archivados.';
       names.add(name);
@@ -172,7 +254,7 @@
     const changes = new Map([...products.keys()].map((id) => [id, new Map()]));
     for (const row of state.movements) {
       const product = products.get(row?.productId);
-      if (!row || !product || !validText(row.id, 80) || ids.has(row.id) || !validDate(row.date) || row.date < product.startDate || typeof row.time !== 'string' || row.time.length !== 5 || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.time) || !['entrada', 'consumo'].includes(row.type) || !validQuantity(row.quantity) || row.quantity === 0 || typeof row.cancelled !== 'boolean' || typeof row.notes !== 'string' || row.notes.length > 120) return 'Revisá el producto, la fecha y la cantidad del movimiento.';
+      if (!row || !product || !validText(row.id, 80) || ids.has(row.id) || !validDate(row.date) || row.date < product.startDate || typeof row.time !== 'string' || row.time.length !== 5 || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.time) || !['entrada', 'consumo'].includes(row.type) || !validQuantity(row.quantity) || row.quantity === 0 || typeof row.cancelled !== 'boolean' || typeof row.notes !== 'string' || row.notes.length > 120 || (row.unitCost !== undefined && !validCost(row.unitCost)) || (row.cost !== undefined && !validSnapshotCost(row.cost)) || (row.source !== undefined && (row.source !== 'sale' || !validText(row.sourceId, 80))) || (row.barberId !== undefined && (row.type !== 'consumo' || row.source === 'sale' || !validText(row.barberId, 80) || !validText(row.barberName, 200))) || (row.barberName !== undefined && row.barberId === undefined)) return 'Revisá el producto, la fecha y la cantidad del movimiento.';
       ids.add(row.id);
       if (row.cancelled) continue;
       const days = changes.get(row.productId);
@@ -188,6 +270,6 @@
     return '';
   }
 
-  root.TheLuxeLogic = Object.freeze({ parseAmount, salePaymentTotal, advancePaymentTotal, expensePaymentTotal, paymentTotal, transferTotal, dominantPayment, mixedTipError, balance, barberPayout, barberPaymentState, isoDate, monthWeeks, currentMonthWeek, periodBounds, cutValueByPayment, summarize, dailyRevenue, inventorySummary, inventoryError });
+  root.TheLuxeLogic = Object.freeze({ parseAmount, salePaymentTotal, advancePaymentTotal, expensePaymentTotal, paymentTotal, transferTotal, dominantPayment, mixedTipError, balance, barberPayout, barberSettlement, barberPaymentState, isoDate, monthWeeks, currentMonthWeek, periodBounds, cutValueByPayment, summarize, dailyRevenue, inventorySummary, inventoryUnitCost, inventoryValuation, inventoryMovementCost, inventoryCostSummary, inventoryError });
   Object.assign(root, root.TheLuxeLogic);
 }(globalThis));

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createApp } from '../support/app.mjs';
 
-for (const [id, type, add, form] of [['CFG-001', 'services', 'addServiceConfig', 'serviceConfigForm'], ['CFG-002', 'products', 'addProductConfig', 'productConfigForm'], ['CFG-003', 'barbers', 'addBarberConfig', 'barberConfigForm']]) {
+for (const [id, type, add, form] of [['CFG-001', 'services', 'addServiceConfig', 'serviceConfigForm'], ['CFG-003', 'barbers', 'addBarberConfig', 'barberConfigForm']]) {
   test(`${id} - Crea edita y elimina un elemento de ${type} sin operaciones`, (t) => {
     const app = createApp(t);
     const initial = app.run(`config.${type}.length`);
@@ -43,7 +43,7 @@ test('CFG-005 - Precio cero en catalogo no guarda y corregirlo permite continuar
   assert.equal(app.run('config.services.at(-1).price'), 100);
 });
 
-for (const [id, type, item, expected] of [['CFG-006', 'services', 'barba', 'Barba'], ['CFG-007', 'products', 'pomada', 'Pomada'], ['CFG-008', 'barbers', 'Mateo', 'Mateo']]) {
+for (const [id, type, item, expected] of [['CFG-006', 'services', 'barba', 'Barba'], ['CFG-008', 'barbers', 'Mateo', 'Mateo']]) {
   test(`${id} - No elimina ${type} con operaciones asociadas`, (t) => {
     const app = createApp(t);
     app.financialFixture();
@@ -65,17 +65,17 @@ test('CFG-009 - Renombrar barbero conserva cortes adelantos y pagos de todas sus
   assert.equal(app.run('dayBalance("Efectivo")'), 2650);
 });
 
-test('CFG-010 - Renombrar servicio y producto actualiza referencias sin tocar precios vendidos', (t) => {
+test('CFG-010 - Renombrar servicio conserva referencias y el catálogo de ventas vive en inventario', (t) => {
   const app = createApp(t);
   app.financialFixture();
   app.click('[data-config-edit="services"][data-id="barba"]');
   app.submit('serviceConfigForm', { name: 'Barba nueva', price: '99999' });
   assert.equal(app.run('entries[0].service'), 'Barba nueva');
   assert.equal(app.run('entries[0].amount'), 1000);
-  app.click('[data-config-edit="products"][data-id="pomada"]');
-  app.submit('productConfigForm', { name: 'Pomada nueva', price: '99999' });
-  assert.equal(app.run('sales[0].product'), 'Pomada nueva');
-  assert.equal(app.run('sales[0].total'), 500);
+  app.click('#addSale');
+  assert.equal(app.element('saleForm').elements.product.value, '');
+  assert.deepEqual([...app.element('saleForm').elements.product.options].slice(1).map(({ value }) => value), ['pomada', 'shampoo']);
+  app.click('#closeSaleDialog');
 });
 
 test('CFG-011 - No elimina un barbero sin cortes que tenga dinero pagado', (t) => {
@@ -113,7 +113,7 @@ test('CFG-013 - Guardar configuracion no cambia silenciosamente los filtros del 
 test('CFG-014 - Cerrar catalogos cancela borradores sin crear elementos', (t) => {
   const app = createApp(t);
   const before = app.snapshot('config');
-  for (const [add, dialog] of [['addBarberConfig', 'barberConfigDialog'], ['addProductConfig', 'productConfigDialog'], ['addServiceConfig', 'serviceConfigDialog']]) {
+  for (const [add, dialog] of [['addBarberConfig', 'barberConfigDialog'], ['addServiceConfig', 'serviceConfigDialog']]) {
     app.click(`#${add}`);
     app.click(`#${dialog} .config-close`);
     assert.equal(app.element(dialog).open, false);

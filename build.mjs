@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const types = {
   'index.html': 'text/html; charset=utf-8',
@@ -10,6 +11,11 @@ const types = {
   'dialogs.js': 'text/javascript; charset=utf-8',
 };
 const assets = Object.fromEntries(Object.entries(types).map(([file, type]) => [file, [readFileSync(file, 'utf8'), type]]));
+const version = createHash('sha256').update(JSON.stringify(Object.entries(assets).map(([file, [content]]) => [file, content]))).digest('hex');
+assets['index.html'][0] = assets['index.html'][0]
+  .replace(/((?:href|src)=")(styles\.css|logic\.js|inventory\.js|script\.js|reports\.js|dialogs\.js)(?:\?[^\"]*)?"/g, (_, prefix, file) => `${prefix}${file}?v=${version}"`)
+  .replace('</head>', `  <meta name="theluxe-build" content="${version}">\n</head>`);
+assets['version.json'] = [JSON.stringify({ version, commit: process.env.SOURCE_COMMIT || null }), 'application/json; charset=utf-8'];
 mkdirSync('dist/client', { recursive: true });
 for (const [file, [content]] of Object.entries(assets)) writeFileSync(`dist/client/${file}`, content);
 const worker = `const assets = ${JSON.stringify(assets)};
@@ -20,7 +26,7 @@ export default {
     const key = path === '/' ? 'index.html' : path.slice(1);
     const asset = Object.hasOwn(assets, key) ? assets[key] : null;
     if (!asset) return new Response('Not Found', { status: 404 });
-    return new Response(request.method === 'HEAD' ? null : asset[0], { headers: { 'Content-Type': asset[1], 'Cache-Control': path === '/' ? 'no-cache' : 'public, max-age=3600' } });
+    return new Response(request.method === 'HEAD' ? null : asset[0], { headers: { 'Content-Type': asset[1], 'Cache-Control': key === 'version.json' ? 'no-store' : path === '/' ? 'no-cache' : 'public, max-age=3600' } });
   },
 };
 `;

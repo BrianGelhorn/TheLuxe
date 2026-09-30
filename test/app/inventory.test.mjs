@@ -3,15 +3,16 @@ import test from 'node:test';
 import { createApp } from '../support/app.mjs';
 
 const key = 'theluxe-inventory-v1';
-const product = (changes = {}) => ({ id: 'navajas', name: 'Navajas', unit: 'unidades', initialStock: 10, startDate: '2026-09-01', active: true, ...changes });
+const product = (changes = {}) => ({ id: 'navajas', name: 'Navajas', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 10, unitCost: 100, startDate: '2026-09-01', active: true, ...changes });
 const movement = (changes = {}) => ({ id: 'mov-1', productId: 'navajas', date: '2026-09-03', time: '10:00', type: 'consumo', quantity: 4, notes: '', cancelled: false, ...changes });
-const fixture = (changes = {}) => ({ version: 1, products: [product()], movements: [], ...changes });
+const fixture = (changes = {}) => ({ version: 2, products: [product()], movements: [], ...changes });
 const stockApp = (t, state = fixture()) => createApp(t, { storage: { [key]: JSON.stringify(state) } });
 const raw = (app) => app.window.localStorage.getItem(key);
 const saved = (app) => JSON.parse(raw(app));
+const savedStockProduct = (app) => saved(app).products.find((item) => item.stockEnabled);
 const fields = (app, id) => app.element(id).elements;
-const stockCells = (app) => [...app.query('#stockRows tr').cells].slice(1).map((cell) => cell.firstChild.textContent);
-const productValues = (changes = {}) => ({ stockName: 'Guantes', stockUnit: 'unidades', initialStock: 0, ...changes });
+const stockCells = (app) => [...app.query('#stockRows tr:not(.stock-group)').cells].slice(2, 5).map((cell) => cell.firstChild.textContent);
+const productValues = (changes = {}) => ({ stockName: 'Guantes', stockUnit: 'unidades', initialStock: 0, unitCost: 100, ...changes });
 const movementValues = (changes = {}) => ({ stockProduct: 'navajas', stockType: 'consumo', stockQuantity: 1, stockNotes: '', ...changes });
 
 function workday(app, date) {
@@ -60,7 +61,7 @@ function failStorage(t, app, method, name = 'QuotaExceededError') {
 test('STO-001 - Inventario nuevo inicia vacio sin escribir almacenamiento', (t) => {
   const app = createApp(t);
   assert.equal(raw(app), null);
-  assert.deepEqual(app.snapshot('inventory'), { version: 1, products: [], movements: [] });
+  assert.deepEqual(app.snapshot('inventory').products.map((item) => item.name), ['Pomada', 'Shampoo']);
   assert.equal(app.element('stockEmpty').hidden, false);
   assert.equal(app.element('stockMovementsEmpty').hidden, false);
   assert.equal(app.element('stockMovementCount').textContent, '0');
@@ -84,7 +85,7 @@ test('STO-003 - Alta real recorta nombre y persiste fecha y stock', (t) => {
   app.click('[data-view="configView"]');
   app.setForm('stockProductForm', productValues({ stockName: '  Guantes  ', initialStock: 10 }));
   app.click('#saveStockProduct');
-  assert.deepEqual(saved(app), { version: 1, products: [product({ id: 'test-id-1', name: 'Guantes', startDate: '2026-09-03' })], movements: [] });
+  assert.deepEqual(saved(app), { version: 2, products: [{ id: 'pomada', name: 'Pomada', saleEnabled: true, stockEnabled: false, salePrice: 12000, active: true }, { id: 'shampoo', name: 'Shampoo', saleEnabled: true, stockEnabled: false, salePrice: 9000, active: true }, product({ id: 'test-id-1', name: 'Guantes', startDate: '2026-09-03', initialUnitCost: 100 })], movements: [] });
   assert.deepEqual(app.snapshot('inventory'), saved(app));
   assert.equal(app.run('inventorySnapshot'), raw(app));
   assert.deepEqual(stockCells(app), ['10', '0', '0']);
@@ -99,34 +100,34 @@ test('STO-003 - Alta real recorta nombre y persiste fecha y stock', (t) => {
 test('STO-004 - Alta con stock cero muestra sin stock y permite ingresos', (t) => {
   const app = createApp(t);
   assert.equal(app.submit('stockProductForm', productValues()), true);
-  assert.equal(saved(app).products[0].initialStock, 0);
-  assert.equal(app.query('#stockRows .stock-empty-value small').textContent, 'Sin stock');
+  assert.equal(savedStockProduct(app).initialStock, 0);
+  assert.equal(app.query('#stockRows .stock-empty-value small').textContent, 'unidades · Sin stock');
   assert.equal(app.query('#stockMovementForm button[type="submit"]').disabled, false);
 });
 
 test('STO-005 - Alta acepta stock inicial maximo', (t) => {
   const app = createApp(t);
   assert.equal(app.submit('stockProductForm', productValues({ initialStock: 1000000000 })), true);
-  assert.equal(saved(app).products[0].initialStock, 1000000000);
+  assert.equal(savedStockProduct(app).initialStock, 1000000000);
 });
 
 test('STO-006 - Alta acepta nombre de ochenta caracteres', (t) => {
   const app = createApp(t);
   assert.equal(app.submit('stockProductForm', productValues({ stockName: 'N'.repeat(80) })), true);
-  assert.equal(saved(app).products[0].name, 'N'.repeat(80));
+  assert.equal(savedStockProduct(app).name, 'N'.repeat(80));
 });
 
 test('STO-007 - Alta acepta unidad mililitros', (t) => {
   const app = createApp(t);
   assert.equal(app.submit('stockProductForm', productValues({ stockUnit: 'ml' })), true);
-  assert.equal(saved(app).products[0].unit, 'ml');
+  assert.equal(savedStockProduct(app).unit, 'ml');
   assert.equal(app.query('#stockRows small').textContent, 'ml');
 });
 
 test('STO-008 - Alta acepta unidad gramos', (t) => {
   const app = createApp(t);
   assert.equal(app.submit('stockProductForm', productValues({ stockUnit: 'g' })), true);
-  assert.equal(saved(app).products[0].unit, 'g');
+  assert.equal(savedStockProduct(app).unit, 'g');
 });
 
 test('STO-009 - Nombre requerido bloquea submit nativo y listener', (t) => {
@@ -158,7 +159,7 @@ test('STO-015 - Nombre de espacios pasa required pero no validador de negocio', 
   const before = raw(app);
   assert.equal(app.submit('stockProductForm', productValues({ stockName: '   ' })), true);
   unchanged(app, before);
-  message(app, /stock inicial del producto/, true);
+  message(app, /opciones de venta/, true);
 });
 
 test('STO-016 - Nombre excesivo no se guarda aunque se asigne por script', (t) => {
@@ -176,7 +177,7 @@ test('STO-017 - Unidad inexistente no se guarda aunque select no sea required', 
   const before = raw(app);
   app.submit('stockProductForm', productValues({ stockUnit: 'kg' }));
   unchanged(app, before);
-  message(app, /stock inicial del producto/, true);
+  message(app, /opciones de venta/, true);
 });
 
 test('STO-018 - Alta duplicada normaliza acentos mayusculas y espacios', (t) => {
@@ -200,7 +201,7 @@ test('STO-020 - Alta retroactiva usa jornada seleccionada', (t) => {
   const app = createApp(t);
   workday(app, '2026-08-31');
   app.submit('stockProductForm', productValues({ initialStock: 5 }));
-  assert.equal(saved(app).products[0].startDate, '2026-08-31');
+  assert.equal(savedStockProduct(app).startDate, '2026-08-31');
   assert.match(app.element('stockInitialDate').textContent, /2026-08-31/);
 });
 
@@ -209,7 +210,7 @@ test('STO-021 - Alta futura se rechaza sin escribir', (t) => {
   workday(app, '2026-09-04');
   app.submit('stockProductForm', productValues());
   assert.equal(raw(app), null);
-  assert.equal(app.run('inventory.products.length'), 0);
+  assert.equal(app.run('inventory.products.length'), 2);
   message(app, /hoy o anterior/, true);
 });
 
@@ -232,7 +233,7 @@ test('STO-023 - Editar carga producto y bloquea unidad y stock inicial', (t) => 
   assert.equal(form.initialStock.value, '10');
   assert.equal(form.stockUnit.disabled, true);
   assert.equal(form.initialStock.disabled, true);
-  assert.equal(app.element('saveStockProduct').textContent, 'Guardar nombre');
+  assert.equal(app.element('saveStockProduct').textContent, 'Guardar producto');
   assert.equal(app.element('cancelStockProduct').hidden, false);
   assert.equal(app.window.document.activeElement, form.stockName);
   assert.match(app.element('stockInitialDate').textContent, /2026-09-01/);
@@ -352,7 +353,7 @@ test('STO-033 - Consumo por boton real descuenta y limpia campos transitorios', 
   app.click('[data-view="salesView"]');
   app.setForm('stockMovementForm', movementValues({ stockQuantity: 4, stockNotes: '  Uso diario  ' }));
   app.click('#stockMovementForm button[type="submit"]');
-  assert.deepEqual(saved(app).movements, [movement({ id: 'test-id-1', time: '12:00', notes: 'Uso diario' })]);
+  assert.deepEqual(saved(app).movements, [movement({ id: 'test-id-1', time: '12:00', notes: 'Uso diario', cost: 400 })]);
   assert.deepEqual(stockCells(app), ['6', '0', '4']);
   assert.equal(app.element('stockMovementCount').textContent, '1');
   assert.equal(app.element('stockMovementsEmpty').hidden, true);
@@ -367,16 +368,16 @@ test('STO-033 - Consumo por boton real descuenta y limpia campos transitorios', 
 test('STO-034 - Ingreso real incrementa stock y contador diario', (t) => {
   const app = stockApp(t);
   app.submit('stockMovementForm', movementValues({ stockType: 'entrada', stockQuantity: 5 }));
-  assert.deepEqual(saved(app).movements, [movement({ id: 'test-id-1', time: '12:00', type: 'entrada', quantity: 5 })]);
+  assert.deepEqual(saved(app).movements, [movement({ id: 'test-id-1', time: '12:00', type: 'entrada', quantity: 5, unitCost: 100, cost: 500 })]);
   assert.deepEqual(stockCells(app), ['15', '5', '0']);
-  message(app, /Ingreso registrado/);
+  message(app, /Reposición registrada/);
 });
 
 test('STO-035 - Consumo exacto muestra cero y sin stock', (t) => {
   const app = stockApp(t);
   app.submit('stockMovementForm', movementValues({ stockQuantity: 10 }));
   assert.deepEqual(stockCells(app), ['0', '0', '10']);
-  assert.equal(app.query('#stockRows .stock-empty-value small').textContent, 'Sin stock');
+  assert.equal(app.query('#stockRows .stock-empty-value small').textContent, 'unidades · Sin stock');
 });
 
 test('STO-036 - Ingreso acepta cantidad maxima del formulario', (t) => {
@@ -687,7 +688,7 @@ test('STO-073 - Accion obsoleta de movimiento inexistente es inocua', (t) => {
 test('STO-074 - Nombre con HTML se representa como texto en todas las vistas', (t) => {
   const name = 'Navajas <img src=x onerror="alert(1)"> & \'kit\'';
   const app = stockApp(t, fixture({ products: [product({ name })], movements: [movement()] }));
-  assert.equal(app.query('#stockRows tr').cells[0].firstChild.textContent, name);
+  assert.equal(app.query('#stockRows tr:not(.stock-group)').cells[0].firstChild.textContent, name);
   assert.equal(app.query('#stockMovementRows tr').cells[1].textContent, name);
   assert.equal(app.query('#stockConfigList .config-item > span').firstChild.textContent, name);
   assert.equal(fields(app, 'stockMovementForm').stockProduct.options[1].textContent, `${name} (unidades)`);
@@ -700,7 +701,7 @@ test('STO-075 - Nota con HTML se representa como texto sin crear nodos', (t) => 
   const app = stockApp(t);
   app.submit('stockMovementForm', movementValues({ stockNotes: notes }));
   assert.equal(saved(app).movements[0].notes, notes);
-  assert.equal(app.query('#stockMovementRows tr').cells[4].textContent, notes);
+  assert.equal(app.query('#stockMovementRows tr').cells[5].textContent, notes);
   assert.equal(app.window.document.querySelector('#stockMovementRows img, #stockMovementRows b'), null);
   assert.deepEqual(app.alerts, []);
 });
@@ -722,12 +723,37 @@ test('STO-077 - Movimientos de stock no alteran ventas caja ni finanzas', (t) =>
   const before = app.snapshot('({ entries, sales, advances, expenses, transfers, cashRegisters, barberPayments })');
   const cash = app.element('cashTotal').textContent;
   const mp = app.element('mpTotal').textContent;
-  app.submit('stockMovementForm', movementValues({ stockQuantity: 4 }));
+  app.submit('stockMovementForm', movementValues({ stockQuantity: 4, stockBarber: 'Mateo' }));
   app.submit('stockMovementForm', movementValues({ stockType: 'entrada', stockQuantity: 2 }));
+  assert.equal(saved(app).movements[0].barberId, 'Mateo');
+  assert.equal(saved(app).movements[0].barberName, 'Mateo');
+  assert.equal(saved(app).movements[1].barberId, undefined);
   assert.deepEqual(app.snapshot('({ entries, sales, advances, expenses, transfers, cashRegisters, barberPayments })'), before);
   assert.equal(app.element('cashTotal').textContent, cash);
   assert.equal(app.element('mpTotal').textContent, mp);
   assert.deepEqual(stockCells(app), ['8', '2', '4']);
+  app.element('stockBarberFilter').value = 'Julián';
+  app.emit('#stockBarberFilter', 'change');
+  assert.deepEqual(stockCells(app), ['8', '2', '0']);
+  assert.equal(app.element('stockConsumedValue').textContent, app.money(0));
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(800));
+  app.element('stockBarberFilter').value = 'Mateo';
+  app.emit('#stockBarberFilter', 'change');
+  assert.equal(app.element('stockConsumedValue').textContent, app.money(400));
+  assert.match(app.query('#stockMovementRows').textContent, /Mateo/);
+});
+
+test('STO-124 - Reposición oculta responsable y un consumo antiguo queda sin asignar', (t) => {
+  const app = stockApp(t, fixture({ movements: [movement({ type: 'consumo' })] }));
+  assert.equal(app.query('#stockMovementRows tr').cells[4].textContent, 'Sin asignar');
+  const formFields = fields(app, 'stockMovementForm');
+  formFields.stockType.value = 'entrada';
+  app.emit(formFields.stockType, 'change');
+  assert.equal(app.element('stockMovementBarberField').hidden, true);
+  assert.equal(formFields.stockBarber.disabled, true);
+  formFields.stockBarber.value = 'Mateo';
+  app.submit('stockMovementForm', { stockProduct: 'navajas' });
+  assert.equal(saved(app).movements[1].barberId, undefined);
 });
 
 test('STO-078 - Recarga completa conserva altas ediciones archivo y anulaciones', (t) => {
@@ -741,12 +767,12 @@ test('STO-078 - Recarga completa conserva altas ediciones archivo y anulaciones'
   const reloaded = createApp(t, { storage: { [key]: encoded } });
   assert.equal(raw(reloaded), encoded);
   assert.deepEqual(reloaded.snapshot('inventory'), saved(app));
-  assert.equal(reloaded.element('stockRows').children.length, 1);
+  assert.equal(reloaded.element('stockRows').children.length, 2);
   assert.equal(reloaded.query('[data-stock-archive="navajas"]').textContent, 'Activar');
   assert.equal(reloaded.query('[data-stock-toggle="mov-1"]').textContent, 'Restaurar');
   reloaded.click('[data-stock-archive="navajas"]');
-  assert.equal(reloaded.element('stockRows').children.length, 2);
-  assert.equal(reloaded.query('#stockRows tr').cells[1].firstChild.textContent, '10');
+  assert.equal(reloaded.element('stockRows').children.length, 3);
+  assert.equal(reloaded.query('#stockRows tr:not(.stock-group)').cells[2].firstChild.textContent, '10');
 });
 
 test('STO-079 - JSON corrupto al iniciar bloquea escritura sin sobrescribir', (t) => {
@@ -757,12 +783,12 @@ test('STO-079 - JSON corrupto al iniciar bloquea escritura sin sobrescribir', (t
   assert.equal(app.query('#stockMovementForm button[type="submit"]').disabled, true);
   app.submit('stockProductForm', productValues());
   assert.equal(raw(app), '{broken');
-  assert.equal(app.run('inventory.products.length'), 0);
+  assert.equal(app.run('inventory.products.length'), 2);
   message(app, /No se pudo leer/, true);
 });
 
 test('STO-080 - Version incompatible al iniciar se conserva sin sobrescribir', (t) => {
-  const encoded = JSON.stringify({ ...fixture(), version: 2 });
+  const encoded = JSON.stringify({ ...fixture(), version: 3 });
   const app = createApp(t, { storage: { [key]: encoded } });
   assert.equal(raw(app), encoded);
   assert.equal(app.element('saveStockProduct').disabled, true);
@@ -774,7 +800,7 @@ test('STO-081 - Historial negativo guardado se rechaza al iniciar', (t) => {
   const app = createApp(t, { storage: { [key]: encoded } });
   assert.equal(raw(app), encoded);
   assert.equal(app.run('inventoryReadError'), true);
-  assert.equal(app.run('inventory.products.length'), 0);
+  assert.equal(app.run('inventory.products.length'), 2);
   message(app, /No se pudo leer/, true);
 });
 
@@ -819,7 +845,7 @@ test('STO-085 - Fallo al archivar no oculta ni cancela edicion', (t) => {
   failStorage(t, app, 'setItem');
   app.click('[data-stock-archive="navajas"]');
   unchanged(app, before);
-  assert.equal(app.element('stockRows').children.length, 1);
+  assert.equal(app.element('stockRows').children.length, 2);
   assert.equal(fields(app, 'stockProductForm').stockId.value, 'navajas');
   message(app, /No se pudo guardar/, true);
 });
@@ -919,7 +945,7 @@ test('STO-093 - Evento de otra clave no lee ni cambia inventario', (t) => {
   storageEvent(app, 'unrelated');
   assert.equal(spy.mock.callCount(), 0);
   assert.deepEqual(app.snapshot('inventory'), before);
-  assert.equal(app.element('stockRows').children.length, 1);
+  assert.equal(app.element('stockRows').children.length, 2);
   assert.equal(app.element('stockMessage').hidden, true);
 });
 
@@ -933,7 +959,7 @@ test('STO-094 - Evento de inventario carga vista sin escribir de vuelta', (t) =>
   assert.equal(spy.mock.callCount(), 0);
   assert.deepEqual(app.snapshot('inventory'), remote);
   assert.equal(app.run('inventorySnapshot'), encoded);
-  assert.equal(app.query('#stockRows tr').cells[0].firstChild.textContent, 'Hojas');
+  assert.equal(app.query('#stockRows tr:not(.stock-group)').cells[0].firstChild.textContent, 'Hojas');
   assert.deepEqual(stockCells(app), ['6', '0', '4']);
   message(app, /actualizado desde otra pesta/);
 });
@@ -943,7 +969,7 @@ test('STO-095 - Evento de clear con clave nula vacia inventario', (t) => {
   app.window.localStorage.clear();
   storageEvent(app, null);
   assert.equal(raw(app), null);
-  assert.deepEqual(app.snapshot('inventory'), { version: 1, products: [], movements: [] });
+  assert.deepEqual(app.snapshot('inventory').products.map((item) => item.name), ['Pomada', 'Shampoo']);
   assert.equal(app.run('inventorySnapshot'), null);
   assert.equal(app.element('stockRows').children.length, 0);
   assert.equal(app.element('stockMovementRows').children.length, 0);
@@ -957,7 +983,7 @@ test('STO-096 - Evento de borrado de clave permite nueva alta', (t) => {
   storageEvent(app);
   assert.equal(app.element('stockRows').children.length, 0);
   app.submit('stockProductForm', productValues());
-  assert.deepEqual(saved(app).products.map((row) => row.name), ['Guantes']);
+  assert.deepEqual(saved(app).products.map((row) => row.name), ['Pomada', 'Shampoo', 'Guantes']);
 });
 
 test('STO-097 - Evento corrupto preserva ultimo estado pero no datos corruptos en memoria', (t) => {
@@ -977,7 +1003,7 @@ test('STO-097 - Evento corrupto preserva ultimo estado pero no datos corruptos e
 test('STO-098 - Evento de version invalida bloquea acciones sin borrar historial', (t) => {
   const app = stockApp(t, fixture({ movements: [movement()] }));
   const before = app.snapshot('inventory');
-  const encoded = JSON.stringify({ ...fixture(), version: 2 });
+  const encoded = JSON.stringify({ ...fixture(), version: 3 });
   app.window.localStorage.setItem(key, encoded);
   storageEvent(app);
   assert.equal(raw(app), encoded);
@@ -994,7 +1020,7 @@ test('STO-099 - Conflicto de alta sin evento carga remoto y no pisa sus datos', 
   app.submit('stockProductForm', productValues());
   unchanged(app, encoded);
   assert.equal(fields(app, 'stockProductForm').stockName.value, 'Guantes');
-  assert.equal(app.element('stockRows').children.length, 2);
+  assert.equal(app.element('stockRows').children.length, 3);
   message(app, /cambi.*otra pesta/, true);
 });
 
@@ -1070,7 +1096,7 @@ test('STO-106 - Conflicto con borrado remoto no resucita productos', (t) => {
   app.window.localStorage.removeItem(key);
   app.submit('stockProductForm', productValues());
   assert.equal(raw(app), null);
-  assert.deepEqual(app.snapshot('inventory'), { version: 1, products: [], movements: [] });
+  assert.deepEqual(app.snapshot('inventory').products.map((item) => item.name), ['Pomada', 'Shampoo']);
   assert.equal(app.element('stockRows').children.length, 0);
   message(app, /cambi.*otra pesta/, true);
 });
@@ -1138,4 +1164,249 @@ test('STO-112 - Guardado no modifica claves ajenas al inventario', (t) => {
   app.submit('stockProductForm', productValues());
   assert.equal(app.window.localStorage.getItem('unrelated'), 'conservar');
   assert.deepEqual(Object.keys(app.window.localStorage).sort(), [key, 'unrelated']);
+});
+
+test('STO-113 - Resume uso ingresos y valor actual con costos guardados', (t) => {
+  const app = stockApp(t, fixture({ movements: [movement(), movement({ id: 'mov-2', type: 'entrada', quantity: 2 })] }));
+  assert.equal(app.element('stockConsumedValue').textContent, app.money(400));
+  assert.equal(app.element('stockIncomingValue').textContent, app.money(200));
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(800));
+  assert.equal(app.query('#stockRows tr:not(.stock-group)').cells[1].firstChild.textContent, app.money(100));
+  assert.equal(app.query('#stockRows tr:not(.stock-group)').cells[1].querySelector('small').textContent, 'por unidad');
+  assert.match(app.query('#stockConfigList .config-item small').textContent, /por unidad/);
+  assert.equal(app.query('#stockRows tr:not(.stock-group)').cells[5].textContent, app.money(400));
+  assert.equal(app.query('#stockMovementRows tr').cells[6].textContent, app.money(200));
+});
+
+test('STO-114 - Alta congela el costo inicial al editar el precio', (t) => {
+  const app = createApp(t);
+  app.submit('stockProductForm', productValues({ initialStock: 5, unitCost: '2.500' }));
+  assert.equal(savedStockProduct(app).unitCost, 2500);
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(12500));
+  app.click('[data-stock-edit="test-id-1"]');
+  assert.equal(fields(app, 'stockProductForm').unitCost.value, '2.500');
+  app.input('#stockProductForm [name="unitCost"]', '3000');
+  app.submit('stockProductForm');
+  assert.equal(savedStockProduct(app).unitCost, 3000);
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(12500));
+});
+
+test('STO-126 - Editar precio congela historial, la reposición nueva y el gráfico', (t) => {
+  const app = stockApp(t, fixture({ movements: [movement()] }));
+  app.click('[data-stock-edit="navajas"]');
+  app.input('#stockProductForm [name="unitCost"]', '200');
+  app.submit('stockProductForm');
+  assert.equal(saved(app).products[0].initialUnitCost, 100);
+  assert.equal(saved(app).movements[0].cost, 400);
+  assert.equal(saved(app).movements[0].unitCost, undefined);
+  app.submit('stockMovementForm', movementValues({ stockType: 'entrada', stockQuantity: 2 }));
+  assert.equal(saved(app).movements[1].cost, 400);
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(1000));
+  app.click('[data-view="summaryView"]');
+  app.element('summaryPeriod').value = 'month';
+  app.emit('#summaryPeriod', 'change');
+  assert.equal(app.element('stockReportConsumed').textContent, app.money(400));
+  assert.equal(app.element('stockReportIncoming').textContent, app.money(400));
+  assert.match(app.query('#stockReportChart [aria-label^="03/09"]').getAttribute('aria-label'), /reposiciones .*400.*consumos .*400/);
+});
+
+test('STO-127 - Fallo al congelar precio no altera historial ni producto', (t) => {
+  const app = stockApp(t, fixture({ movements: [movement()] }));
+  const before = raw(app);
+  app.click('[data-stock-edit="navajas"]');
+  app.input('#stockProductForm [name="unitCost"]', '200');
+  failStorage(t, app, 'setItem');
+  app.submit('stockProductForm');
+  unchanged(app, before);
+  assert.equal(fields(app, 'stockProductForm').unitCost.value, '200');
+});
+
+test('STO-128 - Un consumo antiguo de dos lotes conserva su costo FIFO al editar precio', (t) => {
+  const app = stockApp(t, fixture({
+    products: [product({ initialStock: 2, initialUnitCost: 100 })],
+    movements: [
+      movement({ id: 'compra', date: '2026-09-02', type: 'entrada', quantity: 2, unitCost: 200, cost: 400 }),
+      movement({ id: 'uso', type: 'consumo', quantity: 3, barberId: 'Mateo', barberName: 'Mateo' }),
+    ],
+  }));
+  assert.equal(app.element('stockConsumedValue').textContent, app.money(400));
+  app.element('stockBarberFilter').value = 'Mateo';
+  app.emit('#stockBarberFilter', 'change');
+  assert.equal(app.element('stockConsumedValue').textContent, app.money(400));
+  assert.equal(app.query('#stockMovementRows tr').cells[6].textContent, app.money(400));
+  app.click('[data-stock-edit="navajas"]');
+  app.input('#stockProductForm [name="unitCost"]', '300');
+  app.submit('stockProductForm');
+  assert.equal(saved(app).movements.find((row) => row.id === 'uso').cost, 400);
+  assert.equal(app.element('stockConsumedValue').textContent, app.money(400));
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(200));
+  app.click('[data-view="summaryView"]');
+  app.element('summaryPeriod').value = 'month';
+  app.emit('#summaryPeriod', 'change');
+  app.element('summaryBarberFilter').value = 'Mateo';
+  app.emit('#summaryBarberFilter', 'change');
+  assert.equal(app.element('stockReportConsumed').textContent, app.money(400));
+  assert.match(app.query('#stockReportChart [aria-label^="03/09"]').getAttribute('aria-label'), /consumos \$\s*400/);
+});
+
+test('STO-129 - Una reposición con costo unitario previo no pierde su precio al congelar', (t) => {
+  const app = stockApp(t, fixture({ movements: [movement({ id: 'compra', date: '2026-09-02', type: 'entrada', quantity: 2, unitCost: 200 })] }));
+  app.click('[data-stock-edit="navajas"]');
+  app.input('#stockProductForm [name="unitCost"]', '300');
+  app.submit('stockProductForm');
+  assert.equal(saved(app).movements[0].unitCost, 200);
+  assert.equal(saved(app).movements[0].cost, 400);
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(1400));
+});
+
+test('STO-115 - Inventario anterior sin costo sigue siendo válido y vale cero', (t) => {
+  const legacy = { version: 1, products: [product({ saleEnabled: undefined, stockEnabled: undefined })], movements: [] };
+  delete legacy.products[0].unitCost;
+  const encoded = JSON.stringify(legacy);
+  const app = createApp(t, { storage: { [key]: encoded } });
+  assert.equal(raw(app), encoded);
+  assert.equal(app.element('stockConsumedValue').textContent, app.money(0));
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(0));
+  assert.equal(app.element('stockPriceWarning').hidden, false);
+  assert.match(app.element('stockPriceWarningText').textContent, /1 producto no tiene/);
+  assert.equal(app.query('#stockRows .stock-missing-price').textContent, 'Sin precio');
+});
+
+test('STO-116 - Costo unitario excesivo se rechaza y permite corrección', (t) => {
+  const app = createApp(t);
+  app.setForm('stockProductForm', productValues({ unitCost: 1000000001 }));
+  app.emit('#stockProductForm', 'submit');
+  assert.equal(raw(app), null);
+  assert.equal(fields(app, 'stockProductForm').unitCost.validity.customError, true);
+  app.input('#stockProductForm [name="unitCost"]', '100');
+  assert.equal(app.submit('stockProductForm'), true);
+  assert.equal(savedStockProduct(app).unitCost, 100);
+});
+
+test('STO-117 - Costo cero no crea productos sin precio', (t) => {
+  const app = createApp(t);
+  app.setForm('stockProductForm', productValues({ unitCost: 0 }));
+  app.emit('#stockProductForm', 'submit');
+  assert.equal(raw(app), null);
+  assert.equal(fields(app, 'stockProductForm').unitCost.validity.customError, true);
+  assert.match(fields(app, 'stockProductForm').unitCost.validationMessage, /mayor que cero/);
+});
+
+test('STO-118 - Una caja ingresa sus unidades y cada consumo usa el costo proporcional', (t) => {
+  const app = createApp(t);
+  app.submit('stockProductForm', productValues({ stockName: 'Navajas', packageLabel: 'caja', packageSize: 50, unitCost: '5.000' }));
+  const savedProduct = savedStockProduct(app);
+  assert.equal(savedProduct.packageLabel, 'caja');
+  assert.equal(savedProduct.packageSize, 50);
+  assert.equal(savedProduct.packageCost, 5000);
+  assert.equal(savedProduct.unitCost, 100);
+  app.setForm('stockMovementForm', { stockProduct: savedProduct.id, stockType: 'entrada', stockQuantity: 1 });
+  app.emit('#stockMovementForm [name="stockProduct"]', 'change');
+  assert.match(app.element('stockConversionPreview').textContent, /1 caja suma 50 unidades al stock/);
+  app.submit('stockMovementForm');
+  assert.equal(saved(app).movements[0].quantity, 50);
+  assert.equal(app.element('stockIncomingValue').textContent, app.money(5000));
+  app.submit('stockMovementForm', { stockProduct: savedProduct.id, stockType: 'consumo', stockQuantity: 1 });
+  assert.equal(saved(app).movements[1].quantity, 1);
+  assert.deepEqual(stockCells(app), ['49', '50', '1']);
+  assert.equal(app.element('stockConsumedValue').textContent, app.money(100));
+  assert.equal(app.element('stockCurrentValue').textContent, app.money(4900));
+});
+
+test('STO-119 - Una entrada convertida no puede superar el límite de stock', (t) => {
+  const app = createApp(t);
+  app.submit('stockProductForm', productValues({ stockName: 'Navajas', packageLabel: 'caja', packageSize: 2, unitCost: 100 }));
+  const id = savedStockProduct(app).id;
+  app.setForm('stockMovementForm', { stockProduct: id, stockType: 'entrada', stockQuantity: 1000000000 });
+  app.emit('#stockMovementForm', 'submit');
+  assert.equal(saved(app).movements.length, 0);
+  assert.equal(fields(app, 'stockMovementForm').stockQuantity.validity.customError, true);
+  assert.match(fields(app, 'stockMovementForm').stockQuantity.validationMessage, /cantidad convertida/);
+});
+
+test('STO-120 - Contenido por compra solo aparece para cajas', (t) => {
+  const app = createApp(t);
+  const form = fields(app, 'stockProductForm');
+  assert.equal(app.element('stockPackageSizeField').hidden, true);
+  assert.equal(form.packageSize.disabled, true);
+  assert.equal(app.element('stockPurchasePriceLabel').textContent, 'Precio unitario');
+  form.packageLabel.value = 'caja';
+  app.emit(form.packageLabel, 'change');
+  assert.equal(app.element('stockPackageSizeField').hidden, false);
+  assert.equal(form.packageSize.disabled, false);
+  assert.equal(app.element('stockPurchasePriceLabel').textContent, 'Precio de caja');
+  form.packageLabel.value = 'unidad';
+  app.emit(form.packageLabel, 'change');
+  assert.equal(app.element('stockPackageSizeField').hidden, true);
+  assert.equal(form.packageSize.disabled, true);
+});
+
+test('STO-121 - Cargar ejemplo crea productos, movimientos y gráfico de stock', (t) => {
+  const app = createApp(t);
+  app.click('#loadStockDemo');
+  assert.equal(saved(app).products.length, 5);
+  assert.equal(saved(app).movements.length, 10);
+  assert.equal(saved(app).products.find((item) => item.id === 'demo-navajas').packageSize, 50);
+  assert.equal(saved(app).products.find((item) => item.id === 'demo-navajas').unitCost, 100);
+  assert.equal(app.element('summaryPeriod').value, 'month');
+  assert.equal(app.element('stockReportChart').hidden, false);
+  assert.notEqual(app.element('stockReportConsumed').textContent, app.money(0));
+});
+
+test('STO-122 - Activar stock en un producto de venta permite fijar cantidad inicial', (t) => {
+  const app = createApp(t);
+  app.click('[data-stock-edit="pomada"]');
+  const form = fields(app, 'stockProductForm');
+  form.stockEnabled.checked = true;
+  app.emit(form.stockEnabled, 'change');
+  assert.equal(form.initialStock.disabled, false);
+  form.initialStock.value = '8';
+  form.unitCost.value = '500';
+  app.emit('#stockProductForm', 'submit');
+  const item = saved(app).products.find((product) => product.id === 'pomada');
+  assert.equal(item.initialStock, 8);
+  assert.equal(item.stockEnabled, true);
+  assert.equal(item.saleEnabled, true);
+  assert.equal(app.query('#stockRows').textContent.includes('Pomada'), true);
+});
+
+test('STO-123 - Migra catálogo anterior sin escribir ni duplicar nombres o IDs', (t) => {
+  const legacy = { version: 1, products: [
+    { id: 'pomada', name: 'Navajas', unit: 'unidades', initialStock: 3, unitCost: 0, startDate: '2026-09-01', active: true },
+    { id: 'shampoo', name: 'Shampoo', unit: 'unidades', initialStock: 4, unitCost: 100, startDate: '2026-09-01', active: true },
+  ], movements: [] };
+  const before = JSON.stringify(legacy);
+  const app = createApp(t, { storage: { [key]: before } });
+  assert.equal(raw(app), before);
+  const migrated = app.snapshot('inventory');
+  assert.equal(migrated.version, 2);
+  assert.equal(migrated.products.find((item) => item.id === 'pomada').name, 'Navajas');
+  assert.equal(migrated.products.find((item) => item.name === 'Pomada').saleEnabled, true);
+  assert.equal(migrated.products.find((item) => item.name === 'Shampoo').stockEnabled, true);
+  assert.equal(new Set(migrated.products.map((item) => item.id)).size, migrated.products.length);
+  assert.equal(app.run('inventoryError(inventory)'), '');
+});
+
+test('STO-125 - Catálogo identifica venta, insumo y ambos sin mezclar precios', (t) => {
+  const app = stockApp(t, fixture({ products: [
+    { id: 'pomada', name: 'Pomada', saleEnabled: true, stockEnabled: false, salePrice: 12000, active: true },
+    product(),
+    product({ id: 'mixto', name: 'Mixto', saleEnabled: true, salePrice: 1500 }),
+  ] }));
+  const items = [...app.query('#stockConfigList').querySelectorAll('.config-item')];
+  assert.deepEqual(items.map((item) => item.querySelector('.stock-product-type').textContent), ['Venta', 'Insumo', 'Venta e insumo']);
+  assert.match(items[0].textContent, /Precio de venta/);
+  assert.doesNotMatch(items[0].textContent, /Sin precio|undefined/);
+  assert.match(items[1].textContent, /Stock 10 unidades/);
+  assert.match(items[2].textContent, /Precio de venta.*Stock 10 unidades/);
+  assert.deepEqual([...app.query('.stock-product-options').querySelectorAll('label')].map((label) => label.textContent.trim()), ['Venta', 'Insumo']);
+});
+
+test('STO-130 - Ventas antiguas resuelven producto por nombre y corregir cantidad limpia su error', (t) => {
+  const app = stockApp(t);
+  assert.equal(app.run('saleProduct({product:"Navajas"}).id'), 'navajas');
+  const quantity = app.query('#stockMovementForm [name="stockQuantity"]');
+  quantity.setCustomValidity('Corregir');
+  app.input('#stockMovementForm [name="stockQuantity"]', '2');
+  assert.equal(quantity.validity.customError, false);
 });

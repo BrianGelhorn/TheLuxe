@@ -22,8 +22,8 @@ test('COM-002 - El cambio diario reemplaza comisiones de todos los barberos ya c
   assert.deepEqual(app.snapshot('entries.map(({ commissionRate, commissionAmount }) => [commissionRate, commissionAmount])'), [[80, 800], [80, 1600], [80, 720]]);
   assert.equal(app.element('dailyCommission').textContent, app.money(3120));
   assert.equal(app.element('dailyNet').textContent, app.money(1980));
-  assert.equal(app.query('[data-barber-column="Mateo"]').dataset.paymentDue, '1820');
-  assert.equal(app.query('[data-barber-column="Lucas"]').dataset.paymentDue, '1600');
+  assert.equal(app.query('[data-barber-column="Mateo"]').dataset.paymentDue, '1520');
+  assert.equal(app.query('[data-barber-column="Lucas"]').dataset.paymentDue, '1500');
   assert.deepEqual(app.snapshot('[dayBalance("Efectivo"), dayBalance("Mercado Pago")]'), [2850, 4900]);
 });
 
@@ -43,7 +43,8 @@ test('COM-004 - Un override de cero anula comisiones existentes sin anular propi
   change(app, 0);
   assert.equal(app.element('dailyCommission').textContent, app.money(0));
   assert.equal(app.element('dailyNet').textContent, app.money(5100));
-  assert.equal(app.query('[data-barber-column="Mateo"]').dataset.paymentDue, '300');
+  assert.equal(app.query('[data-barber-column="Mateo"]').dataset.paymentDue, '0');
+  assert.equal(app.element('dailyTips').textContent, app.money(300));
   app.click('#changeCommission');
   assert.equal(app.element('dailyCommissionForm').elements.commission.value, '0');
 });

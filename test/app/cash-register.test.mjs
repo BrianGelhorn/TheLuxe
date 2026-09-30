@@ -357,6 +357,8 @@ test('REG-025 - Los cierres guardados se restauran al volver a cada jornada', (t
   app.element('summaryPeriod').value = 'month';
   app.emit('#summaryPeriod', 'change');
   assert.equal(app.element('summaryWithdrawals').textContent, app.money(300));
+  app.element('summaryBarberFilter').value = '__shop__';
+  app.emit('#summaryBarberFilter', 'change');
   assert.equal(app.element('summaryRows').children.length, 2);
   balances(app, 0, 0);
 });
@@ -409,6 +411,48 @@ test('REG-038 - Una jornada cerrada rechaza operaciones aunque se dispare el han
     ['#stockProductForm', 'submit'], ['#stockConfigList', 'click'], ['#stockMovementForm', 'submit'], ['#stockMovementRows', 'click'],
   ]) app.emit(selector, type);
   assert.deepEqual(app.snapshot('({ entries, sales, advances, expenses, transfers, inventory })'), before);
+});
+
+test('REG-039 - El retiro MP se valida, se hereda y mantiene compatibilidad sin el campo', (t) => {
+  const app = createApp(t);
+  app.submit('cashRegisterForm', { realCash: '100', realMp: '200', withdrawal: '0', withdrawalMp: '201' });
+  assert.equal(app.run('"realMp" in cashRegisters[workday.value]'), false);
+  app.input('#cashRegisterForm [name="withdrawalMp"]', '50');
+  app.submit('cashRegisterForm');
+  assert.equal(app.run('cashRegisters[workday.value].withdrawalMp'), 50);
+  app.element('workday').value = '2026-09-04';
+  app.emit('#workday', 'change');
+  assert.equal(app.element('openingCashForm').elements.initialMp.value, '150');
+  app.seed({ cashRegisters: { '2026-09-03': { realCash: 0, realMp: 200, withdrawal: 0 } } });
+  app.render();
+  assert.equal(app.element('openingCashForm').elements.initialMp.value, '200');
+});
+
+test('REG-040 - Cancelar la confirmación de impagos no guarda el cierre', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  assert.equal(app.element('closingUnpaidWarning').hidden, false);
+  assert.match(app.element('closingUnpaidWarning').textContent, /Mateo.*Lucas/);
+  assert.doesNotMatch(app.element('closingUnpaidWarning').textContent, /deberás confirmarlo/);
+  app.confirm(false);
+  app.submit('cashRegisterForm', { realCash: '2850', realMp: '4900', withdrawal: '0' });
+  assert.equal(app.confirmations.length, 1);
+  assert.equal(app.run('"realCash" in cashRegisters[workday.value]'), false);
+  app.confirm(true);
+  app.submit('cashRegisterForm');
+  assert.equal(app.run('"realCash" in cashRegisters[workday.value]'), true);
+  assert.equal(app.element('closingUnpaidWarning').hidden, true);
+});
+
+test('REG-041 - Aviso de impagos desaparece al pagar a todos sin recargar', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  assert.equal(app.element('closingUnpaidWarning').hidden, false);
+  app.click('[data-barber-column="Mateo"] [data-barber-payment-method="Efectivo"]');
+  assert.match(app.element('closingUnpaidWarning').textContent, /Lucas/);
+  assert.doesNotMatch(app.element('closingUnpaidWarning').textContent, /Mateo/);
+  app.click('[data-barber-column="Lucas"] [data-barber-payment-method="Mercado Pago"]');
+  assert.equal(app.element('closingUnpaidWarning').hidden, true);
 });
 
 test('REG-026 - Transferir todo el efectivo resta origen y suma destino', (t) => {
