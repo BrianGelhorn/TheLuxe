@@ -306,7 +306,13 @@ function barberPaymentRecord(barber, date = workday.value) {
   const record = barberPayments[date]?.[barber];
   if (!record) return { status: 'No pago', cashAmount: '', mpAmount: '' };
   if (typeof record === 'string') return { status: record, cashAmount: '', mpAmount: '' };
-  return { status: record.status || 'No pago', cashAmount: record.cashAmount ?? '', mpAmount: record.mpAmount ?? '' };
+  return { status: record.status || 'No pago', cashAmount: record.cashAmount ?? '', mpAmount: record.mpAmount ?? '', ...(record.paidAmount === undefined ? {} : { paidAmount: record.paidAmount }) };
+}
+
+function paymentStatusLabel(payment, state) {
+  if (payment.status !== 'Efectivo' && payment.status !== 'Mercado Pago') return state.label;
+  return state.remaining ? `${state.label} · Faltan ${money.format(state.remaining)}`
+    : state.excess ? `${state.label} · ${money.format(state.excess)} de más` : state.label;
 }
 
 function updateBarberPaymentColumn(column, payment) {
@@ -316,11 +322,12 @@ function updateBarberPaymentColumn(column, payment) {
     state.label = 'Cubierto con adelantos';
   }
   const mixed = state.mixed;
+  const label = paymentStatusLabel(payment, state);
   column.classList.toggle('is-paid', state.isPaid);
-  column.classList.toggle('is-payment-incomplete', mixed && !state.isPaid);
+  column.classList.toggle('is-payment-incomplete', payment.status !== 'No pago' && !state.isPaid);
   column.dataset.paymentStatus = payment.status;
-  column.querySelector('[data-payment-label]').textContent = state.label;
-  column.querySelector('.payment-disclosure').title = `Pago del día: ${state.label}`;
+  column.querySelector('[data-payment-label]').textContent = label;
+  column.querySelector('.payment-disclosure').title = `Pago del día: ${label}`;
   column.querySelectorAll('[data-barber-payment-method]').forEach((button) => {
     button.setAttribute('aria-pressed', String(button.dataset.barberPaymentMethod === payment.status));
   });
@@ -518,6 +525,7 @@ function barberColumn(barber, list) {
     paymentState.isPaid = true;
     paymentState.label = 'Cubierto con adelantos';
   }
+  const paymentLabel = paymentStatusLabel(payment, paymentState);
   const paymentMethods = ['No pago', 'Efectivo', 'Mercado Pago', 'Mixto'].map((method) => `<button type="button" class="payment-method-option" data-barber-payment-method="${method}" aria-pressed="${method === paymentStatus}" aria-label="${method} para ${escapeHtml(barber)}" title="${method}" ${reorderingBarbers ? 'disabled' : ''}>${method === 'Mercado Pago' ? 'MP' : method}</button>`).join('');
   const rows = cuts.length ? cuts.map((entry) => `
     <button class="barber-service" type="button" data-cut="${escapeHtml(entry.id)}">
@@ -537,7 +545,7 @@ function barberColumn(barber, list) {
       ${entry.notes ? `<small class="service-note">Nota: ${escapeHtml(entry.notes)}</small>` : ''}
     </button>`).join('') : '<div class="barber-empty">Sin cortes cargados</div>';
   return `
-    <section class="barber-column${paymentState.isPaid ? ' is-paid' : paymentState.mixed ? ' is-payment-incomplete' : ''}" data-payment-due="${payout.total}" data-advance-covered="${Boolean(settlement.gross && !settlement.due && settlement.advance)}" data-payment-status="${escapeHtml(paymentStatus)}" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
+    <section class="barber-column${paymentState.isPaid ? ' is-paid' : paymentStatus !== 'No pago' ? ' is-payment-incomplete' : ''}" data-payment-due="${payout.total}" data-advance-covered="${Boolean(settlement.gross && !settlement.due && settlement.advance)}" data-payment-status="${escapeHtml(paymentStatus)}" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
       <header class="barber-column-header">
         <strong>${escapeHtml(barber)}</strong>
         <button class="add-cut" type="button" data-barber="${escapeHtml(barber)}" aria-label="Registrar corte para ${escapeHtml(barber)}" title="Agregar corte" ${isDayOpen(workday.value) ? '' : 'disabled'}>+</button>
@@ -554,9 +562,9 @@ function barberColumn(barber, list) {
           <div class="payment-amount-due" title="Comisión y propinas pendientes luego de adelantos ya egresados de caja"><dt>Total a pagar</dt><dd>${money.format(payout.total)}</dd></div>
         </dl>
         <details class="barber-payment-control">
-          <summary class="payment-disclosure" title="Pago del día: ${escapeHtml(paymentState.label)}" ${reorderingBarbers ? 'aria-disabled="true"' : ''}>
+          <summary class="payment-disclosure" title="Pago del día: ${escapeHtml(paymentLabel)}" ${reorderingBarbers ? 'aria-disabled="true"' : ''}>
             <span class="payment-disclosure-mark" aria-hidden="true"></span>
-            <span data-payment-label aria-live="polite">${paymentState.label}</span>
+            <span data-payment-label aria-live="polite">${paymentLabel}</span>
             <span class="payment-disclosure-chevron" aria-hidden="true"></span>
           </summary>
           <div class="payment-dropdown-content">
@@ -637,7 +645,13 @@ document.getElementById('barberColumns').addEventListener('click', (event) => {
   if (paymentMethod) {
     const column = paymentMethod.closest('[data-barber-column]');
     const barber = column.dataset.barberColumn;
-    const payment = { ...barberPaymentRecord(barber), status: paymentMethod.dataset.barberPaymentMethod };
+    const previous = barberPaymentRecord(barber);
+    const status = paymentMethod.dataset.barberPaymentMethod;
+    const payment = { ...previous, status };
+    if (status === 'Efectivo' || status === 'Mercado Pago') {
+      const due = Number(column.dataset.paymentDue);
+      payment.paidAmount = previous.status === status ? Math.max(Number(previous.paidAmount ?? due), due) : due;
+    }
     barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: payment };
     saveBarberPayments();
     updateBarberPaymentColumn(column, payment);
@@ -1214,6 +1228,19 @@ function hydrateState(state) {
   ({ config, entries, sales, advances, expenses, transfers, openingAdjustments, cashRegisters, barberPayments, inventory } = state);
   inventory = inventory.version === 1 ? migrateInventory(inventory) : inventory;
   inventoryReadError = false;
+  let migratedPayments = false;
+  for (const [date, payments] of Object.entries(barberPayments)) {
+    for (const [barber, payment] of Object.entries(payments)) {
+      const status = typeof payment === 'string' ? payment : payment.status;
+      if (!['Efectivo', 'Mercado Pago'].includes(status) || typeof payment !== 'string' && payment.paidAmount !== undefined) continue;
+      const cuts = entries.filter((cut) => cut.date === date && cut.barber === barber);
+      const dayAdvances = advances.filter((advance) => advance.date === date && advance.barber === barber);
+      const paidAmount = barberSettlement(cuts, dayAdvances, {}, effectiveCommission).due;
+      payments[barber] = { ...(typeof payment === 'string' ? { status, cashAmount: '', mpAmount: '' } : payment), paidAmount };
+      migratedPayments = true;
+    }
+  }
+  return migratedPayments;
 }
 async function bootstrapState() {
   const shell = document.querySelector('.app-shell');
@@ -1236,10 +1263,11 @@ async function bootstrapState() {
     stateRevision = stored.revision;
     const pendingRaw = localStorage.getItem(pendingStateKey);
     const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+    let migratedPayments = false;
     if (pending && (!Number.isSafeInteger(pending.revision) || pending.revision < 0 || !pending.state)) throw new Error('Respaldo pendiente inválido');
     if (pending && stored.state && JSON.stringify(pending.state) === JSON.stringify(stored.state)) clearPendingState();
     else if (pending) {
-      hydrateState(pending.state);
+      migratedPayments = hydrateState(pending.state);
       if (pending.revision !== stateRevision) {
         stateConflict = true; stateDirty = true;
         stateMessage('Hay cambios locales sin guardar y la base cambió en otra sesión. Se conservaron en este navegador; no recargues ni borres los datos locales hasta resolver el conflicto.', true);
@@ -1250,12 +1278,12 @@ async function bootstrapState() {
       if (!localInventoryOk) throw new Error('Inventario local inválido');
       entries = []; sales = []; advances = []; expenses = []; transfers = []; openingAdjustments = []; cashRegisters = {}; barberPayments = {};
     } else if (!pending || stored.state && JSON.stringify(pending.state) === JSON.stringify(stored.state)) {
-      hydrateState(stored.state);
+      migratedPayments = hydrateState(stored.state);
       stockMessage('');
     }
     initInventory(false); renderConfig(); render();
     stateLoaded = true; shell.inert = false; stateMessage('');
-    if (stored.state === null || pending && pending.revision === stateRevision) queueStateSave();
+    if (stored.state === null || pending && pending.revision === stateRevision || migratedPayments) queueStateSave();
   } catch (error) {
     stateMessage(error.message === 'Inventario local inválido'
       ? 'El inventario local no es válido. No se creó una base nueva ni se sobrescribió el respaldo. Reparalo antes de reintentar.'

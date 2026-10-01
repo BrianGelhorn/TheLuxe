@@ -1341,16 +1341,13 @@ test('STO-120 - Contenido por compra solo aparece para cajas', (t) => {
   assert.equal(form.packageSize.disabled, true);
 });
 
-test('STO-121 - Cargar ejemplo crea productos, movimientos y gráfico de stock', (t) => {
-  const app = createApp(t);
-  app.click('#loadStockDemo');
-  assert.equal(saved(app).products.length, 5);
-  assert.equal(saved(app).movements.length, 10);
-  assert.equal(saved(app).products.find((item) => item.id === 'demo-navajas').packageSize, 50);
-  assert.equal(saved(app).products.find((item) => item.id === 'demo-navajas').unitCost, 100);
-  assert.equal(app.element('summaryPeriod').value, 'month');
-  assert.equal(app.element('stockReportChart').hidden, false);
-  assert.notEqual(app.element('stockReportConsumed').textContent, app.money(0));
+test('STO-121 - Sin carga de ejemplo conserva productos y movimientos existentes', (t) => {
+  const previous = fixture({ products: [product({ id: 'demo-navajas' })], movements: [movement({ id: 'demo-m1', productId: 'demo-navajas' })] });
+  const encoded = JSON.stringify(previous);
+  const app = createApp(t, { storage: { [key]: encoded } });
+  assert.equal(app.window.document.getElementById('loadStockDemo'), null);
+  assert.equal(raw(app), encoded);
+  assert.deepEqual(app.snapshot('inventory'), previous);
 });
 
 test('STO-122 - Activar stock en un producto de venta permite fijar cantidad inicial', (t) => {

@@ -390,3 +390,23 @@ test('PERSIST-025 - la versión instalada no opera en modo temporal sin fetch', 
   assert.equal(app.query('.app-shell').inert, true);
   assert.match(app.element('persistenceMessage').textContent, /no puede conectarse a la base/);
 });
+
+test('PERSIST-026 - un pago simple antiguo congela su importe al hidratar y no cambia con la comisión', async (t) => {
+  const legacy = emptyState();
+  legacy.entries = [{ id: 'c', date: '2026-09-03', time: '12:00', barber: 'Mateo', service: 'Corte', amount: 1000, tip: 0, payment: 'Efectivo', commissionRate: 50, commissionAmount: 500 }];
+  legacy.advances = [{ id: 'a', date: '2026-09-03', time: '11:00', barber: 'Mateo', payment: 'Efectivo', amount: 100, reason: 'Adelanto' }];
+  legacy.barberPayments = { '2026-09-03': { Mateo: 'Efectivo' } };
+  const writes = [];
+  const app = createApp(t, { clean: false, fetch: async (url, options = {}) => {
+    if (options.method === 'PUT') { writes.push(JSON.parse(options.body)); return response({ revision: 3 + writes.length }); }
+    return response({ revision: 3, state: legacy });
+  } });
+  await wait(app);
+  assert.equal(app.run('barberPaymentRecord("Mateo").paidAmount'), 400);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].state.barberPayments['2026-09-03'].Mateo.paidAmount, 400);
+  app.run('entries[0].commissionAmount = 800; save()');
+  await wait(app);
+  assert.equal(writes[1].state.barberPayments['2026-09-03'].Mateo.paidAmount, 400);
+  assert.equal(app.run('barberSettlement(entries, advances, barberPaymentRecord("Mateo")).paidCash'), 400);
+});

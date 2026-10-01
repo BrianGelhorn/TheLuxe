@@ -7,35 +7,6 @@ let stockEditingSnapshot = null;
 const stockProductForm = document.getElementById('stockProductForm');
 const stockMovementForm = document.getElementById('stockMovementForm');
 
-function stockDemoInventory() {
-  const date = (offset) => {
-    const value = new Date(`${today()}T12:00:00`);
-    value.setDate(value.getDate() + offset);
-    return isoDate(value);
-  };
-  const startDate = date(-14);
-  return {
-    version: 2,
-    products: [
-      { id: 'demo-navajas', name: 'Navajas', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 50, unitCost: 100, initialUnitCost: 100, packageSize: 50, packageCost: 5000, packageLabel: 'caja', startDate, active: true },
-      { id: 'demo-guantes', name: 'Guantes', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 30, unitCost: 300, initialUnitCost: 300, startDate, active: true },
-      { id: 'demo-toallas', name: 'Toallas descartables', saleEnabled: false, stockEnabled: true, unit: 'unidades', initialStock: 80, unitCost: 120, initialUnitCost: 120, packageSize: 100, packageCost: 12000, packageLabel: 'caja', startDate, active: true },
-    ],
-    movements: [
-      { id: 'demo-m1', productId: 'demo-navajas', date: date(-6), time: '09:00', type: 'entrada', quantity: 50, notes: 'Compra de 1 caja', cancelled: false, unitCost: 100, cost: 5000 },
-      { id: 'demo-m2', productId: 'demo-navajas', date: date(-5), time: '18:00', type: 'consumo', quantity: 7, notes: 'Uso diario', cancelled: false },
-      { id: 'demo-m3', productId: 'demo-guantes', date: date(-4), time: '09:15', type: 'entrada', quantity: 20, notes: 'Reposición', cancelled: false },
-      { id: 'demo-m4', productId: 'demo-toallas', date: date(-3), time: '10:00', type: 'entrada', quantity: 100, notes: 'Compra de 1 caja', cancelled: false },
-      { id: 'demo-m5', productId: 'demo-navajas', date: date(-2), time: '18:10', type: 'consumo', quantity: 10, notes: 'Uso diario', cancelled: false },
-      { id: 'demo-m6', productId: 'demo-guantes', date: date(-2), time: '18:15', type: 'consumo', quantity: 6, notes: 'Uso diario', cancelled: false },
-      { id: 'demo-m7', productId: 'demo-toallas', date: date(-1), time: '18:20', type: 'consumo', quantity: 15, notes: 'Uso diario', cancelled: false },
-      { id: 'demo-m8', productId: 'demo-navajas', date: date(0), time: '11:00', type: 'consumo', quantity: 5, notes: 'Uso de prueba', cancelled: false },
-      { id: 'demo-m9', productId: 'demo-guantes', date: date(0), time: '11:05', type: 'consumo', quantity: 3, notes: 'Uso de prueba', cancelled: false },
-      { id: 'demo-m10', productId: 'demo-toallas', date: date(0), time: '11:10', type: 'consumo', quantity: 25, notes: 'Uso de prueba', cancelled: false },
-    ],
-  };
-}
-
 function updateStockProductCostPreview() {
   const fields = stockProductForm.elements;
   const packaged = fields.packageLabel.value === 'caja';
@@ -249,23 +220,6 @@ function initInventory(load = true) {
   if (load) loadInventory();
   updateProductFields();
   populateSelectors();
-  document.getElementById('loadStockDemo').addEventListener('click', () => {
-    const demo = stockDemoInventory();
-    const existingNames = new Set(inventory.products.map((product) => searchText(product.name)));
-    const existingIds = new Set(inventory.products.map((product) => product.id));
-    const products = demo.products.filter((product) => !existingNames.has(searchText(product.name)) && !existingIds.has(product.id));
-    if (!products.length) return stockMessage('Los productos de ejemplo ya están cargados. No se modificó el inventario ni las ventas.');
-    const productIds = new Set(products.map((product) => product.id));
-    const movements = [...inventory.movements, ...demo.movements.filter((row) => productIds.has(row.productId))];
-    if (!saveInventory({ ...inventory, products: [...inventory.products, ...products], movements })) return;
-    resetStockProductForm();
-    renderInventory();
-    stockMessage('Productos de ejemplo agregados. El inventario y las ventas existentes se conservaron.');
-    document.querySelector('.nav-item[data-view="summaryView"]').click();
-    document.getElementById('summaryPeriod').value = 'month';
-    updateSummaryReference();
-    renderSummary();
-  });
   stockProductForm.addEventListener('submit', (event) => {
     event.preventDefault();
     updateStockProductCostPreview();

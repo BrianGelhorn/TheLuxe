@@ -52,11 +52,11 @@ const config = (value) => value && typeof value === 'object' && !Array.isArray(v
   && catalog(value.expenseCategories) && amount(value.commission) && value.commission <= 100 && (value.commissionHistory === undefined || Array.isArray(value.commissionHistory) && value.commissionHistory.every((item) => item && typeof item === 'object' && date(item.date, true) && amount(item.rate) && item.rate <= 100));
 const registers = (value) => value && typeof value === 'object' && !Array.isArray(value) && Object.entries(value).every(([key, row]) => date(key) && row && typeof row === 'object' && !Array.isArray(row)
   && ['initialCash', 'initialMp', 'realCash', 'realMp', 'withdrawal', 'withdrawalMp', 'commissionRate'].every((field) => amount(row[field], false)) && (row.commissionRate === undefined || row.commissionRate <= 100)
-  && (row.initialCash !== undefined || row.initialMp !== undefined) && (row.opened === undefined || typeof row.opened === 'boolean') && (row.autoOpened === undefined || typeof row.autoOpened === 'boolean')
+  && (row.initialCash !== undefined || row.initialMp !== undefined || Object.keys(row).length === 1 && row.commissionRate !== undefined) && (row.opened === undefined || typeof row.opened === 'boolean') && (row.autoOpened === undefined || typeof row.autoOpened === 'boolean')
   && (row.inheritedFrom === undefined || date(row.inheritedFrom)) && ['openedAt', 'updatedAt', 'closedAt'].every((field) => row[field] === undefined || typeof row[field] === 'string' && row[field].length <= 40));
 const draftAmount = (value) => value === '' || amount(value);
 const payments = (value) => value && typeof value === 'object' && !Array.isArray(value) && Object.entries(value).every(([day, rows]) => date(day) && rows && typeof rows === 'object' && !Array.isArray(rows)
-  && Object.entries(rows).every(([barber, row]) => text(barber, 100) && (typeof row === 'string' ? status(row) : row && typeof row === 'object' && status(row.status || 'No pago') && draftAmount(row.cashAmount ?? '') && draftAmount(row.mpAmount ?? ''))));
+  && Object.entries(rows).every(([barber, row]) => text(barber, 100) && (typeof row === 'string' ? status(row) : row && typeof row === 'object' && status(row.status || 'No pago') && draftAmount(row.cashAmount ?? '') && draftAmount(row.mpAmount ?? '') && (row.paidAmount === undefined || Number.isSafeInteger(row.paidAmount) && amount(row.paidAmount)))));
 const saleStockConsistent = (state) => {
   const products = new Map(state.inventory.products.map((product) => [product.id, product]));
   const sales = new Map(state.sales.map((item) => [item.id, item]));

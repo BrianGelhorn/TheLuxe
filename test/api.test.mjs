@@ -93,3 +93,32 @@ test('API conserva ventas anteriores al inicio del control de stock', async (t) 
   assert.equal((await request(api.url(), '/api/products', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [withStock] }) })).status, 200);
   assert.equal((await request(api.url(), '/api/sales')).body.data[0].id, 'sale-1');
 });
+
+test('API permite comisión diaria antes de abrir la caja sin aceptar registros incompletos', async (t) => {
+  const api = await fixture(t);
+  const headers = { 'Content-Type': 'application/json' };
+  const pending = state();
+  pending.cashRegisters = { '2026-09-03': { commissionRate: 60 } };
+  assert.equal((await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 0, state: pending }) })).status, 200);
+  assert.deepEqual((await request(api.url(), '/api/cash-registers')).body, { revision: 1, data: pending.cashRegisters });
+  for (const row of [{}, { opened: true }, { commissionRate: -1 }, { commissionRate: 101 }, { commissionRate: 60, withdrawal: 1 }]) {
+    assert.equal((await request(api.url(), '/api/cash-registers', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: { '2026-09-03': row } }) })).status, 400, JSON.stringify(row));
+  }
+  const opened = { '2026-09-03': { commissionRate: 60, initialCash: 0, initialMp: 0, opened: true } };
+  assert.equal((await request(api.url(), '/api/cash-registers', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: opened }) })).status, 200);
+  assert.deepEqual((await request(api.url(), '/api/cash-registers')).body, { revision: 2, data: opened });
+});
+
+test('API persiste el pago simple entregado y rechaza importes inválidos', async (t) => {
+  const api = await fixture(t);
+  const headers = { 'Content-Type': 'application/json' };
+  assert.equal((await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 0, state: state() }) })).status, 200);
+  const paid = { '2026-09-03': { Mateo: { status: 'Efectivo', cashAmount: '', mpAmount: '', paidAmount: 500 } } };
+  assert.equal((await request(api.url(), '/api/barber-payments', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: paid }) })).status, 200);
+  assert.deepEqual((await request(api.url(), '/api/barber-payments')).body, { revision: 2, data: paid });
+  for (const paidAmount of [-1, 0.5, '500', 1_000_000_001]) {
+    const invalid = { '2026-09-03': { Mateo: { ...paid['2026-09-03'].Mateo, paidAmount } } };
+    assert.equal((await request(api.url(), '/api/barber-payments', { method: 'PUT', headers, body: JSON.stringify({ revision: 2, data: invalid }) })).status, 400, String(paidAmount));
+  }
+  assert.equal((await request(api.url(), '/api/barber-payments')).body.revision, 2);
+});

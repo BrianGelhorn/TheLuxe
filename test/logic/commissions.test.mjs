@@ -147,3 +147,15 @@ test('PAYOUT-052 - Un corte nuevo recalcula el pago mixto desde la comision redo
     mixed: true, paidAmount: 52, isPaid: false, label: 'Mixto \u00b7 Incompleto', remaining: 60, excess: 0,
   });
 });
+
+test('PAYOUT-053 - Un pago simple conserva lo entregado aunque cambie la deuda', () => {
+  const logic = loadLogic();
+  const payment = { status: 'Efectivo', paidAmount: 500 };
+  assert.equal(logic.barberSettlement([{ amount: 1000, commissionRate: 80 }], [], payment).paidCash, 500);
+  assert.deepEqual({ ...logic.barberPaymentState(payment, 800) }, {
+    mixed: false, paidAmount: 500, isPaid: false, label: 'Pago parcial \u00b7 Efectivo', remaining: 300, excess: 0,
+  });
+  assert.equal(logic.barberSettlement([{ amount: 1000, commissionRate: 40 }], [], payment).paidCash, 500);
+  assert.equal(logic.barberPaymentState(payment, 400).excess, 100);
+  assert.equal(logic.barberSettlement([{ amount: 1000, commissionRate: 80 }], [], { status: 'Efectivo' }).paidCash, 800);
+});

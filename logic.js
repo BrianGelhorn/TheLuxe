@@ -53,8 +53,8 @@
     const advance = advances.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const due = Math.max(0, gross - advance);
     const simple = payment.status === 'Efectivo' || payment.status === 'Mercado Pago';
-    const paidCash = simple ? (payment.status === 'Efectivo' ? due : 0) : payment.status === 'Mixto' ? Number(payment.cashAmount || 0) : 0;
-    const paidMp = simple ? (payment.status === 'Mercado Pago' ? due : 0) : payment.status === 'Mixto' ? Number(payment.mpAmount || 0) : 0;
+    const paidCash = simple ? (payment.status === 'Efectivo' ? Number(payment.paidAmount ?? due) : 0) : payment.status === 'Mixto' ? Number(payment.cashAmount || 0) : 0;
+    const paidMp = simple ? (payment.status === 'Mercado Pago' ? Number(payment.paidAmount ?? due) : 0) : payment.status === 'Mixto' ? Number(payment.mpAmount || 0) : 0;
     let commissionRemaining = commission;
     const allocate = (amount) => {
       const paid = Math.min(commissionRemaining, Math.max(0, amount));
@@ -73,10 +73,11 @@
 
   function barberPaymentState(payment, totalDue) {
     const mixed = payment.status === 'Mixto';
-    const paidAmount = Number(payment.cashAmount || 0) + Number(payment.mpAmount || 0);
-    const isPaid = mixed ? paidAmount >= totalDue : ['Efectivo', 'Mercado Pago'].includes(payment.status);
+    const simple = payment.status === 'Efectivo' || payment.status === 'Mercado Pago';
+    const paidAmount = simple ? Number(payment.paidAmount ?? totalDue) : Number(payment.cashAmount || 0) + Number(payment.mpAmount || 0);
+    const isPaid = (simple || mixed) && paidAmount >= totalDue;
     const label = mixed ? `Mixto · ${isPaid ? 'Completo' : 'Incompleto'}`
-      : isPaid ? `Pagado · ${payment.status === 'Mercado Pago' ? 'MP' : payment.status}` : 'No pago';
+      : simple ? `${isPaid ? paidAmount > totalDue ? 'Pagado de más' : 'Pagado' : 'Pago parcial'} · ${payment.status === 'Mercado Pago' ? 'MP' : 'Efectivo'}` : 'No pago';
     return { mixed, paidAmount, isPaid, label, remaining: Math.max(0, totalDue - paidAmount), excess: Math.max(0, paidAmount - totalDue) };
   }
 

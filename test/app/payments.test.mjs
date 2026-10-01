@@ -255,7 +255,7 @@ test('PAY-016 - Renderizar y repetir el mismo pago no duplica descuentos', (t) =
   assert.deepEqual(app.snapshot('Object.keys(barberPayments[workday.value])'), ['Mateo']);
 });
 
-test('PAY-017 - Un corte posterior recalcula el pago unico con su nueva propina', (t) => {
+test('PAY-017 - Un corte posterior deja pendiente la diferencia del pago simple ya entregado', (t) => {
   const app = createApp(t);
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
@@ -263,11 +263,13 @@ test('PAY-017 - Un corte posterior recalcula el pago unico con su nueva propina'
   app.submit('cutForm', { service: 'Barba', amount: '2000', tip: '100', payment: 'Efectivo' });
   assert.equal(app.query(mateo).dataset.paymentDue, '2050');
   assert.equal(app.query(mateo).dataset.paymentStatus, 'Efectivo');
-  assert.equal(app.query(mateo).classList.contains('is-paid'), true);
-  balances(app, 2900, 4900);
+  assert.equal(app.query(mateo).classList.contains('is-payment-incomplete'), true);
+  assert.equal(app.run('barberPaymentRecord("Mateo").paidAmount'), 950);
+  assert.match(app.query(`${mateo} [data-payment-label]`).textContent, /1.100/);
+  balances(app, 4000, 4900);
 });
 
-test('PAY-018 - Editar un corte pagado recalcula cobro y descuento una sola vez', (t) => {
+test('PAY-018 - Editar un corte pagado recalcula cobro pero conserva dinero entregado', (t) => {
   const app = createApp(t);
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
@@ -275,13 +277,15 @@ test('PAY-018 - Editar un corte pagado recalcula cobro y descuento una sola vez'
   app.click('#editCut');
   app.submit('cutForm', { amount: '2000', tip: '100' });
   assert.equal(app.query(mateo).dataset.paymentDue, '1350');
+  assert.equal(app.run('barberPaymentRecord("Mateo").paidAmount'), 950);
+  assert.equal(app.query(mateo).classList.contains('is-payment-incomplete'), true);
   assert.equal(app.run('entries.length'), 3);
-  balances(app, 2400, 4900);
+  balances(app, 2800, 4900);
   app.render();
-  balances(app, 2400, 4900);
+  balances(app, 2800, 4900);
 });
 
-test('PAY-019 - Eliminar un corte pagado elimina tambien su parte del pago unico', (t) => {
+test('PAY-019 - Eliminar un corte pagado conserva el dinero entregado y muestra excedente', (t) => {
   const app = createApp(t);
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
@@ -289,7 +293,8 @@ test('PAY-019 - Eliminar un corte pagado elimina tambien su parte del pago unico
   app.click('#deleteCut');
   assert.equal(app.query(mateo).dataset.paymentDue, '250');
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
-  balances(app, 1400, 4900);
+  assert.match(app.query(`${mateo} [data-payment-label]`).textContent, /700.*de más/);
+  balances(app, 700, 4900);
 });
 
 test('PAY-020 - Un nuevo corte deja mixto incompleto sin cambiar importes entregados', (t) => {
@@ -321,7 +326,7 @@ test('PAY-021 - Eliminar corte mantiene el mixto entregado y muestra nuevo exced
   balances(app, 900, 4400);
 });
 
-test('PAY-022 - Cambiar comision diaria recalcula el descuento del pago completo', (t) => {
+test('PAY-022 - Cambiar comisión diaria deja pendiente la diferencia sin mover caja', (t) => {
   const app = createApp(t);
   app.financialFixture();
   app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
@@ -329,7 +334,8 @@ test('PAY-022 - Cambiar comision diaria recalcula el descuento del pago completo
   app.submit('dailyCommissionForm', { commission: '60' });
   assert.equal(app.query(mateo).dataset.paymentDue, '1140');
   assert.equal(app.query(lucas).dataset.paymentDue, '1100');
-  balances(app, 1710, 4900);
+  assert.equal(app.query(mateo).classList.contains('is-payment-incomplete'), true);
+  balances(app, 1900, 4900);
 });
 
 test('PAY-023 - Los estados de pago y sus descuentos quedan aislados por jornada', (t) => {
@@ -465,4 +471,22 @@ test('PAY-031 - Guardar cierre tras pago conserva sus importes reales al volver'
   assert.deepEqual(['realCash', 'realMp', 'withdrawal'].map((name) => app.element('cashRegisterForm').elements.namedItem(name).value), ['1.900', '4.900', '100']);
   assert.equal(app.element('cashDifference').textContent, app.money(0));
   balances(app, 1900, 4900);
+});
+
+test('PAY-032 - Un pago simple no cambia al variar la comisión y permite pagar la diferencia', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
+  assert.equal(app.run('barberPaymentRecord("Mateo").paidAmount'), 950);
+  app.submit('dailyCommissionForm', { commission: '60' });
+  assert.equal(app.query(mateo).dataset.paymentDue, '1140');
+  assert.equal(app.run('barberPaymentRecord("Mateo").paidAmount'), 950);
+  assert.equal(app.query(mateo).classList.contains('is-payment-incomplete'), true);
+  assert.match(app.query(`${mateo} [data-payment-label]`).textContent, /Pago parcial/);
+  assert.match(app.query(`${mateo} [data-payment-label]`).textContent, /190/);
+  balances(app, 1900, 4900);
+  app.click(`${mateo} [data-barber-payment-method="Efectivo"]`);
+  assert.equal(app.run('barberPaymentRecord("Mateo").paidAmount'), 1140);
+  assert.equal(app.query(mateo).classList.contains('is-paid'), true);
+  balances(app, 1710, 4900);
 });
