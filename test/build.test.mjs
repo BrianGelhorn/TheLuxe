@@ -11,7 +11,11 @@ const worker = (await import(new URL('dist/server/index.js', root))).default;
 test('HTTP-011 - Docker publica solo archivos web y escucha en la PC', () => {
   const outputDirectory = 'dist/client';
   assert.match(read('Dockerfile'), /COPY --from=build \/app\/dist\/client\/ \/usr\/share\/nginx\/html\//);
+  assert.match(read('Dockerfile'), /FROM node:24-alpine AS api[\s\S]*?COPY api\.mjs logic\.js/);
   assert.match(read('compose.yaml'), /127\.0\.0\.1:8000:8000/);
+  assert.match(read('compose.yaml'), /target: api[\s\S]*?data:\/data/);
+  assert.match(read('nginx.conf'), /resolver 127\.0\.0\.11[\s\S]*?location \/api\/ \{[\s\S]*?proxy_pass http:\/\/\$api_upstream/);
+  assert.match(read('nginx.conf'), /\$http_host != "127\.0\.0\.1:8000"/);
   const files = ['index.html', 'styles.css', 'version.json', ...scripts];
   assert.deepEqual(readdirSync(new URL(`${outputDirectory}/`, root)).sort(), files.sort());
   for (const file of files.filter((item) => !['index.html', 'version.json'].includes(item))) assert.equal(read(`${outputDirectory}/${file}`), read(file));

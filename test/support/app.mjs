@@ -6,7 +6,7 @@ import { read, root, scripts, financialFixture } from './logic.mjs';
 
 // Real HTML/forms/events, without network or layout. Only browser APIs absent in
 // jsdom (modal presentation, scrolling, cloning) and nondeterminism are replaced.
-export function createApp(t, { clean = true, storage = {}, now = '2026-09-03T12:00:00', buildVersion = '' } = {}) {
+export function createApp(t, { clean = true, storage = {}, session = {}, sessionReadError = false, broadcastChannel, uuidPrefix = 'test-id', now = '2026-09-03T12:00:00', buildVersion = '', fetch } = {}) {
   const html = read('index.html');
   const dom = new JSDOM(buildVersion ? html.replace('</head>', `<meta name="theluxe-build" content="${buildVersion}"></head>`) : html, { url: 'http://127.0.0.1:8000/', runScripts: 'outside-only' });
   t?.after(() => dom.window.close());
@@ -24,14 +24,25 @@ export function createApp(t, { clean = true, storage = {}, now = '2026-09-03T12:
     static now() { return timestamp; }
   };
   window.structuredClone = structuredClone;
-  window.crypto.randomUUID = () => `test-id-${++sequence}`;
+  window.crypto.randomUUID = () => `${uuidPrefix}-${++sequence}`;
   window.alert = (message) => alerts.push(message);
   window.confirm = (message) => { confirmations.push(message); return accepted; };
+  if (fetch) window.fetch = fetch;
+  if (broadcastChannel) window.BroadcastChannel = broadcastChannel;
   window.HTMLElement.prototype.scrollIntoView = function () {};
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
   window.addEventListener('error', (event) => { errors.push(event.error); event.preventDefault(); });
   for (const [key, value] of Object.entries(storage)) window.localStorage.setItem(key, value);
+  window.sessionStorage.setItem('theluxe-tab-v1', 'test-tab');
+  for (const [key, value] of Object.entries(session)) window.sessionStorage.setItem(key, value);
+  if (sessionReadError) {
+    const getItem = window.Storage.prototype.getItem;
+    window.Storage.prototype.getItem = function (key) {
+      if (this === window.sessionStorage && key === 'theluxe-tab-v1') throw new Error('sessionStorage bloqueado');
+      return getItem.call(this, key);
+    };
+  }
   const run = (source) => vm.runInContext(source, context);
   const checkErrors = () => { if (errors.length) throw errors.shift(); };
   for (const file of scripts) new vm.Script(read(file), { filename: fileURLToPath(new URL(file, root)) }).runInContext(context);
@@ -78,6 +89,7 @@ export function createApp(t, { clean = true, storage = {}, now = '2026-09-03T12:
     render: () => { run('render()'); checkErrors(); },
     money: (value) => run(`money.format(${Number(value)})`),
     confirm: (value) => { accepted = value; },
+    settle: () => new Promise((resolve) => window.setTimeout(resolve, 0)),
     click: (selector) => { query(selector).click(); checkErrors(); },
     input: (selector, value) => { const node = query(selector); node.value = String(value); emit(node, 'input'); },
     submit: (id, values) => {

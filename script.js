@@ -5,7 +5,6 @@ const defaultConfig = {
   commission: 50,
   commissionHistory: [{ date: '0000-01-01', rate: 50 }],
 };
-try { Object.keys(localStorage).filter((key) => key.startsWith('theluxe-') && key !== inventoryStorageKey).forEach((key) => localStorage.removeItem(key)); } catch {}
 let config = structuredClone(defaultConfig);
 let barbers = config.barbers.filter(({ active }) => active !== false).map(({ name }) => name);
 let prices = Object.fromEntries(config.services.map(({ name, price }) => [name, price]));
@@ -138,24 +137,31 @@ document.querySelectorAll('.money-input input').forEach((input) => input.addEven
 }));
 
 function save() {
+  queueStateSave();
 }
 
 function saveSales() {
+  queueStateSave();
 }
 
 function saveAdvances() {
+  queueStateSave();
 }
 
 function saveExpenses() {
+  queueStateSave();
 }
 
 function saveCashRegisters() {
+  queueStateSave();
 }
 
 function saveTransfers() {
+  queueStateSave();
 }
 
 function saveOpeningAdjustments() {
+  queueStateSave();
 }
 
 function saveConfig() {
@@ -164,7 +170,10 @@ function saveConfig() {
   populateSelectors();
   renderConfig();
   render();
+  queueStateSave();
 }
+
+function saveBarberPayments() { queueStateSave(); }
 
 function populateSelectors() {
   const options = [...document.querySelectorAll('#summaryServiceOptions input')];
@@ -630,6 +639,7 @@ document.getElementById('barberColumns').addEventListener('click', (event) => {
     const barber = column.dataset.barberColumn;
     const payment = { ...barberPaymentRecord(barber), status: paymentMethod.dataset.barberPaymentMethod };
     barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: payment };
+    saveBarberPayments();
     updateBarberPaymentColumn(column, payment);
     renderAvailableBalances();
     renderSummary();
@@ -660,6 +670,7 @@ document.getElementById('barberColumns').addEventListener('input', (event) => {
   input.setSelectionRange(caret, caret);
   const updated = { ...payment, [field]: input.value === '' ? '' : parseAmount(input.value) };
   barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: updated };
+  saveBarberPayments();
   updateBarberPaymentColumn(column, updated);
   renderAvailableBalances();
   renderSummary();
@@ -1114,9 +1125,152 @@ document.getElementById('configView').addEventListener('click', (event) => {
   openConfigDialog(type, item);
 });
 
-initInventory();
-renderConfig();
-render();
+const stateApiEnabled = typeof window.fetch === 'function';
+let tabId = null;
+try {
+  tabId = sessionStorage.getItem('theluxe-tab-v1') || crypto.randomUUID();
+  sessionStorage.setItem('theluxe-tab-v1', tabId);
+} catch { /* Conserva el respaldo con una clave de reserva si no hay sessionStorage. */ }
+let pendingStateKey = tabId ? `theluxe-pending-state-v1:${tabId}` : 'theluxe-pending-state-v1';
+const tabChannel = typeof window.BroadcastChannel === 'function' && tabId ? new window.BroadcastChannel('theluxe-pending-tabs') : null;
+const tabNonce = tabChannel ? crypto.randomUUID() : null;
+let tabOccupied = false;
+if (tabChannel) tabChannel.onmessage = ({ data }) => {
+  if (data?.id !== tabId || data.nonce === tabNonce) return;
+  if (data.type === 'claim') tabChannel.postMessage({ type: 'occupied', id: tabId, nonce: tabNonce });
+  if (data.type === 'occupied') tabOccupied = true;
+};
+window.addEventListener('pagehide', () => tabChannel?.close());
+async function claimTab() {
+  if (!tabChannel) return;
+  tabOccupied = false;
+  tabChannel.postMessage({ type: 'claim', id: tabId, nonce: tabNonce });
+  await new Promise((resolve) => window.setTimeout(resolve, 50));
+  if (tabOccupied) {
+    tabId = crypto.randomUUID();
+    sessionStorage.setItem('theluxe-tab-v1', tabId);
+    pendingStateKey = `theluxe-pending-state-v1:${tabId}`;
+  }
+}
+let stateRevision = 0;
+let stateDirty = false;
+let stateSaving = false;
+let stateFlushQueued = false;
+let stateConflict = false;
+let stateLoaded = false;
+function stateSnapshot() { return structuredClone({ config, entries, sales, advances, expenses, transfers, openingAdjustments, cashRegisters, barberPayments, inventory }); }
+function stateMessage(message, error = false, retry = false) {
+  const notice = document.getElementById('persistenceNotice');
+  notice.hidden = !message; notice.classList.toggle('error', error);
+  notice.setAttribute('role', error ? 'alert' : 'status');
+  notice.setAttribute('aria-live', error ? 'assertive' : 'polite');
+  document.getElementById('persistenceMessage').textContent = message;
+  document.getElementById('retryPersistence').hidden = !retry;
+}
+function backUpPendingState() {
+  try {
+    localStorage.setItem(pendingStateKey, JSON.stringify({ revision: stateRevision, state: stateSnapshot() }));
+    return true;
+  } catch { return false; }
+}
+function clearPendingState() { try { localStorage.removeItem(pendingStateKey); } catch { /* Respaldo intacto si falla el almacenamiento. */ } }
+function queueStateSave() {
+  if (!stateApiEnabled) return;
+  stateDirty = true;
+  if (!backUpPendingState()) stateMessage('No se pudo crear una copia de los cambios pendientes en este navegador. No cierres la página hasta confirmar el guardado en la base.', true);
+  if (stateFlushQueued || stateSaving || stateConflict) return;
+  stateFlushQueued = true;
+  queueMicrotask(() => { stateFlushQueued = false; void flushStateSave(); });
+}
+async function flushStateSave() {
+  if (!stateDirty || stateSaving || stateConflict) return;
+  stateSaving = true; stateDirty = false; stateMessage('Guardando cambios…');
+  try {
+    const response = await window.fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: stateRevision, state: stateSnapshot() }) });
+    if (response.status === 409) {
+      stateConflict = true; stateDirty = true;
+      stateMessage('Los datos cambiaron en otra sesión. No se sobrescribió la base; los cambios pendientes siguen guardados en este navegador. Resolvé el conflicto antes de continuar.', true);
+      return;
+    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const saved = await response.json();
+    if (!Number.isSafeInteger(saved.revision) || saved.revision !== stateRevision + 1) throw new Error('Revisión inválida');
+    stateRevision = saved.revision;
+    if (stateDirty) backUpPendingState();
+    else clearPendingState();
+    stateMessage('');
+  } catch {
+    stateDirty = true;
+    stateMessage('No se pudieron guardar los cambios. Permanecen en esta pantalla; reintentá antes de recargar.', true, true);
+  } finally {
+    stateSaving = false;
+    if (stateDirty && !stateConflict && document.getElementById('retryPersistence').hidden) queueStateSave();
+  }
+}
+function hydrateState(state) {
+  if (!state || !state.config || !Array.isArray(state.config.services) || !Array.isArray(state.config.barbers)
+    || !['entries', 'sales', 'advances', 'expenses', 'transfers', 'openingAdjustments'].every((key) => Array.isArray(state[key]))
+    || !state.cashRegisters || !state.barberPayments || inventoryError(state.inventory)) throw new Error('Respuesta inválida');
+  ({ config, entries, sales, advances, expenses, transfers, openingAdjustments, cashRegisters, barberPayments, inventory } = state);
+  inventory = inventory.version === 1 ? migrateInventory(inventory) : inventory;
+  inventoryReadError = false;
+}
+async function bootstrapState() {
+  const shell = document.querySelector('.app-shell');
+  if (!stateApiEnabled) {
+    if (document.querySelector('meta[name="theluxe-build"]')) {
+      shell.inert = true;
+      stateMessage('Este navegador no puede conectarse a la base de datos. Actualizá el navegador antes de operar.', true);
+      return;
+    }
+    initInventory(); renderConfig(); render(); return;
+  }
+  shell.inert = true; stateMessage('Cargando datos guardados…');
+  const localInventoryOk = loadInventory(); // Legacy inventory stays as a backup until DB import succeeds.
+  try {
+    await claimTab();
+    const response = await window.fetch('/api/state', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const stored = await response.json();
+    if (!Number.isSafeInteger(stored.revision) || stored.revision < 0) throw new Error('Respuesta inválida');
+    stateRevision = stored.revision;
+    const pendingRaw = localStorage.getItem(pendingStateKey);
+    const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+    if (pending && (!Number.isSafeInteger(pending.revision) || pending.revision < 0 || !pending.state)) throw new Error('Respaldo pendiente inválido');
+    if (pending && stored.state && JSON.stringify(pending.state) === JSON.stringify(stored.state)) clearPendingState();
+    else if (pending) {
+      hydrateState(pending.state);
+      if (pending.revision !== stateRevision) {
+        stateConflict = true; stateDirty = true;
+        stateMessage('Hay cambios locales sin guardar y la base cambió en otra sesión. Se conservaron en este navegador; no recargues ni borres los datos locales hasta resolver el conflicto.', true);
+        return;
+      }
+    }
+    if (!pending && stored.state === null) {
+      if (!localInventoryOk) throw new Error('Inventario local inválido');
+      entries = []; sales = []; advances = []; expenses = []; transfers = []; openingAdjustments = []; cashRegisters = {}; barberPayments = {};
+    } else if (!pending || stored.state && JSON.stringify(pending.state) === JSON.stringify(stored.state)) {
+      hydrateState(stored.state);
+      stockMessage('');
+    }
+    initInventory(false); renderConfig(); render();
+    stateLoaded = true; shell.inert = false; stateMessage('');
+    if (stored.state === null || pending && pending.revision === stateRevision) queueStateSave();
+  } catch (error) {
+    stateMessage(error.message === 'Inventario local inválido'
+      ? 'El inventario local no es válido. No se creó una base nueva ni se sobrescribió el respaldo. Reparalo antes de reintentar.'
+      : 'No se pudieron cargar los datos guardados. La aplicación permanece bloqueada para no sobrescribir información.', true, true);
+  }
+}
+document.getElementById('retryPersistence').addEventListener('click', () => {
+  if (!stateLoaded) { void bootstrapState(); return; }
+  if (!stateConflict) { stateMessage(''); void flushStateSave(); }
+});
+window.addEventListener('beforeunload', (event) => {
+  if (!stateDirty && !stateSaving) return;
+  event.preventDefault(); event.returnValue = '';
+});
+void bootstrapState();
 
 let mainUpdateAvailable = false;
 const updaterUrl = 'http://127.0.0.1:8001';
@@ -1182,11 +1336,15 @@ document.getElementById('checkUpdates').addEventListener('click', async (event) 
 });
 
 async function applyUpdate() {
-  if (!mainUpdateAvailable) {
-    if (confirm('Al recargar se perderán las ventas y los datos financieros de esta sesión. ¿Actualizar igualmente?')) window.location.reload();
+  if (stateDirty || stateSaving) {
+    alert('Hay cambios pendientes de guardado. Reintentá el guardado antes de actualizar o recargar.');
     return;
   }
-  if (!confirm('Se instalará main y se reiniciará Docker. Al recargar se perderán los datos financieros de esta sesión. ¿Continuar?')) return;
+  if (!mainUpdateAvailable) {
+    if (confirm('Se recargará la aplicación. No se perderán las ventas ni los datos financieros confirmados. ¿Continuar?')) window.location.reload();
+    return;
+  }
+  if (!confirm('Se instalará main y se reiniciará Docker. Los datos financieros confirmados permanecen guardados. ¿Continuar?')) return;
   const button = document.getElementById('configApplyUpdate');
   const status = document.getElementById('configUpdateStatus');
   button.disabled = true;

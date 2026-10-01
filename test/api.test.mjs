@@ -1,0 +1,95 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+import { createApi } from '../api.mjs';
+
+const state = () => ({
+  config: { services: [], barbers: [], expenseCategories: [], commission: 50, commissionHistory: [] }, entries: [], sales: [], advances: [], expenses: [], transfers: [], openingAdjustments: [], cashRegisters: {}, barberPayments: {},
+  inventory: { version: 2, products: [], movements: [] },
+});
+const appSnapshot = () => ({
+  config: { services: [{ id: 'corte', name: 'Corte clásico', price: 15000 }], barbers: [{ id: 'Mateo', name: 'Mateo', active: true }], expenseCategories: [{ id: 'otros', name: 'Otros' }], commission: 50, commissionHistory: [{ date: '0000-01-01', rate: 50 }] },
+  entries: [{ id: 'cut-1', date: '2026-09-03', time: '10:00', barber: 'Mateo', service: 'Corte clásico', amount: 15000, tip: 0, payment: 'Efectivo', cashAmount: 0, mpAmount: 0, notes: '', commissionRate: 50, commissionAmount: 7500 }],
+  sales: [{ id: 'sale-1', date: '2026-09-03', time: '10:10', productId: 'pomada', product: 'Pomada', quantity: 1, unitPrice: 12000, total: 12000, payment: 'Mercado Pago' }],
+  advances: [{ id: 'advance-1', date: '2026-09-03', time: '11:00', barber: 'Mateo', amount: 1000, payment: 'Efectivo', reason: '' }],
+  expenses: [{ id: 'expense-1', date: '2026-09-03', time: '11:10', amount: 500, payment: 'Efectivo', reason: 'Limpieza', category: 'Otros' }],
+  transfers: [{ id: 'transfer-1', date: '2026-09-03', time: '12:00', from: 'Efectivo', to: 'Mercado Pago', amount: 200, description: 'Transferencia entre medios' }],
+  openingAdjustments: [{ id: 'opening-1', date: '2026-09-03', time: '09:00', medium: 'Efectivo', previous: 0, current: 50000, description: 'Apertura' }],
+  cashRegisters: { '2026-09-03': { initialCash: 50000, initialMp: 80000, opened: true, realCash: 49000, realMp: 80000, withdrawal: 0, withdrawalMp: 0, openedAt: '2026-09-03T09:00:00.000Z', updatedAt: '2026-09-03T12:00:00.000Z' } },
+  barberPayments: { '2026-09-03': { Mateo: { status: 'Mixto', cashAmount: '', mpAmount: '' }, Legacy: 'No pago' } },
+  inventory: { version: 2, products: [{ id: 'pomada', name: 'Pomada', saleEnabled: true, stockEnabled: false, salePrice: 12000, active: true }], movements: [] },
+});
+async function fixture(t) {
+  const dir = await mkdtemp(join(tmpdir(), 'theluxe-api-'));
+  const start = () => new Promise((resolve) => {
+    const server = createApi({ databasePath: join(dir, 'state.sqlite') });
+    server.listen(0, '127.0.0.1', () => resolve(server));
+  });
+  let server = await start();
+  t.after(async () => { await new Promise((resolve) => server.close(resolve)); await rm(dir, { recursive: true, force: true }); });
+  return { url: () => `http://127.0.0.1:${server.address().port}`, restart: async () => { await new Promise((resolve) => server.close(resolve)); server = await start(); } };
+}
+async function request(base, path, options) {
+  const response = await fetch(base + path, options);
+  return { status: response.status, body: await response.json() };
+}
+
+test('API CAS state and domain resources', async (t) => {
+  const api = await fixture(t);
+  assert.deepEqual((await request(api.url(), '/api/state')).body, { revision: 0, state: null });
+  assert.equal((await request(api.url(), '/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: 0, state: state() }) })).body.revision, 1);
+  const cut = { id: 'cut-1', date: '2026-09-03', time: '10:00', barber: 'Mateo', service: 'Corte', amount: 100, payment: 'Efectivo' };
+  assert.equal((await request(api.url(), '/api/cuts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: 1, data: [cut] }) })).body.revision, 2);
+  assert.deepEqual((await request(api.url(), '/api/cuts')).body, { revision: 2, data: [cut] });
+  assert.equal((await request(api.url(), '/api/sales', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: 1, data: [] }) })).status, 409);
+});
+
+test('API validates input and inventory without overwriting state', async (t) => {
+  const api = await fixture(t);
+  const headers = { 'Content-Type': 'application/json' };
+  const malformed = await request(api.url(), '/api/state', { method: 'PUT', headers, body: '{' });
+  assert.deepEqual(malformed, { status: 400, body: { error: 'Malformed JSON' } });
+  const corrupt = { ...state(), inventory: { version: 2, products: [{}], movements: [] } };
+  assert.equal((await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 0, state: corrupt }) })).status, 400);
+  assert.equal((await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 0, state: state() }) })).status, 200);
+  assert.equal((await request(api.url(), '/api/inventory', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: { version: 2, products: [{}], movements: [] } }) })).status, 400);
+  assert.equal((await request(api.url(), '/api/cuts', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [{}] }) })).status, 400);
+  assert.equal((await request(api.url(), '/api/cuts', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [null] }) })).status, 400);
+  assert.equal((await request(api.url(), '/api/cuts', { method: 'PUT', headers: { ...headers, Origin: 'https://evil.example' }, body: JSON.stringify({ revision: 1, data: [] }) })).status, 403);
+  assert.equal((await request(api.url(), '/api/state')).body.revision, 1);
+});
+
+test('API accepts an app snapshot and payment drafts while rejecting malformed financial rows', async (t) => {
+  const api = await fixture(t);
+  const headers = { 'Content-Type': 'application/json' };
+  const snapshot = appSnapshot();
+  assert.equal((await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 0, state: snapshot }) })).status, 200);
+  assert.deepEqual((await request(api.url(), '/api/barber-payments')).body, { revision: 1, data: snapshot.barberPayments });
+  assert.equal((await request(api.url(), '/api/sales', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [{ id: 'bad', date: '2026-09-03', time: '10:00', productId: 'pomada', product: 'Pomada', quantity: 1, unitPrice: 12000, total: -1, payment: 'Efectivo' }] }) })).status, 400);
+  assert.equal((await request(api.url(), '/api/sales', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [{ ...snapshot.sales[0], total: 1 }] }) })).status, 400);
+  assert.equal((await request(api.url(), '/api/cuts', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [{ ...snapshot.entries[0], payment: 'Ambos', cashAmount: 1, mpAmount: 1 }] }) })).status, 400);
+  const large = await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, state: 'x'.repeat(16 * 1024 * 1024) }) });
+  assert.deepEqual(large, { status: 413, body: { error: 'Payload too large' } });
+  assert.equal((await request(api.url(), '/api/state')).body.revision, 1);
+});
+
+test('API nested resources persist after restart', async (t) => {
+  const api = await fixture(t);
+  const headers = { 'Content-Type': 'application/json' };
+  await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 0, state: state() }) });
+  assert.equal((await request(api.url(), '/api/services', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [{ id: 'corte', name: 'Corte', price: 12000 }] }) })).status, 200);
+  await api.restart();
+  assert.deepEqual((await request(api.url(), '/api/services')).body, { revision: 2, data: [{ id: 'corte', name: 'Corte', price: 12000 }] });
+});
+
+test('API conserva ventas anteriores al inicio del control de stock', async (t) => {
+  const api = await fixture(t);
+  const headers = { 'Content-Type': 'application/json' };
+  const old = appSnapshot();
+  assert.equal((await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 0, state: old }) })).status, 200);
+  const withStock = { ...old.inventory.products[0], stockEnabled: true, unit: 'unidades', initialStock: 10, unitCost: 100, initialUnitCost: 100, startDate: '2026-09-01' };
+  assert.equal((await request(api.url(), '/api/products', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [withStock] }) })).status, 200);
+  assert.equal((await request(api.url(), '/api/sales')).body.data[0].id, 'sale-1');
+});

@@ -26,7 +26,7 @@ test('UPD-001 - Avisa solo cuando el despliegue tiene una versión distinta', as
   assert.equal(requested.options.cache, 'no-store');
   app.confirm(false);
   app.click('#reloadUpdate');
-  assert.match(app.confirmations[0], /perderán las ventas/);
+  assert.match(app.confirmations[0], /No se perderán las ventas/);
   assert.equal(app.element('updateNotice').hidden, false);
   app.window.fetch = async () => ({ ok: true, json: async () => ({ version: 'a'.repeat(64) }) });
   await app.run('checkForUpdates()');
@@ -49,7 +49,7 @@ test('UPD-003 - Configuración permite buscar y actualizar solo cuando hay una v
   assert.match(app.element('configUpdateStatus').textContent, /GitHub main/);
   app.confirm(false);
   app.click('#configApplyUpdate');
-  assert.match(app.confirmations[0], /datos financieros/);
+  assert.match(app.confirmations[0], /datos financieros confirmados permanecen guardados/);
   available = false;
   app.click('#checkUpdates');
   await new Promise((resolve) => app.window.setTimeout(resolve, 0));
@@ -159,4 +159,19 @@ test('UPD-011 - Al volver a la pestaña busca la versión desplegada', async (t)
   app.emit(app.window, 'focus');
   await new Promise((resolve) => app.window.setTimeout(resolve, 0));
   assert.equal(app.element('updateNotice').hidden, false);
+});
+
+test('UPD-013 - el host no anuncia éxito si Docker sigue sirviendo la versión anterior', async (t) => {
+  const app = createApp(t);
+  const meta = app.window.document.createElement('meta');
+  meta.name = 'theluxe-build';
+  meta.content = 'a'.repeat(64);
+  app.window.document.head.append(meta);
+  app.window.fetch = async (url) => ({ ok: true, json: async () => url.startsWith('version.json')
+    ? { version: 'a'.repeat(64) } : url.endsWith('/status') ? { available: true } : { started: true } });
+  app.click('#checkUpdates');
+  await new Promise((resolve) => app.window.setTimeout(resolve, 0));
+  app.window.setTimeout = (callback) => { queueMicrotask(callback); return 1; };
+  await app.run('applyUpdate()');
+  assert.match(app.element('configUpdateStatus').textContent, /Docker no está sirviendo la actualización/);
 });

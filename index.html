@@ -10,6 +10,10 @@
   <link rel="stylesheet" href="styles.css?v=166">
 </head>
 <body>
+  <div id="persistenceNotice" class="open-days-warning persistence-notice" role="status" aria-live="polite" hidden>
+    <span id="persistenceMessage"></span>
+    <button id="retryPersistence" class="secondary-btn compact-btn" type="button" hidden>Reintentar</button>
+  </div>
   <div class="app-shell">
     <aside class="sidebar">
       <button id="sidebarToggle" class="brand" type="button" aria-label="Abrir menú lateral" aria-controls="sidebarNav" aria-expanded="false">
@@ -25,7 +29,7 @@
     <main class="main">
       <header class="topbar">
         <div>
-          <p class="eyebrow">OPERACIÓN DIARIA · PRUEBA DE ACTUALIZACIÓN</p>
+          <p class="eyebrow">OPERACIÓN DIARIA</p>
           <h1>Panel diario</h1>
         </div>
         <nav class="workspace-tabs" aria-label="Operación de la jornada">
@@ -46,9 +50,8 @@
       <div id="updateNotice" class="update-notice" role="status" hidden>
         <span>Hay una versión nueva disponible.</span>
         <button id="reloadUpdate" class="secondary-btn compact-btn" type="button">Actualizar</button>
-        <small>Recargar borra las ventas y los datos financieros de esta sesión. El inventario queda guardado.</small>
+        <small>Los datos confirmados permanecen guardados. No recargues mientras haya cambios pendientes.</small>
       </div>
-
       <section id="dailyView" class="view active">
         <p id="dailyLockFeedback" class="daily-lock-feedback" role="status" hidden>Jornada cerrada: los datos y movimientos de esta jornada están bloqueados.</p>
         <article class="card daily-sheet opening-card">
@@ -252,7 +255,7 @@
           <div id="stockEmpty" class="barber-empty">Agregá los productos que quieras controlar en Configuración.</div>
            <details class="movement-history"><summary>Movimientos de stock <span id="stockMovementCount">0</span></summary><div class="sales-table-wrap"><table class="sales-table stock-table"><thead><tr><th>Hora</th><th>Producto</th><th>Movimiento</th><th>Cantidad</th><th>Responsable</th><th>Nota</th><th>Valor</th><th></th></tr></thead><tbody id="stockMovementRows"></tbody></table></div><div id="stockMovementsEmpty" class="barber-empty">Sin movimientos en esta jornada</div></details>
           </div>
-          <small class="stock-hint">Guardado en este navegador. Los consumos de venta se ajustan desde la venta.</small>
+          <small class="stock-hint">Inventario confirmado en la base de datos. Los consumos de venta se ajustan desde la venta.</small>
         </article>
       </section>
 

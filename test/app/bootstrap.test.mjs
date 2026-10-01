@@ -16,10 +16,10 @@ test('BOOT-002 - Una jornada vacia muestra todos los importes en cero', (t) => {
   }
 });
 
-test('BOOT-003 - El inicio conserva inventario y claves ajenas pero descarta finanzas de sesiones anteriores', (t) => {
+test('BOOT-003 - El inicio conserva inventario y claves locales existentes', (t) => {
   const inventory = JSON.stringify({ version: 1, products: [], movements: [] });
   const app = createApp(t, { storage: { 'theluxe-inventory-v1': inventory, 'theluxe-cuts': 'old', unrelated: 'keep' } });
   assert.equal(app.window.localStorage.getItem('theluxe-inventory-v1'), inventory);
-  assert.equal(app.window.localStorage.getItem('theluxe-cuts'), null);
+  assert.equal(app.window.localStorage.getItem('theluxe-cuts'), 'old');
   assert.equal(app.window.localStorage.getItem('unrelated'), 'keep');
 });

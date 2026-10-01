@@ -94,6 +94,12 @@ function saveInventory(next) {
   if (inventoryReadError) return false;
   const error = inventoryError(next);
   if (error) { stockMessage(error, true); return false; }
+  if (typeof stateApiEnabled !== 'undefined' && stateApiEnabled && stateLoaded) {
+    if (stateConflict) { stockMessage('Hay un conflicto con la base de datos. No se guardó este cambio.', true); return false; }
+    inventory = next;
+    queueStateSave();
+    return true;
+  }
   try {
     if (localStorage.getItem(inventoryStorageKey) !== inventorySnapshot) {
       if (loadInventory()) stockMessage('El inventario cambió en otra pestaña. Se actualizó la vista; revisá los datos y volvé a guardar.', true);
@@ -104,6 +110,7 @@ function saveInventory(next) {
     localStorage.setItem(inventoryStorageKey, raw);
     inventorySnapshot = raw;
     inventory = next;
+    if (typeof queueStateSave === 'function') queueStateSave();
     return true;
   } catch {
     stockMessage('No se pudo guardar. No se aplicó el cambio: revisá el espacio o los permisos de almacenamiento del navegador.', true);
@@ -238,8 +245,8 @@ function renderInventory() {
   document.getElementById('stockInitialDate').textContent = editing?.stockEnabled ? `Cantidad inicial registrada el ${editing.startDate}. Los cambios se hacen con reposiciones o consumos.` : `Cantidad inicial al ${date || 'día seleccionado'}, expresada en la unidad elegida.`;
 }
 
-function initInventory() {
-  loadInventory();
+function initInventory(load = true) {
+  if (load) loadInventory();
   updateProductFields();
   populateSelectors();
   document.getElementById('loadStockDemo').addEventListener('click', () => {
@@ -378,6 +385,7 @@ function initInventory() {
     stockMessage(row.cancelled ? 'Movimiento restaurado; stock actualizado.' : 'Movimiento anulado; stock actualizado. Podés restaurarlo desde el historial.');
   });
   window.addEventListener('storage', (event) => {
+    if (typeof stateApiEnabled !== 'undefined' && stateApiEnabled) return; // SQLite es la fuente de verdad; localStorage conserva solo el respaldo anterior.
     if (event.key !== inventoryStorageKey && event.key !== null) return;
     if (loadInventory()) stockMessage('Inventario actualizado desde otra pestaña.');
     renderInventory();

@@ -23,7 +23,12 @@ async function installedVersion() {
   return version;
 }
 
-export function createUpdater({ run = command, installed = installedVersion } = {}) {
+async function apiHealthy() {
+  const response = await fetch(`${appOrigin}/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+  return response.ok && (await response.json()).ok === true;
+}
+
+export function createUpdater({ run = command, installed = installedVersion, healthy = apiHealthy } = {}) {
   let busy = false;
   let phase = '';
   let error = '';
@@ -61,6 +66,7 @@ export function createUpdater({ run = command, installed = installedVersion } = 
     error = '';
     void (async () => {
       let restartAttempted = false;
+      let oldApiImage = false;
       try {
         phase = 'Descargando main';
         await run('git', ['fetch', 'origin', 'main']);
@@ -72,13 +78,18 @@ export function createUpdater({ run = command, installed = installedVersion } = 
         if (await run('git', ['rev-parse', 'HEAD']) !== fetched) throw new Error('La copia local no coincide con main.');
         phase = 'Preparando contenedor';
         await run('docker', ['tag', 'theluxe-local', 'theluxe-rollback']);
-        await run('docker', ['compose', '-f', 'compose.yaml', 'build', '--build-arg', `SOURCE_COMMIT=${fetched}`, 'web'], 900000);
-        phase = 'Reiniciando contenedor';
+        try {
+          await run('docker', ['image', 'inspect', 'theluxe-api-local']);
+          oldApiImage = true;
+        } catch { /* Primera instalación de la API; no hay imagen anterior. */ }
+        if (oldApiImage) await run('docker', ['tag', 'theluxe-api-local', 'theluxe-api-rollback']);
+        await run('docker', ['compose', '-f', 'compose.yaml', 'build', '--build-arg', `SOURCE_COMMIT=${fetched}`, 'api', 'web'], 900000);
+        phase = 'Reiniciando contenedores';
         restartAttempted = true;
-        await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', '--no-deps', 'web'], 180000);
+        await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', 'api', 'web'], 180000);
         let ready = false;
         for (let attempt = 0; attempt < 20; attempt++) {
-          try { if ((await installed()).commit === fetched) { ready = true; break; } } catch { /* Contenedor todavía iniciando. */ }
+          try { if ((await installed()).commit === fetched && await healthy()) { ready = true; break; } } catch { /* Contenedores todavía iniciando. */ }
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
         if (!ready) throw new Error('Docker no está sirviendo la versión nueva. Revisá el contenedor.');
@@ -87,7 +98,8 @@ export function createUpdater({ run = command, installed = installedVersion } = 
         if (restartAttempted) {
           try {
             await run('docker', ['tag', 'theluxe-rollback', 'theluxe-local']);
-            await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', '--no-deps', 'web'], 180000);
+            if (oldApiImage) await run('docker', ['tag', 'theluxe-api-rollback', 'theluxe-api-local']);
+            await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', 'api', 'web'], 180000);
             error += ' Se restauró la versión anterior.';
           } catch { error += ' No se pudo restaurar la versión anterior. Revisá Docker.'; }
         }

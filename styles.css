@@ -586,3 +586,5 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .opening-actions { grid-column: 1; }
   .opening-actions .primary-btn { width: auto; }
 }
+/* El aviso debe permanecer operable mientras el resto de la aplicación está bloqueado. */
+.persistence-notice { position: fixed; z-index: 1000; top: 16px; left: 50%; transform: translateX(-50%); width: min(680px, calc(100% - 24px)); }
