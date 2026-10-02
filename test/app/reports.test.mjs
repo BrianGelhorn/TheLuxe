@@ -131,7 +131,7 @@ test('RPT-026 - Barberia vacia limpia importes conteos y desgloses anteriores', 
 for (const [id, period, reference, dates] of [
   ['RPT-027', 'month', '2026-09', ['2026-08-31', '2026-09-01', '2026-09-30', '2026-10-01']],
   ['RPT-028', 'year', '2026', ['2025-12-31', '2026-01-01', '2026-12-31', '2027-01-01']],
-  ['RPT-029', 'week', '2026-09', ['2026-09-06', '2026-09-07', '2026-09-13', '2026-09-14']],
+  ['RPT-029', 'week', '2026-09', ['2026-08-31', '2026-09-01', '2026-09-06', '2026-09-07']],
 ]) {
   test(`${id} - Barberia incluye extremos y excluye externos de ${period} en todas las colecciones`, (t) => {
     const app = createApp(t);
@@ -380,7 +380,7 @@ test('RPT-010 - Cambiar semana actualiza rango y excluye ventas de la semana ant
   app.run('sales = [{date:"2026-09-07",payment:"Efectivo",total:100},{date:"2026-09-14",payment:"Efectivo",total:200}]');
   report(app, 'week');
   assert.equal(app.element('summaryWeekField').hidden, false);
-  app.element('summaryWeek').value = '2';
+  app.element('summaryWeek').value = '3';
   app.emit('#summaryWeek', 'change');
   amounts(app, { Invoiced: 0, AverageTicket: 200, AverageTicketNeto: 0 });
   assert.equal(app.element('summaryRows').rows.length, 1);

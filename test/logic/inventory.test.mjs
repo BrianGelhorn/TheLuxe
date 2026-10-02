@@ -43,6 +43,20 @@ test('STK-187 - Responsable opcional solo en consumo manual y compatible con his
   assert.match(logic.inventoryError(state), /movimiento/);
 });
 
+test('STK-191 - Una venta solo puede originar consumo, incluso si está anulado', () => {
+  const state = fixture();
+  Object.assign(state.movements[0], { source: 'sale', sourceId: 'venta-1' });
+  assert.match(logic.inventoryError(state), /movimiento/);
+  state.movements[0].cancelled = true;
+  assert.match(logic.inventoryError(state), /movimiento/);
+  state.movements[0].type = 'consumo';
+  assert.equal(logic.inventoryError(state), '');
+  delete state.movements[0].source;
+  delete state.movements[0].sourceId;
+  state.movements[0].type = 'entrada';
+  assert.equal(logic.inventoryError(state), '');
+});
+
 test('STK-183 - Acepta productos anteriores sin costo unitario', () => {
   const state = fixture();
   delete state.products[0].unitCost;

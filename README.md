@@ -20,6 +20,7 @@ node host-updater.mjs
 ```
 
 Dejá `node host-updater.mjs` ejecutándose. Para iniciarlo automáticamente con Windows, configurá el Programador de tareas para ejecutar `node C:\TheLuxe\host-updater.mjs` al iniciar sesión, después de Docker Desktop. No lo ejecutes desde un repositorio con cambios locales: el actualizador se negará a modificarlos.
+Si una versión modifica `host-updater.mjs`, reiniciá el proceso Node: el proceso que ya estaba corriendo no carga automáticamente el código nuevo. Para instalar por primera vez la versión con respaldo previo, cerrá el actualizador anterior y, desde la **copia limpia de instalación**, ejecutá `git pull --ff-only origin main` y `node host-updater.mjs`. Esto actualiza el código del host **sin reiniciar aún la web**; después usá Buscar → Actualizar → Recargar en la app. No lo hagas en el repositorio de desarrollo con cambios locales.
 
 Abrí **http://127.0.0.1:8000/**. En Configuración, pulsá **Buscar** para consultar `main`, **Actualizar** para instalar y, una vez que Docker sirva la versión nueva, **Recargar**. Si el repositorio es privado, configurá el acceso de Git a GitHub en la PC; no pongas tokens en la web.
 
@@ -48,6 +49,8 @@ El estado completo (configuración, cortes, ventas, adelantos, gastos, transfere
 
 Si se corta la conexión durante un guardado, la app muestra el error y conserva una copia **provisional** de los cambios pendientes en ese navegador hasta que SQLite confirme el guardado. Reintentá antes de cerrar. Si otra pestaña cambió la base, se bloquea el guardado para no pisarla: conservá esa pestaña y resolvé el conflicto manualmente; no borres el almacenamiento del navegador mientras queden cambios pendientes.
 
+Si aparece un conflicto entre pestañas, **Descargar copia sin guardar** conserva el borrador en un archivo JSON; **Usar versión de la base de datos** descarta ese borrador solo después de confirmarlo y vuelve a leer la base. No se combinan automáticamente operaciones diferentes: revisá el archivo y cargá manualmente las que falten.
+
 ## API
 
 `GET /api/state` lee un estado consistente y su `revision`. `PUT /api/state` con `{ "revision": 1, "state": { ... } }` guarda **todo junto**, necesario para operaciones como venta + descuento de stock. La API devuelve la nueva revisión o `409` si alguien actualizó la base antes. También están disponibles `GET` y `PUT` con `{ "revision", "data" }` para cada recurso: `/api/config`, `/api/services`, `/api/barbers`, `/api/expense-categories`, `/api/commissions`, `/api/cuts`, `/api/sales`, `/api/advances`, `/api/expenses`, `/api/transfers`, `/api/opening-adjustments`, `/api/cash-registers`, `/api/barber-payments`, `/api/inventory`, `/api/products` y `/api/stock-movements`. Cada `PUT` reemplaza la colección completa indicada, no un registro individual; para cambios relacionados usá `/api/state`. `GET /api/health` verifica la base. El estado completo se vuelve a enviar en cada escritura, con límite de 16 MiB: si el historial crece hasta ese tamaño habrá que pasar a escrituras por registro. No hay cuentas ni acceso remoto: no publiques el puerto 8000 fuera de la PC.
@@ -61,3 +64,11 @@ docker compose start api
 ```
 
 Guardá esa copia fuera de la PC. Si se pierde el volumen, Docker no puede reconstruir los datos.
+
+Antes de cada actualización con el botón, el actualizador guarda una copia consistente en `%LOCALAPPDATA%\TheLuxe\backups`. Si falla el despliegue, solo restaura automáticamente SQLite cuando su revisión no cambió desde la copia: **jamás pisa ventas nuevas**. Si la revisión cambió, informa la ruta del backup y necesita revisión manual. Para recuperar una copia después de respaldar también el estado actual y comprobar que nadie esté operando:
+
+```powershell
+docker compose stop web api
+docker compose cp "C:\ruta\a\la-copia.sqlite" api:/data/theluxe.sqlite
+docker compose up -d api web
+```

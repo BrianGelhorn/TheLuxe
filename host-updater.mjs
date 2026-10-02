@@ -2,7 +2,11 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
+import { resolve, join, basename } from 'node:path';
+import { homedir } from 'node:os';
+import { mkdir } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
 
 const exec = promisify(execFile);
 const repo = fileURLToPath(new URL('.', import.meta.url));
@@ -28,7 +32,37 @@ async function apiHealthy() {
   return response.ok && (await response.json()).ok === true;
 }
 
-export function createUpdater({ run = command, installed = installedVersion, healthy = apiHealthy } = {}) {
+async function databaseRevision(run) {
+  const script = "import {DatabaseSync} from 'node:sqlite'; const db=new DatabaseSync('/data/theluxe.sqlite',{readOnly:true}); try { console.log(db.prepare('SELECT revision FROM api_state WHERE id=1').get()?.revision ?? 0); } finally { db.close(); }";
+  const value = await run('docker', ['compose', '-f', 'compose.yaml', 'run', '--rm', '--no-deps', 'api', 'node', '--input-type=module', '-e', script]);
+  const revision = Number(value);
+  if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('No se pudo verificar la revisión de la base.');
+  return revision;
+}
+
+async function databaseBackup(run, commit) {
+  const directory = join(process.env.LOCALAPPDATA || homedir(), 'TheLuxe', 'backups');
+  await mkdir(directory, { recursive: true });
+  const filename = `theluxe-${commit}-${Date.now()}-${randomUUID()}.sqlite`;
+  const path = join(directory, filename);
+  const script = `import {DatabaseSync,backup} from 'node:sqlite'; const db=new DatabaseSync('/data/theluxe.sqlite',{readOnly:true}); try { await backup(db,'/data/${filename}'); } finally { db.close(); }`;
+  try {
+    await run('docker', ['compose', '-f', 'compose.yaml', 'exec', '-T', 'api', 'node', '--input-type=module', '-e', script], 180000);
+    await run('docker', ['compose', '-f', 'compose.yaml', 'cp', `api:/data/${filename}`, path], 180000);
+  } finally {
+    try { await run('docker', ['compose', '-f', 'compose.yaml', 'exec', '-T', 'api', 'rm', '-f', `/data/${filename}`]); }
+    catch { /* La copia externa queda disponible; el temporal se puede limpiar luego. */ }
+  }
+  const db = new DatabaseSync(path, { readOnly: true });
+  try {
+    if (db.prepare('PRAGMA quick_check').get().quick_check !== 'ok') throw new Error('La copia de seguridad de SQLite no pasó la verificación.');
+    const revision = db.prepare('SELECT revision FROM api_state WHERE id=1').get()?.revision ?? 0;
+    if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('La copia de seguridad no tiene una revisión válida.');
+    return { path, revision };
+  } finally { db.close(); }
+}
+
+export function createUpdater({ run = command, installed = installedVersion, healthy = apiHealthy, backup = databaseBackup, revision = databaseRevision } = {}) {
   let busy = false;
   let phase = '';
   let error = '';
@@ -66,7 +100,9 @@ export function createUpdater({ run = command, installed = installedVersion, hea
     error = '';
     void (async () => {
       let restartAttempted = false;
+      let oldWebImage = false;
       let oldApiImage = false;
+      let snapshot = null;
       try {
         phase = 'Descargando main';
         await run('git', ['fetch', 'origin', 'main']);
@@ -78,15 +114,22 @@ export function createUpdater({ run = command, installed = installedVersion, hea
         if (await run('git', ['rev-parse', 'HEAD']) !== fetched) throw new Error('La copia local no coincide con main.');
         phase = 'Preparando contenedor';
         await run('docker', ['tag', 'theluxe-local', 'theluxe-rollback']);
+        oldWebImage = true;
         try {
           await run('docker', ['image', 'inspect', 'theluxe-api-local']);
           oldApiImage = true;
         } catch { /* Primera instalación de la API; no hay imagen anterior. */ }
         if (oldApiImage) await run('docker', ['tag', 'theluxe-api-local', 'theluxe-api-rollback']);
         await run('docker', ['compose', '-f', 'compose.yaml', 'build', '--build-arg', `SOURCE_COMMIT=${fetched}`, 'api', 'web'], 900000);
-        phase = 'Reiniciando contenedores';
+        phase = 'Respaldando base de datos';
+        if (oldApiImage) snapshot = await backup(run, current.installedCommit);
         restartAttempted = true;
-        await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', 'api', 'web'], 180000);
+        phase = 'Reiniciando API';
+        await run('docker', ['compose', '-f', 'compose.yaml', 'stop', 'web'], 180000);
+        if (snapshot && await revision(run) !== snapshot.revision) throw new Error('La base cambió durante el respaldo. No se aplicó la actualización.');
+        await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', '--no-deps', 'api'], 180000);
+        phase = 'Reiniciando contenedor web';
+        await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', '--no-deps', 'web'], 180000);
         let ready = false;
         for (let attempt = 0; attempt < 20; attempt++) {
           try { if ((await installed()).commit === fetched && await healthy()) { ready = true; break; } } catch { /* Contenedores todavía iniciando. */ }
@@ -95,13 +138,32 @@ export function createUpdater({ run = command, installed = installedVersion, hea
         if (!ready) throw new Error('Docker no está sirviendo la versión nueva. Revisá el contenedor.');
       } catch (failure) {
         error = String(failure.message || failure).slice(0, 300);
-        if (restartAttempted) {
+        if (!restartAttempted && oldWebImage) {
           try {
             await run('docker', ['tag', 'theluxe-rollback', 'theluxe-local']);
             if (oldApiImage) await run('docker', ['tag', 'theluxe-api-rollback', 'theluxe-api-local']);
+          } catch { error += ' No se pudieron recuperar las etiquetas anteriores de Docker.'; }
+        }
+        if (restartAttempted) {
+          try {
+            await run('docker', ['compose', '-f', 'compose.yaml', 'stop', 'web'], 180000);
+            let restored = false;
+            if (snapshot) await run('docker', ['compose', '-f', 'compose.yaml', 'stop', 'api'], 180000);
+            if (snapshot && await revision(run) === snapshot.revision) {
+              await run('docker', ['compose', '-f', 'compose.yaml', 'cp', snapshot.path, 'api:/data/theluxe.sqlite'], 180000);
+              restored = true;
+            }
+            await run('docker', ['tag', 'theluxe-rollback', 'theluxe-local']);
+            if (oldApiImage) await run('docker', ['tag', 'theluxe-api-rollback', 'theluxe-api-local']);
             await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', 'api', 'web'], 180000);
-            error += ' Se restauró la versión anterior.';
-          } catch { error += ' No se pudo restaurar la versión anterior. Revisá Docker.'; }
+            let ready = false;
+            for (let attempt = 0; attempt < 20; attempt++) {
+              try { if ((await installed()).commit === current.installedCommit && await healthy()) { ready = true; break; } } catch { /* Arranque en curso. */ }
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+            error += ready ? ' Se restauró la versión anterior.' : ' No se pudo confirmar la restauración. Revisá Docker.';
+            if (snapshot) error += restored ? ` Base restaurada desde ${basename(snapshot.path)}.` : ` La base cambió: no se sobrescribió. Copia previa: ${snapshot.path}.`;
+          } catch { error += ` No se pudo restaurar la versión anterior. Revisá Docker.${snapshot ? ` Copia previa: ${snapshot.path}.` : ''}`; }
         }
       } finally {
         phase = '';

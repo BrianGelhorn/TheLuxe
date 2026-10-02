@@ -41,10 +41,10 @@ test('NAV-003 - Abrir resumen inicializa semana y cambiar mes actualiza opciones
   const app = createApp(t);
   app.click('[data-view="summaryView"]');
   assert.equal(app.element('summaryPeriod').value, 'week');
-  assert.equal(app.element('summaryWeek').options.length, 4);
-  app.element('summaryDate').value = '2026-06';
-  app.emit('#summaryDate', 'change');
   assert.equal(app.element('summaryWeek').options.length, 5);
+  app.element('summaryDate').value = '2026-08';
+  app.emit('#summaryDate', 'change');
+  assert.equal(app.element('summaryWeek').options.length, 6);
 });
 
 test('NAV-004 - Ordenar columnas y cancelar no altera el orden guardado', (t) => {

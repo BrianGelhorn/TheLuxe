@@ -87,17 +87,17 @@
 
   function monthWeeks(value) {
     const [year, month] = value.split('-').map(Number);
-    const firstMonday = new Date(year, month - 1, 1);
-    firstMonday.setDate(firstMonday.getDate() + ((8 - firstMonday.getDay()) % 7));
+    const firstSunday = new Date(year, month - 1, 1);
+    firstSunday.setDate(firstSunday.getDate() + (7 - firstSunday.getDay()) % 7);
     const lastDay = new Date(year, month, 0);
-    return Math.floor((lastDay.getDate() - firstMonday.getDate()) / 7) + 1;
+    return Math.ceil((lastDay.getDate() - firstSunday.getDate()) / 7) + 1;
   }
 
   function currentMonthWeek(value) {
     const date = new Date(`${value}T00:00:00`);
-    const firstMonday = new Date(date.getFullYear(), date.getMonth(), 1);
-    firstMonday.setDate(firstMonday.getDate() + ((8 - firstMonday.getDay()) % 7));
-    return Math.max(1, Math.min(monthWeeks(value.slice(0, 7)), Math.floor((date.getDate() - firstMonday.getDate()) / 7) + 1));
+    const firstSunday = new Date(date.getFullYear(), date.getMonth(), 1);
+    firstSunday.setDate(firstSunday.getDate() + (7 - firstSunday.getDay()) % 7);
+    return date.getDate() <= firstSunday.getDate() ? 1 : Math.ceil((date.getDate() - firstSunday.getDate()) / 7) + 1;
   }
 
   function periodBounds(period, value, week = 1) {
@@ -105,10 +105,13 @@
     let end;
     if (period === 'week') {
       const [year, month] = value.split('-').map(Number);
-      start = new Date(year, month - 1, 1);
-      start.setDate(start.getDate() + ((8 - start.getDay()) % 7) + (Number(week) - 1) * 7);
-      end = new Date(start);
-      end.setDate(start.getDate() + 6);
+      const firstSunday = new Date(year, month - 1, 1);
+      firstSunday.setDate(firstSunday.getDate() + (7 - firstSunday.getDay()) % 7);
+      const lastDay = new Date(year, month, 0);
+      start = Number(week) === 1 ? new Date(year, month - 1, 1) : new Date(year, month - 1, firstSunday.getDate() + 1 + (Number(week) - 2) * 7);
+      end = Number(week) === 1 ? firstSunday : new Date(start);
+      if (Number(week) !== 1) end.setDate(start.getDate() + 6);
+      if (end > lastDay) end = lastDay;
     } else if (period === 'month') {
       const [year, month] = value.split('-').map(Number);
       start = new Date(year, month - 1, 1);
@@ -255,7 +258,7 @@
     const changes = new Map([...products.keys()].map((id) => [id, new Map()]));
     for (const row of state.movements) {
       const product = products.get(row?.productId);
-      if (!row || !product || !validText(row.id, 80) || ids.has(row.id) || !validDate(row.date) || row.date < product.startDate || typeof row.time !== 'string' || row.time.length !== 5 || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.time) || !['entrada', 'consumo'].includes(row.type) || !validQuantity(row.quantity) || row.quantity === 0 || typeof row.cancelled !== 'boolean' || typeof row.notes !== 'string' || row.notes.length > 120 || (row.unitCost !== undefined && !validCost(row.unitCost)) || (row.cost !== undefined && !validSnapshotCost(row.cost)) || (row.source !== undefined && (row.source !== 'sale' || !validText(row.sourceId, 80))) || (row.barberId !== undefined && (row.type !== 'consumo' || row.source === 'sale' || !validText(row.barberId, 80) || !validText(row.barberName, 200))) || (row.barberName !== undefined && row.barberId === undefined)) return 'Revisá el producto, la fecha y la cantidad del movimiento.';
+      if (!row || !product || !validText(row.id, 80) || ids.has(row.id) || !validDate(row.date) || row.date < product.startDate || typeof row.time !== 'string' || row.time.length !== 5 || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.time) || !['entrada', 'consumo'].includes(row.type) || !validQuantity(row.quantity) || row.quantity === 0 || typeof row.cancelled !== 'boolean' || typeof row.notes !== 'string' || row.notes.length > 120 || (row.unitCost !== undefined && !validCost(row.unitCost)) || (row.cost !== undefined && !validSnapshotCost(row.cost)) || (row.source !== undefined && (row.source !== 'sale' || row.type !== 'consumo' || !validText(row.sourceId, 80))) || (row.barberId !== undefined && (row.type !== 'consumo' || row.source === 'sale' || !validText(row.barberId, 80) || !validText(row.barberName, 200))) || (row.barberName !== undefined && row.barberId === undefined)) return 'Revisá el producto, la fecha y la cantidad del movimiento.';
       ids.add(row.id);
       if (row.cancelled) continue;
       const days = changes.get(row.productId);

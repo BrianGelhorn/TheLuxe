@@ -69,6 +69,46 @@ const saleStockConsistent = (state) => {
       || movements[0].productId === item.productId && movements[0].date === item.date && movements[0].quantity === item.quantity);
   }) && active.every((row) => sales.has(row.sourceId));
 };
+const changed = (before, after) => {
+  const old = new Map(before.map((row) => [row.id, JSON.stringify(row)]));
+  return after.filter((row) => old.get(row.id) !== JSON.stringify(row));
+};
+const changedRegisters = (before, after) => Object.entries(after).filter(([day, row]) => JSON.stringify(before[day]) !== JSON.stringify(row));
+const mixedTipPossible = (row) => row.payment !== 'Ambos' || (row.tip || 0) <= Math.max(row.cashAmount || 0, row.mpAmount || 0);
+const transferFundsKnown = (state, transfer) => {
+  const register = state.cashRegisters[transfer.date];
+  const initial = register?.[transfer.from === 'Efectivo' ? 'initialCash' : 'initialMp'];
+  if (initial === undefined) return true;
+  const movements = [
+    ...state.entries.filter((row) => row.date === transfer.date).map((row) => ({ ...row, amount: row.payment === 'Ambos' ? (row[transfer.from === 'Efectivo' ? 'cashAmount' : 'mpAmount'] || 0) : row.payment === transfer.from ? row.amount + (row.tip || 0) : 0, sign: 1 })),
+    ...state.sales.filter((row) => row.date === transfer.date).map((row) => ({ ...row, amount: row.payment === 'Ambos' ? (row[transfer.from === 'Efectivo' ? 'cashAmount' : 'mpAmount'] || 0) : row.payment === transfer.from ? row.total : 0, sign: 1 })),
+    ...state.advances.filter((row) => row.date === transfer.date && row.payment === transfer.from).map((row) => ({ ...row, sign: -1 })),
+    ...state.expenses.filter((row) => row.date === transfer.date && row.payment === transfer.from).map((row) => ({ ...row, sign: -1 })),
+    ...state.transfers.filter((row) => row.date === transfer.date && (row.from === transfer.from || row.to === transfer.from)).map((row) => ({ ...row, sign: row.to === transfer.from ? 1 : -1 })),
+  ].filter((row) => row.amount > 0).sort((a, b) => a.time.localeCompare(b.time) || a.id.localeCompare(b.id));
+  if (movements.filter((row) => row.time === transfer.time).length > 1) return true;
+  let balance = initial;
+  for (const row of movements) {
+    if (row.id === transfer.id && row.from === transfer.from && balance < row.amount) return false;
+    balance += row.sign * row.amount;
+  }
+  return true;
+};
+const validChanges = (before, after) => changed(before.entries, after.entries).every((row) => {
+  const old = before.entries.find((item) => item.id === row.id);
+  const commissionUnchanged = old && ['amount', 'commissionRate', 'commissionAmount'].every((key) => old[key] === row[key]);
+  const paymentUnchanged = old && ['payment', 'tip', 'cashAmount', 'mpAmount'].every((key) => old[key] === row[key]);
+  return (commissionUnchanged || row.commissionRate === undefined || row.commissionAmount === undefined || row.commissionAmount === row.amount * row.commissionRate / 100)
+    && (paymentUnchanged || mixedTipPossible(row));
+})
+  && changedRegisters(before.cashRegisters, after.cashRegisters).every(([, row]) => (row.realCash === undefined || row.withdrawal === undefined || row.withdrawal <= row.realCash) && (row.realMp === undefined || row.withdrawalMp === undefined || row.withdrawalMp <= row.realMp))
+  && changed(before.sales, after.sales).every((row) => {
+    const product = after.inventory.products.find((item) => item.id === row.productId);
+    const linked = after.inventory.movements.some((movement) => movement.source === 'sale' && !movement.cancelled && movement.sourceId === row.id);
+    // ponytail: no activation timestamp; sales on startDate may predate stock tracking.
+    return !product?.stockEnabled || row.date <= product.startDate || linked;
+  })
+  && changed(before.transfers, after.transfers).every((row) => transferFundsKnown(after, row));
 const validState = (state) => own(state, stateKeys) && jsonSafe(state) && config(state.config) && Array.isArray(state.entries) && unique(state.entries) && state.entries.every(cut)
   && Array.isArray(state.sales) && unique(state.sales) && state.sales.every(sale) && Array.isArray(state.advances) && unique(state.advances) && state.advances.every(advance)
   && Array.isArray(state.expenses) && unique(state.expenses) && state.expenses.every(expense) && Array.isArray(state.transfers) && unique(state.transfers) && state.transfers.every(transfer)
@@ -148,6 +188,8 @@ export function createApi({ databasePath } = {}) {
         }
         const payload = await body(req);
         if (!own(payload, ['revision', 'state']) || !revision(payload.revision) || !validState(payload.state)) return response(res, 400, { error: 'Invalid state payload' });
+        const current = read();
+        if (!validChanges(current?.state || { entries: [], sales: [], transfers: [], cashRegisters: {} }, payload.state)) return response(res, 400, { error: 'Invalid state payload' });
         const result = replace(payload.revision, payload.state);
         return result === 'invalid' ? response(res, 400, { error: 'Invalid state payload' }) : result === 'conflict'
           ? response(res, 409, { error: 'Revision conflict' }) : response(res, 200, { revision: result });
@@ -162,7 +204,7 @@ export function createApi({ databasePath } = {}) {
       if (!current) return response(res, 409, { error: 'State is not initialized' });
       const next = structuredClone(current.state);
       setAt(next, path, payload.data);
-      if (!validState(next)) return response(res, 400, { error: 'Invalid resource data' });
+      if (!validState(next) || !validChanges(current.state, next)) return response(res, 400, { error: 'Invalid resource data' });
       const result = replace(payload.revision, next);
       return result === 'conflict' ? response(res, 409, { error: 'Revision conflict' }) : response(res, 200, { revision: result });
     } catch (error) {

@@ -60,6 +60,109 @@ test('PERSIST-003 - conflicto o fallo mantiene cambios pendientes sin sobrescrib
   assert.equal(app.element('retryPersistence').hidden, true);
 });
 
+test('PERSIST-030 - un 409 permite exportar el borrador y usar explícitamente la base sin sobrescribirla', async (t) => {
+  const remote = emptyState();
+  remote.entries = [{ id: 'remoto' }];
+  remote.inventory.products = [{ id: 'p', name: 'Pomada', saleEnabled: true, stockEnabled: false, salePrice: 100, active: true }];
+  let gets = 0, puts = 0, download, revoked;
+  const app = createApp(t, { clean: false, fetch: async (url, options = {}) => {
+    if (options.method === 'PUT') { puts++; return response({}, 409); }
+    return response({ revision: gets++ ? 5 : 4, state: remote });
+  } });
+  await wait(app);
+  app.run("entries.push({ id: 'local' }); save();");
+  await wait(app);
+  app.window.URL.createObjectURL = () => 'blob:pending';
+  app.window.URL.revokeObjectURL = (url) => { revoked = url; };
+  const click = app.window.HTMLAnchorElement.prototype.click;
+  app.window.HTMLAnchorElement.prototype.click = function () { download = { href: this.href, name: this.download }; };
+  app.click('#exportPendingState');
+  app.window.HTMLAnchorElement.prototype.click = click;
+  assert.equal(download.href, 'blob:pending');
+  assert.match(download.name, /copia-sin-guardar/);
+  await wait(app);
+  assert.equal(revoked, 'blob:pending');
+  assert.equal(app.query('.app-shell').inert, true);
+  app.confirm(false);
+  app.click('#useDatabaseState');
+  assert.equal(gets, 1);
+  assert.equal(app.run('stateConflict'), true);
+  app.confirm(true);
+  app.click('#useDatabaseState');
+  await wait(app);
+  assert.equal(puts, 1);
+  assert.equal(app.run('stateConflict'), false);
+  assert.equal(app.run('stateDirty'), false);
+  assert.equal(app.run('entries[0].id'), 'remoto');
+  assert.equal(app.query('.app-shell').inert, false);
+  assert.equal(app.window.localStorage.getItem(app.run('pendingStateKey')), null);
+  app.click('[data-stock-archive="p"]');
+  assert.equal(app.run('inventory.products[0].active'), false, 'un solo manejador de inventario debe aplicar el cambio una vez');
+});
+
+test('PERSIST-027 - sin conexión el conflicto mantiene su respaldo y se puede descargar sin ObjectURL', async (t) => {
+  const remote = emptyState();
+  let reads = 0, download;
+  const app = createApp(t, { clean: false, fetch: async (url, options = {}) => {
+    if (options.method === 'PUT') return response({}, 409);
+    if (reads++ === 0) return response({ revision: 1, state: remote });
+    throw new Error('Sin conexión');
+  } });
+  await wait(app);
+  app.run("entries.push({ id: 'local' }); save();");
+  await wait(app);
+  const click = app.window.HTMLAnchorElement.prototype.click;
+  app.window.HTMLAnchorElement.prototype.click = function () { download = this.href; };
+  app.click('#exportPendingState');
+  app.window.HTMLAnchorElement.prototype.click = click;
+  assert.match(download, /^data:application\/json/);
+  app.click('#useDatabaseState');
+  await wait(app);
+  assert.equal(app.run('stateConflict'), true);
+  assert.equal(app.query('.app-shell').inert, true);
+  assert.ok(app.window.localStorage.getItem(app.run('pendingStateKey')));
+  assert.match(app.element('persistenceMessage').textContent, /No se pudo cargar la versión de la base/);
+});
+
+test('PERSIST-028 - resolver conflicto no borra un respaldo que otra pestaña reemplazó mientras cargaba', async (t) => {
+  const remote = emptyState();
+  let reads = 0, finish;
+  const app = createApp(t, { clean: false, fetch: async (url, options = {}) => {
+    if (options.method === 'PUT') return response({}, 409);
+    if (reads++ === 0) return response({ revision: 1, state: remote });
+    return new Promise((resolve) => { finish = resolve; });
+  } });
+  await wait(app);
+  app.run("entries.push({ id: 'local' }); save();");
+  await wait(app);
+  const key = app.run('pendingStateKey');
+  app.click('#useDatabaseState');
+  const newerBackup = JSON.stringify({ revision: 2, state: { ...remote, entries: [{ id: 'otra-pestaña' }] } });
+  app.window.localStorage.setItem(key, newerBackup);
+  finish(response({ revision: 2, state: remote }));
+  await wait(app);
+  assert.equal(app.run('stateConflict'), false);
+  assert.equal(app.window.localStorage.getItem(key), newerBackup);
+  assert.match(app.element('persistenceMessage').textContent, /no se pudo borrar la copia local/);
+});
+
+test('PERSIST-029 - una respuesta remota vacía no descarta el borrador en conflicto', async (t) => {
+  let reads = 0;
+  const app = createApp(t, { clean: false, fetch: async (url, options = {}) => {
+    if (options.method === 'PUT') return response({}, 409);
+    return reads++ === 0 ? response({ revision: 1, state: emptyState() }) : response({ revision: 2, state: null });
+  } });
+  await wait(app);
+  app.run("entries.push({ id: 'local' }); save();");
+  await wait(app);
+  const backup = app.window.localStorage.getItem(app.run('pendingStateKey'));
+  app.click('#useDatabaseState');
+  await wait(app);
+  assert.equal(app.run('stateConflict'), true);
+  assert.equal(app.window.localStorage.getItem(app.run('pendingStateKey')), backup);
+  assert.match(app.element('persistenceMessage').textContent, /No se pudo cargar la versión de la base/);
+});
+
 test('PERSIST-004 - un inventario local corrupto no inicializa una base vacía', async (t) => {
   let writes = 0;
   const app = createApp(t, { clean: false, storage: { 'theluxe-inventory-v1': '{invalid' }, fetch: async (url, options = {}) => {

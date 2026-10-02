@@ -1181,13 +1181,27 @@ function stateMessage(message, error = false, retry = false) {
   document.getElementById('persistenceMessage').textContent = message;
   document.getElementById('retryPersistence').hidden = !retry;
 }
-function backUpPendingState() {
+function conflictActions(visible) { document.getElementById('conflictActions').hidden = !visible; }
+function backUpPendingState(snapshot = stateSnapshot()) {
   try {
-    localStorage.setItem(pendingStateKey, JSON.stringify({ revision: stateRevision, state: stateSnapshot() }));
+    const pending = JSON.stringify({ revision: stateRevision, state: snapshot });
+    localStorage.setItem(pendingStateKey, pending);
+    return pending;
+  } catch { return false; }
+}
+function clearPendingState(expected) {
+  try {
+    if (localStorage.getItem(pendingStateKey) !== expected) return false;
+    localStorage.removeItem(pendingStateKey);
     return true;
   } catch { return false; }
 }
-function clearPendingState() { try { localStorage.removeItem(pendingStateKey); } catch { /* Respaldo intacto si falla el almacenamiento. */ } }
+function enterStateConflict(message) {
+  stateConflict = true; stateDirty = true;
+  document.querySelector('.app-shell').inert = true;
+  conflictActions(true);
+  stateMessage(message, true);
+}
 function queueStateSave() {
   if (!stateApiEnabled) return;
   stateDirty = true;
@@ -1199,11 +1213,12 @@ function queueStateSave() {
 async function flushStateSave() {
   if (!stateDirty || stateSaving || stateConflict) return;
   stateSaving = true; stateDirty = false; stateMessage('Guardando cambios…');
+  const snapshot = stateSnapshot();
+  const pending = backUpPendingState(snapshot);
   try {
-    const response = await window.fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: stateRevision, state: stateSnapshot() }) });
+    const response = await window.fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: stateRevision, state: snapshot }) });
     if (response.status === 409) {
-      stateConflict = true; stateDirty = true;
-      stateMessage('Los datos cambiaron en otra sesión. No se sobrescribió la base; los cambios pendientes siguen guardados en este navegador. Resolvé el conflicto antes de continuar.', true);
+      enterStateConflict('Los datos cambiaron en otra sesión. No se sobrescribió la base; descargá la copia local antes de decidir usar la versión de la base de datos.');
       return;
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1211,7 +1226,7 @@ async function flushStateSave() {
     if (!Number.isSafeInteger(saved.revision) || saved.revision !== stateRevision + 1) throw new Error('Revisión inválida');
     stateRevision = saved.revision;
     if (stateDirty) backUpPendingState();
-    else clearPendingState();
+    else clearPendingState(pending);
     stateMessage('');
   } catch {
     stateDirty = true;
@@ -1265,12 +1280,13 @@ async function bootstrapState() {
     const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
     let migratedPayments = false;
     if (pending && (!Number.isSafeInteger(pending.revision) || pending.revision < 0 || !pending.state)) throw new Error('Respaldo pendiente inválido');
-    if (pending && stored.state && JSON.stringify(pending.state) === JSON.stringify(stored.state)) clearPendingState();
+    if (pending && stored.state && JSON.stringify(pending.state) === JSON.stringify(stored.state)) clearPendingState(pendingRaw);
     else if (pending) {
       migratedPayments = hydrateState(pending.state);
       if (pending.revision !== stateRevision) {
-        stateConflict = true; stateDirty = true;
-        stateMessage('Hay cambios locales sin guardar y la base cambió en otra sesión. Se conservaron en este navegador; no recargues ni borres los datos locales hasta resolver el conflicto.', true);
+        initInventory(false); renderConfig(); render();
+        stateLoaded = true;
+        enterStateConflict('Hay cambios locales sin guardar y la base cambió en otra sesión. Descargá la copia local antes de decidir usar la versión de la base de datos.');
         return;
       }
     }
@@ -1282,7 +1298,7 @@ async function bootstrapState() {
       stockMessage('');
     }
     initInventory(false); renderConfig(); render();
-    stateLoaded = true; shell.inert = false; stateMessage('');
+    stateLoaded = true; shell.inert = false; conflictActions(false); stateMessage('');
     if (stored.state === null || pending && pending.revision === stateRevision || migratedPayments) queueStateSave();
   } catch (error) {
     stateMessage(error.message === 'Inventario local inválido'
@@ -1294,6 +1310,37 @@ document.getElementById('retryPersistence').addEventListener('click', () => {
   if (!stateLoaded) { void bootstrapState(); return; }
   if (!stateConflict) { stateMessage(''); void flushStateSave(); }
 });
+function exportPendingState() {
+  const json = JSON.stringify({ revision: stateRevision, state: stateSnapshot() }, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL ? URL.createObjectURL(blob) : `data:application/json;charset=utf-8,${encodeURIComponent(json)}`;
+  const link = document.createElement('a');
+  link.href = url; link.download = `theluxe-copia-sin-guardar-${today()}.json`;
+  document.body.append(link); link.click(); link.remove();
+  if (URL.revokeObjectURL && URL.createObjectURL) window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+async function useDatabaseState() {
+  if (!stateConflict || !confirm('Se descartarán los cambios locales de esta pestaña y se usará la versión actual de la base de datos. Descargá primero la copia si la necesitás. ¿Continuar?')) return;
+  const expected = localStorage.getItem(pendingStateKey);
+  stateMessage('Cargando la versión de la base de datos…');
+  try {
+    const response = await window.fetch('/api/state', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const stored = await response.json();
+    if (!Number.isSafeInteger(stored.revision) || stored.revision < 0 || !stored.state) throw new Error('Respuesta inválida');
+    hydrateState(stored.state);
+    stateRevision = stored.revision; stateDirty = false; stateConflict = false;
+    populateSelectors(); renderConfig(); render();
+    document.querySelector('.app-shell').inert = false;
+    conflictActions(false);
+    if (expected !== null && !clearPendingState(expected)) stateMessage('Se está usando la versión de la base de datos, pero no se pudo borrar la copia local. Descargala o eliminála manualmente antes de recargar.', true);
+    else stateMessage('');
+  } catch {
+    stateMessage('No se pudo cargar la versión de la base de datos. El conflicto y la copia local siguen protegidos; reintentá cuando haya conexión.', true);
+  }
+}
+document.getElementById('exportPendingState').addEventListener('click', exportPendingState);
+document.getElementById('useDatabaseState').addEventListener('click', () => { void useDatabaseState(); });
 window.addEventListener('beforeunload', (event) => {
   if (!stateDirty && !stateSaving) return;
   event.preventDefault(); event.returnValue = '';

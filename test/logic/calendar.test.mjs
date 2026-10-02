@@ -51,28 +51,28 @@ test('CAL-007 - Mes que empieza lunes puede tener cinco semanas', () => {
   assert.equal(logic.monthWeeks('2026-06'), 5);
 });
 
-test('CAL-008 - Mes que empieza martes conserva cuatro lunes', () => {
-  assert.equal(logic.monthWeeks('2026-09'), 4);
+test('CAL-008 - Mes que empieza martes incluye su semana parcial inicial', () => {
+  assert.equal(logic.monthWeeks('2026-09'), 5);
 });
 
-test('CAL-009 - Mes que empieza miercoles conserva cuatro lunes', () => {
-  assert.equal(logic.monthWeeks('2026-07'), 4);
+test('CAL-009 - Mes que empieza miercoles incluye su semana parcial inicial', () => {
+  assert.equal(logic.monthWeeks('2026-07'), 5);
 });
 
-test('CAL-010 - Mes que empieza jueves conserva cuatro lunes', () => {
-  assert.equal(logic.monthWeeks('2026-01'), 4);
+test('CAL-010 - Mes que empieza jueves incluye su semana parcial inicial', () => {
+  assert.equal(logic.monthWeeks('2026-01'), 5);
 });
 
-test('CAL-011 - Mes que empieza viernes conserva cuatro lunes', () => {
-  assert.equal(logic.monthWeeks('2026-05'), 4);
+test('CAL-011 - Mes que empieza viernes incluye su semana parcial inicial', () => {
+  assert.equal(logic.monthWeeks('2026-05'), 5);
 });
 
-test('CAL-012 - Mes que empieza sabado puede tener cinco lunes', () => {
-  assert.equal(logic.monthWeeks('2026-08'), 5);
+test('CAL-012 - Mes que empieza sabado conserva sus seis semanas parciales', () => {
+  assert.equal(logic.monthWeeks('2026-08'), 6);
 });
 
-test('CAL-013 - Mes que empieza domingo puede tener cinco lunes', () => {
-  assert.equal(logic.monthWeeks('2026-11'), 5);
+test('CAL-013 - Mes que empieza domingo conserva sus seis semanas parciales', () => {
+  assert.equal(logic.monthWeeks('2026-11'), 6);
 });
 
 test('CAL-014 - Febrero comun que empieza lunes tiene cuatro semanas', () => {
@@ -83,8 +83,8 @@ test('CAL-015 - Febrero bisiesto que empieza lunes tiene cinco semanas', () => {
   assert.equal(logic.monthWeeks('2016-02'), 5);
 });
 
-test('CAL-016 - Febrero bisiesto que empieza jueves tiene cuatro semanas', () => {
-  assert.equal(logic.monthWeeks('2024-02'), 4);
+test('CAL-016 - Febrero bisiesto que empieza jueves conserva semana parcial inicial', () => {
+  assert.equal(logic.monthWeeks('2024-02'), 5);
 });
 
 test('CAL-017 - Dia anterior al primer lunes queda en semana uno', () => {
@@ -99,32 +99,32 @@ test('CAL-019 - Hoy fijo anterior al primer lunes queda en semana uno', () => {
   assert.equal(logic.currentMonthWeek('2026-09-03'), 1);
 });
 
-test('CAL-020 - Primer lunes inicia semana uno', () => {
-  assert.equal(logic.currentMonthWeek('2026-07-06'), 1);
+test('CAL-020 - Primer lunes inicia la segunda semana tras la parcial', () => {
+  assert.equal(logic.currentMonthWeek('2026-07-06'), 2);
 });
 
-test('CAL-021 - Primer domingo posterior sigue en semana uno', () => {
-  assert.equal(logic.currentMonthWeek('2026-07-12'), 1);
+test('CAL-021 - Primer domingo posterior queda en segunda semana', () => {
+  assert.equal(logic.currentMonthWeek('2026-07-12'), 2);
 });
 
-test('CAL-022 - Segundo lunes inicia semana dos', () => {
-  assert.equal(logic.currentMonthWeek('2026-07-13'), 2);
+test('CAL-022 - Segundo lunes inicia semana tres', () => {
+  assert.equal(logic.currentMonthWeek('2026-07-13'), 3);
 });
 
-test('CAL-023 - Sabado de segunda semana conserva numero', () => {
-  assert.equal(logic.currentMonthWeek('2026-07-18'), 2);
+test('CAL-023 - Sabado de tercera semana conserva numero', () => {
+  assert.equal(logic.currentMonthWeek('2026-07-18'), 3);
 });
 
-test('CAL-024 - Tercer lunes inicia semana tres', () => {
-  assert.equal(logic.currentMonthWeek('2026-07-20'), 3);
+test('CAL-024 - Tercer lunes inicia semana cuatro', () => {
+  assert.equal(logic.currentMonthWeek('2026-07-20'), 4);
 });
 
-test('CAL-025 - Cuarto lunes inicia semana cuatro', () => {
-  assert.equal(logic.currentMonthWeek('2026-07-27'), 4);
+test('CAL-025 - Cuarto lunes inicia semana cinco', () => {
+  assert.equal(logic.currentMonthWeek('2026-07-27'), 5);
 });
 
-test('CAL-026 - Ultimo dia conserva cuarta semana del mes', () => {
-  assert.equal(logic.currentMonthWeek('2026-07-31'), 4);
+test('CAL-026 - Ultimo dia conserva quinta semana del mes', () => {
+  assert.equal(logic.currentMonthWeek('2026-07-31'), 5);
 });
 
 test('CAL-027 - Quinto lunes inicia semana cinco', () => {
@@ -139,36 +139,36 @@ test('CAL-029 - Nuevo mes reinicia semana aunque continue rango anterior', () =>
   assert.equal(logic.currentMonthWeek('2026-08-01'), 1);
 });
 
-test('CAL-030 - Semana predeterminada empieza en primer lunes', () => {
-  assert.deepEqual(bounds('week', '2026-07'), ['2026-07-06', '2026-07-12']);
+test('CAL-030 - Semana predeterminada empieza el primer dia del mes', () => {
+  assert.deepEqual(bounds('week', '2026-07'), ['2026-07-01', '2026-07-05']);
 });
 
-test('CAL-031 - Primera semana no incorpora dias anteriores al lunes', () => {
-  assert.deepEqual(bounds('week', '2026-09', 1), ['2026-09-07', '2026-09-13']);
+test('CAL-031 - Primera semana incluye del primero al primer domingo', () => {
+  assert.deepEqual(bounds('week', '2026-09', 1), ['2026-09-01', '2026-09-06']);
 });
 
 test('CAL-032 - Semana acepta numero textual del selector', () => {
-  assert.deepEqual(bounds('week', '2026-07', '2'), ['2026-07-13', '2026-07-19']);
+  assert.deepEqual(bounds('week', '2026-07', '2'), ['2026-07-06', '2026-07-12']);
 });
 
 test('CAL-033 - Tercera semana termina domingo inclusivo', () => {
-  assert.deepEqual(bounds('week', '2026-07', 3), ['2026-07-20', '2026-07-26']);
+  assert.deepEqual(bounds('week', '2026-07', 3), ['2026-07-13', '2026-07-19']);
 });
 
-test('CAL-034 - Cuarta semana cruza al mes siguiente sin truncar', () => {
-  assert.deepEqual(bounds('week', '2026-07', 4), ['2026-07-27', '2026-08-02']);
+test('CAL-034 - Cuarta semana conserva lunes y domingo dentro del mes', () => {
+  assert.deepEqual(bounds('week', '2026-07', 4), ['2026-07-20', '2026-07-26']);
 });
 
-test('CAL-035 - Quinta semana cruza al mes siguiente sin truncar', () => {
-  assert.deepEqual(bounds('week', '2026-06', 5), ['2026-06-29', '2026-07-05']);
+test('CAL-035 - Ultima semana termina en el ultimo dia del mes', () => {
+  assert.deepEqual(bounds('week', '2026-06', 5), ['2026-06-29', '2026-06-30']);
 });
 
-test('CAL-036 - Ultima semana cruza de diciembre a enero', () => {
-  assert.deepEqual(bounds('week', '2026-12', 4), ['2026-12-28', '2027-01-03']);
+test('CAL-036 - Ultima semana de diciembre no cruza a enero', () => {
+  assert.deepEqual(bounds('week', '2026-12', 5), ['2026-12-28', '2026-12-31']);
 });
 
-test('CAL-037 - Semana que inicia en dia bisiesto cruza a marzo', () => {
-  assert.deepEqual(bounds('week', '2016-02', 5), ['2016-02-29', '2016-03-06']);
+test('CAL-037 - Semana que inicia en dia bisiesto termina en febrero', () => {
+  assert.deepEqual(bounds('week', '2016-02', 5), ['2016-02-29', '2016-02-29']);
 });
 
 test('CAL-038 - Mes comun de febrero termina el veintiocho', () => {
@@ -215,32 +215,32 @@ test('CAL-048 - Zona DST de prueba cambia realmente una hora en marzo', () => {
   assert.deepEqual(inZone('America/New_York', "[new Date('2026-03-08T00:00:00').getTimezoneOffset(), new Date('2026-03-09T00:00:00').getTimezoneOffset()]"), [300, 240]);
 });
 
-test('CAL-049 - Domingo del adelanto DST sigue en semana uno', () => {
-  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-08')"), 1);
+test('CAL-049 - Domingo del adelanto DST identifica la segunda semana', () => {
+  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-08')"), 2);
 });
 
-test('CAL-050 - Lunes posterior al adelanto DST inicia semana dos', () => {
-  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-09')"), 2);
+test('CAL-050 - Lunes posterior al adelanto DST inicia semana tres', () => {
+  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-09')"), 3);
 });
 
-test('CAL-051 - Segundo lunes posterior al adelanto DST inicia semana tres', () => {
-  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-16')"), 3);
+test('CAL-051 - Segundo lunes posterior al adelanto DST inicia semana cuatro', () => {
+  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-16')"), 4);
 });
 
-test('CAL-052 - Ultimo lunes de marzo tras DST inicia semana cinco', () => {
-  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-30')"), 5);
+test('CAL-052 - Ultimo lunes de marzo tras DST inicia semana seis', () => {
+  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-30')"), 6);
 });
 
-test('CAL-053 - Martes posterior al adelanto DST sigue en semana dos', () => {
-  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-10')"), 2);
+test('CAL-053 - Martes posterior al adelanto DST sigue en semana tres', () => {
+  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2026-03-10')"), 3);
 });
 
-test('CAL-054 - Marzo con adelanto DST conserva cinco lunes', () => {
-  assert.equal(inZone('America/New_York', "logic.monthWeeks('2026-03')"), 5);
+test('CAL-054 - Marzo con adelanto DST conserva seis semanas parciales', () => {
+  assert.equal(inZone('America/New_York', "logic.monthWeeks('2026-03')"), 6);
 });
 
 test('CAL-055 - Semana posterior al adelanto DST conserva lunes y domingo', () => {
-  assert.deepEqual(inZone('America/New_York', "logic.periodBounds('week', '2026-03', 2)"), ['2026-03-09', '2026-03-15']);
+  assert.deepEqual(inZone('America/New_York', "logic.periodBounds('week', '2026-03', 3)"), ['2026-03-09', '2026-03-15']);
 });
 
 test('CAL-056 - Mes con adelanto DST conserva limites civiles', () => {
@@ -251,28 +251,28 @@ test('CAL-057 - Zona DST europea cambia una hora en octubre', () => {
   assert.deepEqual(inZone('Europe/Berlin', "[new Date('2026-10-25T00:00:00').getTimezoneOffset(), new Date('2026-10-26T00:00:00').getTimezoneOffset()]"), [-120, -60]);
 });
 
-test('CAL-058 - Domingo de retroceso DST sigue en semana tres', () => {
-  assert.equal(inZone('Europe/Berlin', "logic.currentMonthWeek('2026-10-25')"), 3);
+test('CAL-058 - Domingo de retroceso DST sigue en semana cuatro', () => {
+  assert.equal(inZone('Europe/Berlin', "logic.currentMonthWeek('2026-10-25')"), 4);
 });
 
-test('CAL-059 - Lunes posterior al retroceso DST inicia semana cuatro', () => {
-  assert.equal(inZone('Europe/Berlin', "logic.currentMonthWeek('2026-10-26')"), 4);
+test('CAL-059 - Lunes posterior al retroceso DST inicia semana cinco', () => {
+  assert.equal(inZone('Europe/Berlin', "logic.currentMonthWeek('2026-10-26')"), 5);
 });
 
-test('CAL-060 - Mes con retroceso DST conserva cuatro lunes', () => {
-  assert.equal(inZone('Europe/Berlin', "logic.monthWeeks('2026-10')"), 4);
+test('CAL-060 - Mes con retroceso DST conserva cinco semanas parciales', () => {
+  assert.equal(inZone('Europe/Berlin', "logic.monthWeeks('2026-10')"), 5);
 });
 
-test('CAL-061 - Ultima semana tras retroceso DST cruza mes correctamente', () => {
-  assert.deepEqual(inZone('Europe/Berlin', "logic.periodBounds('week', '2026-10', 4)"), ['2026-10-26', '2026-11-01']);
+test('CAL-061 - Ultima semana tras retroceso DST termina dentro del mes', () => {
+  assert.deepEqual(inZone('Europe/Berlin', "logic.periodBounds('week', '2026-10', 5)"), ['2026-10-26', '2026-10-31']);
 });
 
-test('CAL-062 - Lunes posterior al adelanto europeo inicia semana cinco', () => {
-  assert.equal(inZone('Europe/Berlin', "logic.currentMonthWeek('2026-03-30')"), 5);
+test('CAL-062 - Lunes posterior al adelanto europeo inicia semana seis', () => {
+  assert.equal(inZone('Europe/Berlin', "logic.currentMonthWeek('2026-03-30')"), 6);
 });
 
 test('CAL-063 - Anio bisiesto conserva lunes correcto despues de DST', () => {
-  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2024-03-11')"), 2);
+  assert.equal(inZone('America/New_York', "logic.currentMonthWeek('2024-03-11')"), 3);
 });
 
 test('CAL-064 - Zona DST de media hora cambia realmente treinta minutos', () => {

@@ -13,6 +13,10 @@
   <div id="persistenceNotice" class="open-days-warning persistence-notice" role="status" aria-live="polite" hidden>
     <span id="persistenceMessage"></span>
     <button id="retryPersistence" class="secondary-btn compact-btn" type="button" hidden>Reintentar</button>
+    <div id="conflictActions" class="persistence-actions" role="group" aria-label="Resolver conflicto de datos" hidden>
+      <button id="exportPendingState" class="secondary-btn compact-btn" type="button">Descargar copia sin guardar</button>
+      <button id="useDatabaseState" class="danger-btn compact-btn" type="button">Usar versión de la base de datos</button>
+    </div>
   </div>
   <div class="app-shell">
     <aside class="sidebar">

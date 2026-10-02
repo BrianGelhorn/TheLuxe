@@ -46,6 +46,10 @@ button { color: inherit; }
 .open-days-warning { display: flex; align-items: baseline; gap: 8px; margin: -8px 0 18px; padding: 11px 14px; border: 1px solid #7d4b42; border-radius: 9px; background: #2a1715; color: #f0c0a9; font-size: .82rem; }
 .open-days-warning[hidden] { display: none; }
 .open-days-warning strong { color: #f0a29b; }
+.persistence-notice { flex-wrap: wrap; }
+.persistence-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
+.persistence-actions[hidden] { display: none; }
+.persistence-actions button { min-width: 0; }
 .update-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: -8px 0 18px; padding: 12px 14px; border: 1px solid #6e5936; border-radius: 9px; background: var(--gold-soft); font-size: .82rem; }
 .update-notice[hidden] { display: none; }
 .update-notice small { flex-basis: 100%; color: var(--muted); }
