@@ -65,7 +65,9 @@ docker compose start api
 
 Guardá esa copia fuera de la PC. Si se pierde el volumen, Docker no puede reconstruir los datos.
 
-Antes de cada actualización con el botón, el actualizador guarda una copia consistente en `%LOCALAPPDATA%\TheLuxe\backups`. Si falla el despliegue, solo restaura automáticamente SQLite cuando su revisión no cambió desde la copia: **jamás pisa ventas nuevas**. Si la revisión cambió, informa la ruta del backup y necesita revisión manual. Para recuperar una copia después de respaldar también el estado actual y comprobar que nadie esté operando:
+Mientras `node host-updater.mjs` esté ejecutándose y Docker permita acceder a la API, se guarda **una copia diaria** de la base en `%LOCALAPPDATA%\TheLuxe\backups\theluxe-daily-AAAA-MM-DD.sqlite`. Comprueba al iniciar y cada hora: si ya existe la del día, no crea otra; si Docker está apagado o falla la copia, registra el error en la consola y reintenta en la siguiente comprobación. No recupera días en que la PC estuvo apagada. Cuando hay una copia válida del día, elimina las copias **automáticas** diarias y previas a actualizaciones anteriores a los últimos 14 días calendario (incluido hoy); no toca archivos manuales o desconocidos. Si la copia del día está dañada, no elimina las anteriores y registra el error para revisarlo. Si falla la limpieza, lo registra para volver a intentarlo en la siguiente comprobación. Las copias quedan en esta misma PC: guardá alguna también fuera de ella. El actualizador debe reiniciarse para incorporar este cambio.
+
+Antes de cada actualización con el botón, el actualizador guarda además una copia consistente en `%LOCALAPPDATA%\TheLuxe\backups`. Si falla el despliegue, solo restaura automáticamente SQLite cuando su revisión no cambió desde la copia: **jamás pisa ventas nuevas**. Si la revisión cambió, informa la ruta del backup y necesita revisión manual. Para recuperar una copia después de respaldar también el estado actual y comprobar que nadie esté operando:
 
 ```powershell
 docker compose stop web api

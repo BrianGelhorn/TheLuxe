@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync, backup as sqliteBackup } from 'node:sqlite';
@@ -168,4 +168,103 @@ test('UPD-015 - La copia caliente de SQLite conserva la revisión previa a cambi
     assert.equal(previous.prepare('PRAGMA quick_check').get().quick_check, 'ok');
     assert.equal(previous.prepare('SELECT revision FROM api_state WHERE id=1').get().revision, 1);
   } finally { previous.close(); }
+});
+
+test('UPD-016 - Una copia diaria persiste tras reiniciar, no se repite y permite actualizar al terminar', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'theluxe-daily-'));
+  const source = new DatabaseSync(join(directory, 'live.sqlite'));
+  t.after(async () => { source.close(); await rm(directory, { recursive: true, force: true }); });
+  source.exec('CREATE TABLE api_state (id INTEGER PRIMARY KEY, revision INTEGER NOT NULL)');
+  source.exec('INSERT INTO api_state VALUES (1, 1)');
+  let date = new Date(2026, 9, 2), copies = 0;
+  let entered, resume;
+  const started = new Promise((resolve) => { entered = resolve; });
+  const paused = new Promise((resolve) => { resume = resolve; });
+  const copy = async () => {
+    const path = join(directory, `temporary-${++copies}.sqlite`);
+    if (copies === 2) { entered(); await paused; }
+    await sqliteBackup(source, path);
+    return { path, revision: source.prepare('SELECT revision FROM api_state').get().revision };
+  };
+  const options = { directory, now: () => date, backup: copy };
+  const updater = createUpdater(options);
+  assert.equal(await updater.dailyBackup(), true);
+  const first = join(directory, 'theluxe-daily-2026-10-02.sqlite');
+  const db = new DatabaseSync(first, { readOnly: true });
+  try { assert.equal(db.prepare('SELECT revision FROM api_state').get().revision, 1); }
+  finally { db.close(); }
+  assert.equal(await createUpdater(options).dailyBackup(), false, 'una instancia nueva detecta la copia existente');
+  assert.equal(copies, 1);
+  source.exec('UPDATE api_state SET revision=2');
+  date = new Date(2026, 9, 3);
+  const pending = updater.dailyBackup();
+  await started;
+  assert.deepEqual(await updater.update(), { started: false, busy: true });
+  assert.equal(await updater.dailyBackup(), false);
+  resume();
+  assert.equal(await pending, true);
+  assert.equal(await updater.dailyBackup(), false);
+  assert.equal(copies, 2);
+  const second = new DatabaseSync(join(directory, 'theluxe-daily-2026-10-03.sqlite'), { readOnly: true });
+  try { assert.equal(second.prepare('SELECT revision FROM api_state').get().revision, 2); }
+  finally { second.close(); }
+  assert.ok((await stat(first)).size > 0);
+});
+
+test('UPD-017 - Una falla o una base vacía permiten reintentar el respaldo diario', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'theluxe-daily-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const old = join(directory, 'theluxe-daily-2026-09-18.sqlite');
+  await writeFile(old, 'copia anterior');
+  let attempts = 0;
+  const updater = createUpdater({ directory, now: () => new Date(2026, 9, 2), backup: async () => {
+    attempts++;
+    if (attempts === 1) throw new Error('Docker apagado');
+    const path = join(directory, `temporary-${attempts}.sqlite`);
+    const db = new DatabaseSync(path);
+    if (attempts === 3) db.exec('CREATE TABLE api_state (id INTEGER PRIMARY KEY, revision INTEGER NOT NULL); INSERT INTO api_state VALUES (1, 1)');
+    db.close();
+    return { path, revision: attempts === 2 ? 0 : 1 };
+  } });
+  await assert.rejects(updater.dailyBackup(), /Docker apagado/);
+  assert.ok((await stat(old)).isFile(), 'un error no borra respaldos anteriores');
+  assert.equal(await updater.dailyBackup(), false);
+  await assert.rejects(stat(join(directory, 'temporary-2.sqlite')), { code: 'ENOENT' });
+  assert.ok((await stat(old)).isFile(), 'una base vacía tampoco inicia la limpieza');
+  assert.equal(await updater.dailyBackup(), true);
+  await assert.rejects(stat(old), { code: 'ENOENT' });
+  assert.equal(attempts, 3);
+});
+
+test('UPD-018 - Conserva 14 días de copias automáticas y nunca elimina archivos manuales', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'theluxe-retention-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const commit = 'a'.repeat(40), id = '00000000-0000-4000-8000-000000000000';
+  const update = (date) => `theluxe-${commit}-${date.getTime()}-${id}.sqlite`;
+  const oldUpdate = update(new Date(2026, 8, 18, 23, 59));
+  const borderUpdate = update(new Date(2026, 8, 19));
+  const old = ['theluxe-daily-2026-09-18.sqlite', oldUpdate];
+  const retained = ['theluxe-daily-2026-09-19.sqlite', 'theluxe-daily-2026-10-01.sqlite', borderUpdate, 'theluxe-manual.sqlite', 'theluxe-daily-not-a-date.sqlite'];
+  for (const name of [...old, ...retained]) await writeFile(join(directory, name), 'manual');
+  let copies = 0;
+  const options = { directory, now: () => new Date(2026, 9, 2, 12), backup: async () => {
+    const path = join(directory, `temporary-${++copies}.sqlite`);
+    const db = new DatabaseSync(path);
+    db.exec('CREATE TABLE api_state (id INTEGER PRIMARY KEY, revision INTEGER NOT NULL); INSERT INTO api_state VALUES (1, 1)');
+    db.close();
+    return { path, revision: 1 };
+  } };
+  assert.equal(await createUpdater(options).dailyBackup(), true);
+  for (const name of old) await assert.rejects(stat(join(directory, name)), { code: 'ENOENT' });
+  for (const name of retained) assert.ok((await stat(join(directory, name))).isFile());
+  const current = join(directory, 'theluxe-daily-2026-10-02.sqlite');
+  assert.ok((await stat(current)).size > 0);
+  await writeFile(join(directory, oldUpdate), 'manual');
+  assert.equal(await createUpdater(options).dailyBackup(), false, 'también limpia al reiniciar si ya existe la copia del día');
+  await assert.rejects(stat(join(directory, oldUpdate)), { code: 'ENOENT' });
+  assert.equal(copies, 1);
+  await writeFile(current, 'copia dañada');
+  await writeFile(join(directory, oldUpdate), 'copia antigua');
+  await assert.rejects(createUpdater(options).dailyBackup());
+  assert.ok((await stat(join(directory, oldUpdate))).isFile(), 'una copia diaria dañada no habilita borrar las anteriores');
 });

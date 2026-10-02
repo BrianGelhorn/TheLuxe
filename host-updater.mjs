@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { resolve, join, basename } from 'node:path';
 import { homedir } from 'node:os';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, stat, rename, unlink, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -13,6 +13,19 @@ const repo = fileURLToPath(new URL('.', import.meta.url));
 const appOrigin = 'http://127.0.0.1:8000';
 const sha = /^[a-f0-9]{40}$/;
 const expectedRemote = /^(?:https:\/\/github\.com\/BrianGelhorn\/TheLuxe(?:\.git)?|git@github\.com:BrianGelhorn\/TheLuxe\.git)$/;
+const backupDirectory = join(process.env.LOCALAPPDATA || homedir(), 'TheLuxe', 'backups');
+const localDay = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+async function pruneBackups(directory, date) {
+  const cutoff = new Date(date.getFullYear(), date.getMonth(), date.getDate() - 13);
+  const oldestDay = localDay(cutoff);
+  for (const file of await readdir(directory, { withFileTypes: true })) {
+    if (!file.isFile()) continue;
+    const daily = /^theluxe-daily-(\d{4}-\d{2}-\d{2})\.sqlite$/.exec(file.name);
+    const update = /^theluxe-(?:[a-f0-9]{40}|null)-(\d{13})-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\.sqlite$/.exec(file.name);
+    if (daily ? daily[1] < oldestDay : update && Number(update[1]) < cutoff.getTime()) await unlink(join(directory, file.name));
+  }
+}
 
 async function command(program, args, timeout = 120000) {
   const { stdout } = await exec(program, args, { cwd: repo, timeout, maxBuffer: 1024 * 1024, windowsHide: true });
@@ -40,11 +53,20 @@ async function databaseRevision(run) {
   return revision;
 }
 
+function verifiedRevision(path) {
+  const db = new DatabaseSync(path, { readOnly: true });
+  try {
+    if (db.prepare('PRAGMA quick_check').get().quick_check !== 'ok') throw new Error('La copia de seguridad de SQLite no pasó la verificación.');
+    const revision = db.prepare('SELECT revision FROM api_state WHERE id=1').get()?.revision ?? 0;
+    if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('La copia de seguridad no tiene una revisión válida.');
+    return revision;
+  } finally { db.close(); }
+}
+
 async function databaseBackup(run, commit) {
-  const directory = join(process.env.LOCALAPPDATA || homedir(), 'TheLuxe', 'backups');
-  await mkdir(directory, { recursive: true });
+  await mkdir(backupDirectory, { recursive: true });
   const filename = `theluxe-${commit}-${Date.now()}-${randomUUID()}.sqlite`;
-  const path = join(directory, filename);
+  const path = join(backupDirectory, filename);
   const script = `import {DatabaseSync,backup} from 'node:sqlite'; const db=new DatabaseSync('/data/theluxe.sqlite',{readOnly:true}); try { await backup(db,'/data/${filename}'); } finally { db.close(); }`;
   try {
     await run('docker', ['compose', '-f', 'compose.yaml', 'exec', '-T', 'api', 'node', '--input-type=module', '-e', script], 180000);
@@ -53,19 +75,38 @@ async function databaseBackup(run, commit) {
     try { await run('docker', ['compose', '-f', 'compose.yaml', 'exec', '-T', 'api', 'rm', '-f', `/data/${filename}`]); }
     catch { /* La copia externa queda disponible; el temporal se puede limpiar luego. */ }
   }
-  const db = new DatabaseSync(path, { readOnly: true });
-  try {
-    if (db.prepare('PRAGMA quick_check').get().quick_check !== 'ok') throw new Error('La copia de seguridad de SQLite no pasó la verificación.');
-    const revision = db.prepare('SELECT revision FROM api_state WHERE id=1').get()?.revision ?? 0;
-    if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('La copia de seguridad no tiene una revisión válida.');
-    return { path, revision };
-  } finally { db.close(); }
+  return { path, revision: verifiedRevision(path) };
 }
 
-export function createUpdater({ run = command, installed = installedVersion, healthy = apiHealthy, backup = databaseBackup, revision = databaseRevision } = {}) {
+export function createUpdater({ run = command, installed = installedVersion, healthy = apiHealthy, backup = databaseBackup, revision = databaseRevision, directory = backupDirectory, now = () => new Date() } = {}) {
   let busy = false;
   let phase = '';
   let error = '';
+
+  async function dailyBackup() {
+    if (busy) return false;
+    busy = true;
+    phase = 'Respaldando base de datos';
+    try {
+      const date = now();
+      const target = join(directory, `theluxe-daily-${localDay(date)}.sqlite`);
+      let exists = false;
+      try { exists = (await stat(target)).isFile(); }
+      catch (failure) { if (failure.code !== 'ENOENT') throw failure; }
+      if (exists && verifiedRevision(target) < 1) throw new Error('La copia diaria existente está vacía. Revisala antes de borrar copias anteriores.');
+      if (!exists) {
+        const snapshot = await backup(run, 'daily');
+        if (snapshot.revision === 0) { await unlink(snapshot.path); return false; }
+        await rename(snapshot.path, target);
+      }
+      try { await pruneBackups(directory, date); }
+      catch (failure) { console.error('No se pudieron limpiar las copias antiguas:', failure); }
+      return !exists;
+    } finally {
+      phase = '';
+      busy = false;
+    }
+  }
 
   async function inspect() {
     const [branch, remote, dirty] = await Promise.all([
@@ -173,7 +214,7 @@ export function createUpdater({ run = command, installed = installedVersion, hea
     return { started: true };
   }
 
-  return { status, update };
+  return { status, update, dailyBackup };
 }
 
 export function createUpdateServer(updater = createUpdater()) {
@@ -200,5 +241,11 @@ export function createUpdateServer(updater = createUpdater()) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  createUpdateServer().listen(8001, '127.0.0.1', () => console.log('Actualizador local: http://127.0.0.1:8001'));
+  const updater = createUpdater();
+  createUpdateServer(updater).listen(8001, '127.0.0.1', () => {
+    console.log('Actualizador local: http://127.0.0.1:8001');
+    const checkBackup = () => { void updater.dailyBackup().catch((failure) => console.error('No se pudo hacer el respaldo diario:', failure)); };
+    checkBackup();
+    setInterval(checkBackup, 60 * 60 * 1000);
+  });
 }
