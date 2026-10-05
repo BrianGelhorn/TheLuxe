@@ -53,7 +53,7 @@ async function databaseRevision(run) {
   return revision;
 }
 
-function verifiedRevision(path) {
+export function verifiedRevision(path) {
   const db = new DatabaseSync(path, { readOnly: true });
   try {
     if (db.prepare('PRAGMA quick_check').get().quick_check !== 'ok') throw new Error('La copia de seguridad de SQLite no pasó la verificación.');
@@ -78,7 +78,7 @@ async function databaseBackup(run, commit) {
   return { path, revision: verifiedRevision(path) };
 }
 
-export function createUpdater({ run = command, installed = installedVersion, healthy = apiHealthy, backup = databaseBackup, revision = databaseRevision, directory = backupDirectory, now = () => new Date() } = {}) {
+export function createUpdater({ run = command, installed = installedVersion, healthy = apiHealthy, backup = databaseBackup, revision = databaseRevision, directory = backupDirectory, now = () => new Date(), deploy } = {}) {
   let busy = false;
   let phase = '';
   let error = '';
@@ -153,6 +153,10 @@ export function createUpdater({ run = command, installed = installedVersion, hea
         await run('git', ['merge-base', '--is-ancestor', 'HEAD', 'FETCH_HEAD']);
         await run('git', ['merge', '--ff-only', 'FETCH_HEAD']);
         if (await run('git', ['rev-parse', 'HEAD']) !== fetched) throw new Error('La copia local no coincide con main.');
+        if (deploy) {
+          await deploy({ commit: fetched, previousCommit: current.installedCommit, setPhase: (value) => { phase = value; } });
+          return;
+        }
         phase = 'Preparando contenedor';
         await run('docker', ['tag', 'theluxe-local', 'theluxe-rollback']);
         oldWebImage = true;

@@ -146,7 +146,7 @@ function body(req) {
   });
 }
 
-export function createApi({ databasePath } = {}) {
+export function createApi({ databasePath, webHandler, host } = {}) {
   const db = new DatabaseSync(databasePath || process.env.DB_PATH || '/data/theluxe.sqlite');
   db.exec('CREATE TABLE IF NOT EXISTS api_state (id INTEGER PRIMARY KEY CHECK (id = 1), revision INTEGER NOT NULL, state TEXT NOT NULL)');
   const select = db.prepare('SELECT revision, state FROM api_state WHERE id = 1');
@@ -173,9 +173,18 @@ export function createApi({ databasePath } = {}) {
   };
   const server = http.createServer(async (req, res) => {
     try {
-      const url = new URL(req.url, 'http://localhost');
+      const expectedHost = typeof host === 'function' ? host() : host;
+      if (expectedHost && req.headers.host !== expectedHost) return response(res, 403, { error: 'Forbidden host' });
+      const url = new URL(req.url, `http://${expectedHost || 'localhost'}`);
       if (req.method === 'GET' && url.pathname === '/api/health') { read(); return response(res, 200, { ok: true }); }
-      if (!url.pathname.startsWith('/api/')) return response(res, 404, { error: 'Not found' });
+      if (!url.pathname.startsWith('/api/')) {
+        if (!webHandler) return response(res, 404, { error: 'Not found' });
+        const result = await webHandler(new Request(url, { method: req.method, headers: req.headers }));
+        const content = req.method === 'HEAD' ? null : Buffer.from(await result.arrayBuffer());
+        const headers = Object.fromEntries(result.headers);
+        res.writeHead(result.status, headers);
+        return res.end(content);
+      }
       if (!['GET', 'PUT'].includes(req.method)) return response(res, 405, { error: 'Method not allowed' });
       if (req.method === 'PUT') {
         if (req.headers.origin && req.headers.origin !== 'http://127.0.0.1:8000') return response(res, 403, { error: 'Forbidden origin' });
