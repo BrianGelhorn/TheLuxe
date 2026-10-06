@@ -384,19 +384,17 @@
           <article class="card form-card"><span class="step">COMISIÓN PREDETERMINADA</span><h2>Porcentaje para nuevos cortes</h2><form id="commissionForm" class="config-form"><label class="field"><span>Comisión (%)</span><input name="commission" type="number" min="0" max="100" required></label><button class="primary-btn compact-btn" type="submit">Guardar</button></form></article>
            <article class="card form-card stock-config-card">
               <div class="section-heading"><div><span class="step">CATÁLOGO</span><h2>Ventas y stock</h2></div></div>
-              <p class="stock-hint">Elegí Venta, Insumo o ambos. Las cajas solo convierten reposiciones.</p>
+              <p class="stock-hint">Elegí Venta, Insumo o ambas opciones. Todos los productos nuevos se controlan por unidades.</p>
             <form id="stockProductForm" class="stock-product-form">
               <input name="stockId" type="hidden">
               <label class="field"><span>Nombre</span><input name="stockName" maxlength="80" placeholder="Ej. Navajas" required></label>
-              <div class="stock-product-options" role="group" aria-labelledby="stockProductOptionsLabel"><span id="stockProductOptionsLabel">Uso del producto</span><div><label><input name="saleEnabled" type="checkbox"> Venta</label><label><input name="stockEnabled" type="checkbox" checked> Insumo</label></div></div>
+              <div class="stock-product-options" role="group" aria-labelledby="stockProductOptionsLabel"><span id="stockProductOptionsLabel">Uso del producto</span><div><label><input name="saleEnabled" type="checkbox"> Venta</label><label><input name="supplyEnabled" type="checkbox" checked> Insumo</label><input name="stockEnabled" type="checkbox" checked hidden></div></div>
               <label id="salePriceField" class="field" hidden><span>Precio de venta</span><div class="money-input"><b>$</b><input name="salePrice" type="text" inputmode="numeric" required disabled></div></label>
               <div id="stockProductFields" class="stock-product-fields">
-                <span class="stock-product-fields-title">Datos de insumo</span>
-                <label class="field"><span>Unidad</span><select name="stockUnit"><option value="unidades">Unidades</option><option value="ml">Mililitros</option><option value="g">Gramos</option></select></label>
+                <span class="stock-product-fields-title">Datos de stock</span>
+                <label class="field"><span>Unidad</span><input name="stockUnit" value="unidades" readonly></label>
                 <label class="field"><span>Cantidad inicial</span><input name="initialStock" type="number" min="0" max="1000000000" step="1" value="0" required></label>
-                <label class="field"><span>Cómo lo comprás</span><select name="packageLabel"><option value="unidad">Por unidad</option><option value="caja">Por caja</option></select></label>
-                <label class="field"><span id="stockPurchasePriceLabel">Precio unitario</span><div class="money-input"><b>$</b><input name="unitCost" type="text" inputmode="numeric" value="0" required></div></label>
-                <label id="stockPackageSizeField" class="field" hidden><span>Cantidad dentro de la caja</span><input name="packageSize" type="number" min="2" max="1000000000" step="1" value="1" required disabled></label>
+                <label class="field"><span>Costo por unidad</span><div class="money-input"><b>$</b><input name="unitCost" type="number" inputmode="decimal" min="0" max="1000000000" step="any" value="0" required></div></label>
                 <p id="stockUnitCostPreview" class="stock-unit-cost-preview"></p><p id="stockInitialDate" class="stock-hint"></p>
               </div>
               <div class="stock-product-actions"><button id="saveStockProduct" class="primary-btn compact-btn" type="submit">Agregar producto</button><button id="cancelStockProduct" class="secondary-btn compact-btn" type="button" hidden>Cancelar</button></div>

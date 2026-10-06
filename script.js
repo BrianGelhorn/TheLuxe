@@ -132,7 +132,7 @@ updateWeekOptions();
 document.getElementById('summaryWeek').value = currentMonthWeek(today());
 populateSelectors();
 document.querySelectorAll('.money-input input').forEach((input) => input.addEventListener('input', () => {
-  input.value = formatAmount(input.value);
+  if (input.type !== 'number') input.value = formatAmount(input.value);
   input.setCustomValidity('');
 }));
 
@@ -175,6 +175,12 @@ function saveConfig() {
 
 function saveBarberPayments() { queueStateSave(); }
 
+function populateSaleProducts() {
+  const selectedProduct = saleForm.elements.product.value;
+  document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + inventory.products.filter((product) => product.active && product.saleEnabled).map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join('');
+  saleForm.elements.product.value = selectedProduct;
+}
+
 function populateSelectors() {
   const options = [...document.querySelectorAll('#summaryServiceOptions input')];
   const selectedServices = new Set(options.filter((input) => input.checked).map((input) => input.value));
@@ -190,9 +196,7 @@ function populateSelectors() {
   const selectedIndex = [...barberFilter.options].findIndex((option) => shopMode ? option.dataset.scope === 'shop' : option.dataset.scope !== 'shop' && option.value === selectedBarber);
   barberFilter.selectedIndex = selectedIndex < 0 ? 0 : selectedIndex;
   updateServiceFilterLabel();
-  const selectedProduct = saleForm.elements.product.value;
-  document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + inventory.products.filter((product) => product.active && product.saleEnabled).map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join('');
-  saleForm.elements.product.value = selectedProduct;
+  populateSaleProducts();
   advanceForm.elements.barber.innerHTML = '<option value="">Seleccionar barbero</option>' + config.barbers.filter(({ active }) => active !== false).map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
   expenseForm.elements.category.innerHTML = '<option value="">Sin categoría</option>' + config.expenseCategories.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
 }

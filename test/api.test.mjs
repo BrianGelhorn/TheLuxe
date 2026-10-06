@@ -205,3 +205,18 @@ test('API rechaza transferencias nuevas sin saldo inicial suficiente, sin reinte
   assert.equal((await request(api.url(), '/api/transfers', { method: 'PUT', headers, body: JSON.stringify({ revision: 2, data: unsafe }) })).status, 400);
   assert.equal((await request(api.url(), '/api/state')).body.revision, 2);
 });
+
+test('API conserva Venta e Insumo independientes y rechaza uso inválido sin sobrescribir', async (t) => {
+  const api = await fixture(t);
+  const headers = { 'Content-Type': 'application/json' };
+  const initial = appSnapshot();
+  const item = { ...initial.inventory.products[0], stockEnabled: true, supplyEnabled: true, unit: 'unidades', initialStock: 10, unitCost: 100, startDate: '2026-09-03' };
+  initial.inventory.products = [item];
+  assert.equal((await request(api.url(), '/api/state', { method: 'PUT', headers, body: JSON.stringify({ revision: 0, state: initial }) })).status, 200);
+  for (const bad of [{ ...item, supplyEnabled: 'true' }, { ...item, supplyEnabled: true, stockEnabled: false }, { ...item, saleEnabled: false, salePrice: undefined, supplyEnabled: false }]) {
+    assert.equal((await request(api.url(), '/api/products', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [bad] }) })).status, 400);
+  }
+  assert.deepEqual((await request(api.url(), '/api/products')).body, { revision: 1, data: [item] });
+  assert.equal((await request(api.url(), '/api/products', { method: 'PUT', headers, body: JSON.stringify({ revision: 1, data: [{ ...item, supplyEnabled: false }] }) })).status, 200);
+  assert.equal((await request(api.url(), '/api/products')).body.data[0].supplyEnabled, false);
+});

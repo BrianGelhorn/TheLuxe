@@ -6,32 +6,26 @@ let inventoryReadError = false;
 let stockEditingSnapshot = null;
 const stockProductForm = document.getElementById('stockProductForm');
 const stockMovementForm = document.getElementById('stockMovementForm');
+const productIsSupply = (product) => product.supplyEnabled ?? product.stockEnabled;
+const productUseLabel = (product) => product.saleEnabled ? productIsSupply(product) ? 'Venta e insumo' : 'Venta' : 'Insumo';
 
 function updateStockProductCostPreview() {
   const fields = stockProductForm.elements;
-  const packaged = fields.packageLabel.value === 'caja';
-  document.getElementById('stockPackageSizeField').hidden = !packaged;
-  fields.packageSize.disabled = !packaged;
-  document.getElementById('stockPurchasePriceLabel').textContent = packaged ? 'Precio de caja' : 'Precio unitario';
-  const size = packaged ? Number(fields.packageSize.value) : 1;
-  const cost = parseAmount(fields.unitCost.value);
+  const cost = Number(fields.unitCost.value);
   const unit = fields.stockUnit.value;
-  document.getElementById('stockUnitCostPreview').textContent = Number.isSafeInteger(size) && size > 0 && Number.isSafeInteger(cost) && cost > 0
-    ? packaged ? `1 caja = ${integer.format(size)} ${unit} · ${unitMoney.format(cost / size)} por ${unit === 'unidades' ? 'unidad' : unit}` : `${unitMoney.format(cost)} por ${unit === 'unidades' ? 'unidad' : unit}`
-    : 'Completá el contenido y el precio para calcular el costo proporcional.';
+  document.getElementById('stockUnitCostPreview').textContent = Number.isFinite(cost) && cost > 0
+    ? `${unitMoney.format(cost)} por ${unit === 'unidades' ? 'unidad' : unit}`
+    : 'Completá el costo por unidad.';
 }
 
 function updateStockMovementConversion() {
   const fields = stockMovementForm.elements;
   const product = inventory.products.find((item) => item.id === fields.stockProduct.value);
-  const packages = product && fields.stockType.value === 'entrada' && Number(product.packageSize) > 1;
   const consumption = fields.stockType.value === 'consumo';
   document.getElementById('stockMovementBarberField').hidden = !consumption;
   fields.stockBarber.disabled = !consumption;
-  document.getElementById('stockQuantityLabel').textContent = packages ? 'Cantidad de cajas' : product ? `Cantidad (${product.unit})` : 'Cantidad';
-  document.getElementById('stockConversionPreview').textContent = packages
-    ? `1 caja suma ${integer.format(product.packageSize)} ${product.unit} al stock.`
-    : product ? `Se registra en ${product.unit}.` : '';
+  document.getElementById('stockQuantityLabel').textContent = product ? `Cantidad (${product.unit})` : 'Cantidad';
+  document.getElementById('stockConversionPreview').textContent = product ? `Se registra en ${product.unit}.` : '';
 }
 
 function stockMessage(message, error = false) {
@@ -93,10 +87,13 @@ function resetStockProductForm() {
   stockEditingSnapshot = null;
   stockProductForm.reset();
   stockProductForm.elements.stockId.value = '';
+  stockProductForm.elements.stockEnabled.checked = true;
+  stockProductForm.elements.stockUnit.value = 'unidades';
   stockProductForm.elements.initialStock.disabled = false;
   stockProductForm.elements.stockUnit.disabled = false;
   stockProductForm.elements.unitCost.setCustomValidity('');
   stockProductForm.elements.salePrice.setCustomValidity('');
+  stockProductForm.elements.saleEnabled.setCustomValidity('');
   stockMovementForm.elements.stockQuantity.setCustomValidity('');
   document.getElementById('saveStockProduct').textContent = 'Agregar producto';
   document.getElementById('cancelStockProduct').hidden = true;
@@ -107,13 +104,13 @@ function resetStockProductForm() {
 function updateProductFields() {
   const fields = stockProductForm.elements;
   const sale = fields.saleEnabled.checked;
-  const stock = fields.stockEnabled.checked;
+  const existing = inventory.products.find((product) => product.id === fields.stockId.value);
+  fields.stockEnabled.checked = true;
+  fields.saleEnabled.setCustomValidity('');
   document.getElementById('salePriceField').hidden = !sale;
-  document.getElementById('stockProductFields').hidden = !stock;
   fields.salePrice.disabled = !sale;
-  [...document.querySelectorAll('#stockProductFields input, #stockProductFields select')].forEach((field) => { field.disabled = !stock || (field.name === 'packageSize' && fields.packageLabel.value !== 'caja'); });
-  if (stock && inventory.products.some((product) => product.id === fields.stockId.value && product.stockEnabled)) {
-    fields.stockUnit.disabled = true;
+  [...document.querySelectorAll('#stockProductFields input')].forEach((field) => { field.disabled = false; });
+  if (existing?.stockEnabled) {
     fields.initialStock.disabled = true;
   }
   updateStockProductCostPreview();
@@ -154,6 +151,7 @@ function saveSaleInventory(sale, previous = null) {
 }
 
 function renderInventory() {
+  populateSaleProducts();
   const date = workday.value;
   const barberFilter = document.getElementById('stockBarberFilter');
   const selectedBarber = barberFilter.value;
@@ -206,10 +204,9 @@ function renderInventory() {
   document.getElementById('stockMovementsEmpty').hidden = rows.length > 0;
    document.getElementById('stockConfigList').innerHTML = inventory.products.map((product) => {
       const unitCost = inventoryUnitCost(product);
-      const packageDetail = product.packageSize ? ` · 1 ${escapeHtml(product.packageLabel)} = ${integer.format(product.packageSize)} ${escapeHtml(product.unit)} por ${money.format(product.packageCost)}` : '';
-      const stockDetail = product.stockEnabled ? `Stock ${integer.format(inventorySummary(product, inventory.movements, today()).stock)} ${escapeHtml(product.unit)} · ${unitCost ? `${unitMoney.format(unitCost)} por ${product.unit === 'unidades' ? 'unidad' : escapeHtml(product.unit)}` : 'Sin precio'}${packageDetail}` : '';
+      const stockDetail = product.stockEnabled ? `Stock ${integer.format(inventorySummary(product, inventory.movements, today()).stock)} ${escapeHtml(product.unit)} · ${unitCost ? `${unitMoney.format(unitCost)} por ${product.unit === 'unidades' ? 'unidad' : escapeHtml(product.unit)}` : 'Sin precio'}` : '';
       const saleDetail = product.saleEnabled ? `Precio de venta ${money.format(product.salePrice)}` : '';
-      const type = product.saleEnabled ? product.stockEnabled ? 'Venta e insumo' : 'Venta' : 'Insumo';
+      const type = productUseLabel(product);
       return `<div class="config-item${product.active ? '' : ' stock-archived'}"><span>${escapeHtml(product.name)}<small><strong class="stock-product-type">${type}</strong> · ${[saleDetail, stockDetail].filter(Boolean).join(' · ')}${product.active ? '' : ' · Archivado'}</small></span><span class="config-actions"><button type="button" data-stock-edit="${escapeHtml(product.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>Editar</button><button type="button" data-stock-archive="${escapeHtml(product.id)}" ${inventoryReadError || locked ? 'disabled' : ''}>${product.active ? 'Archivar' : 'Activar'}</button></span></div>`;
     }).join('') || '<p class="stock-hint">Todavía no agregaste productos.</p>';
   const editing = inventory.products.find((product) => product.id === stockProductForm.elements.stockId.value);
@@ -222,33 +219,33 @@ function initInventory(load = true) {
   populateSelectors();
   stockProductForm.addEventListener('submit', (event) => {
     event.preventDefault();
+    const fields = stockProductForm.elements;
+    fields.salePrice.disabled = !fields.saleEnabled.checked;
     updateStockProductCostPreview();
     if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
     if (!stockProductForm.reportValidity()) return;
-    const fields = stockProductForm.elements;
     const existing = inventory.products.find((product) => product.id === fields.stockId.value);
-    if (!existing && stockProductForm.elements.stockEnabled.checked && (!workday.value || workday.value > today())) return stockMessage('Elegí una jornada de hoy o anterior para registrar el stock inicial.', true);
+    if (!existing) fields.stockUnit.value = 'unidades';
+    if (!existing?.stockEnabled && (!workday.value || workday.value > today())) return stockMessage('Elegí una jornada de hoy o anterior para registrar el stock inicial.', true);
     if (fields.stockId.value && !existing) return stockMessage('El producto ya no está disponible. Cancelá la edición y revisá el listado.', true);
     if (existing && stockEditingSnapshot && JSON.stringify(existing) !== stockEditingSnapshot) return stockMessage('El producto cambió en otra pestaña. Cancelá la edición y volvé a abrirlo antes de guardar.', true);
     const saleEnabled = fields.saleEnabled.checked;
-    const stockEnabled = fields.stockEnabled.checked;
-    if (existing?.stockEnabled && !stockEnabled && inventory.movements.some((row) => row.productId === existing.id)) return stockMessage('No podés apagar stock porque tiene movimientos.', true);
+    const supplyEnabled = fields.supplyEnabled.checked;
+    const stockEnabled = true;
     if (existing?.saleEnabled && !saleEnabled && sales.some((sale) => sale.productId === existing.id || !sale.productId && sale.product === existing.name)) return stockMessage('No podés apagar venta porque tiene ventas.', true);
-    fields.saleEnabled.setCustomValidity(saleEnabled || stockEnabled ? '' : 'Marcá venta, stock o ambos.');
-    fields.stockUnit.setCustomValidity(saleEnabled && stockEnabled && fields.stockUnit.value !== 'unidades' ? 'El descuento automático solo está disponible para unidades; no convertimos ml ni g.' : '');
-    const packageSize = fields.packageLabel.value === 'caja' ? Number(fields.packageSize.value) : 1;
-    const packageCost = parseAmount(fields.unitCost.value);
+    fields.stockUnit.value = existing?.stockEnabled ? existing.unit : 'unidades';
+    fields.saleEnabled.setCustomValidity(!saleEnabled && !supplyEnabled ? 'Elegí Venta, Insumo o ambas opciones.' : saleEnabled && fields.stockUnit.value !== 'unidades' ? 'El descuento automático solo está disponible para unidades; no convertimos ml ni g históricos.' : '');
+    const unitCost = Number(fields.unitCost.value);
     const salePrice = parseAmount(fields.salePrice.value);
-    fields.unitCost.setCustomValidity(!stockEnabled || Number.isSafeInteger(packageCost) && packageCost > 0 && packageCost <= 1000000000 ? '' : 'El precio de compra debe ser mayor que cero y de hasta 1.000.000.000.');
+    fields.unitCost.setCustomValidity(Number.isFinite(unitCost) && unitCost > 0 && unitCost <= 1000000000 ? '' : 'El costo por unidad debe ser mayor que cero y de hasta 1.000.000.000.');
     fields.salePrice.setCustomValidity(!saleEnabled || Number.isSafeInteger(salePrice) && salePrice > 0 ? '' : 'El precio de venta debe ser mayor que cero.');
     if (!stockProductForm.reportValidity()) return;
     const product = {
       id: existing?.id || crypto.randomUUID(), name: fields.stockName.value.trim(),
-      saleEnabled, stockEnabled, active: existing?.active ?? true,
+      saleEnabled, supplyEnabled, stockEnabled, active: existing?.active ?? true,
       ...(saleEnabled ? { salePrice } : {}),
-      ...(stockEnabled ? { unit: existing?.unit || fields.stockUnit.value, initialStock: existing?.initialStock ?? Number(fields.initialStock.value), ...(existing ? existing.initialUnitCost === undefined ? {} : { initialUnitCost: existing.initialUnitCost } : { initialUnitCost: packageCost / packageSize }), unitCost: packageCost / packageSize, startDate: existing?.startDate || workday.value } : {}),
+      unit: existing?.unit || 'unidades', initialStock: existing?.stockEnabled ? existing.initialStock : Number(fields.initialStock.value), ...(existing?.stockEnabled ? existing.initialUnitCost === undefined ? {} : { initialUnitCost: existing.initialUnitCost } : { initialUnitCost: unitCost }), unitCost, startDate: existing?.startDate || workday.value,
     };
-    if (stockEnabled && packageSize > 1) Object.assign(product, { packageSize, packageCost, packageLabel: fields.packageLabel.value.trim() || 'presentación' });
     const priceChanged = existing?.stockEnabled && inventoryUnitCost(existing) !== inventoryUnitCost(product);
     const lastDate = inventory.movements.reduce((date, row) => row.productId === existing?.id && row.date > date ? row.date : date, existing?.startDate || workday.value);
     const historicalCosts = priceChanged ? inventoryValuation(existing, inventory.movements, lastDate).costs : null;
@@ -278,15 +275,13 @@ function initInventory(load = true) {
     stockEditingSnapshot = JSON.stringify(product);
     stockProductForm.elements.stockName.value = product.name;
     stockProductForm.elements.saleEnabled.checked = product.saleEnabled;
-    stockProductForm.elements.stockEnabled.checked = product.stockEnabled;
+    stockProductForm.elements.supplyEnabled.checked = productIsSupply(product);
+    stockProductForm.elements.stockEnabled.checked = true;
     stockProductForm.elements.salePrice.value = formatAmount(product.salePrice || '');
     stockProductForm.elements.stockUnit.value = product.unit || 'unidades';
-    stockProductForm.elements.stockUnit.disabled = true;
-    stockProductForm.elements.initialStock.value = product.initialStock;
+    stockProductForm.elements.initialStock.value = product.initialStock ?? 0;
     stockProductForm.elements.initialStock.disabled = true;
-    stockProductForm.elements.packageLabel.value = product.packageLabel || 'unidad';
-    stockProductForm.elements.packageSize.value = String(product.packageSize || 1);
-    stockProductForm.elements.unitCost.value = formatAmount(product.packageCost ?? product.unitCost ?? 0);
+    stockProductForm.elements.unitCost.value = String(inventoryUnitCost(product));
     document.getElementById('saveStockProduct').textContent = 'Guardar producto';
     document.getElementById('cancelStockProduct').hidden = false;
     renderInventory();
@@ -295,8 +290,8 @@ function initInventory(load = true) {
     stockProductForm.elements.stockName.focus();
   });
   ['input', 'change'].forEach((type) => stockProductForm.addEventListener(type, (event) => {
-    if (['saleEnabled', 'stockEnabled'].includes(event.target.name)) updateProductFields();
-    if (['packageLabel', 'packageSize', 'unitCost', 'stockUnit'].includes(event.target.name)) updateStockProductCostPreview();
+    if (['saleEnabled', 'supplyEnabled', 'stockEnabled'].includes(event.target.name)) updateProductFields();
+    if (['unitCost', 'stockUnit'].includes(event.target.name)) updateStockProductCostPreview();
   }));
   stockMovementForm.addEventListener('change', updateStockMovementConversion);
   document.getElementById('stockBarberFilter').addEventListener('change', renderInventory);
@@ -313,9 +308,8 @@ function initInventory(load = true) {
     if (!product || !workday.value || workday.value > today()) return stockMessage('Elegí un producto activo y una jornada de hoy o anterior.', true);
     const barber = fields.stockType.value === 'consumo' && fields.stockBarber.value ? config.barbers.find((item) => item.id === fields.stockBarber.value && item.active) : null;
     if (fields.stockType.value === 'consumo' && fields.stockBarber.value && !barber) return stockMessage('Elegí un barbero activo o dejá el consumo sin asignar.', true);
-    const enteredQuantity = Number(fields.stockQuantity.value);
-    const quantity = fields.stockType.value === 'entrada' ? enteredQuantity * Number(product.packageSize || 1) : enteredQuantity;
-    fields.stockQuantity.setCustomValidity(Number.isSafeInteger(quantity) && quantity <= 1000000000 ? '' : 'La cantidad convertida no puede superar 1.000.000.000 de unidades.');
+    const quantity = Number(fields.stockQuantity.value);
+    fields.stockQuantity.setCustomValidity(Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= 1000000000 ? '' : 'La cantidad debe ser un entero entre 1 y 1.000.000.000.');
     if (!stockMovementForm.reportValidity()) return;
     const row = { id: crypto.randomUUID(), productId: product.id, date: workday.value, time: nowTime(), type: fields.stockType.value, quantity, notes: fields.stockNotes.value.trim(), cancelled: false, ...(barber ? { barberId: barber.id, barberName: barber.name } : {}) };
     row.cost = row.type === 'entrada' ? quantity * inventoryUnitCost(product) : inventoryMovementCost(product, inventory.movements, row);
@@ -324,7 +318,7 @@ function initInventory(load = true) {
     fields.stockQuantity.value = '1';
     fields.stockNotes.value = '';
     renderInventory();
-    stockMessage(`${row.type === 'entrada' ? 'Reposición registrada' : 'Consumo registrado'}: ${integer.format(row.quantity)} ${product.unit} de ${product.name}${row.type === 'entrada' && product.packageSize ? ` (${integer.format(enteredQuantity)} ${product.packageLabel})` : ''}.`);
+    stockMessage(`${row.type === 'entrada' ? 'Reposición registrada' : 'Consumo registrado'}: ${integer.format(row.quantity)} ${product.unit} de ${product.name}.`);
   });
   document.getElementById('stockMovementRows').addEventListener('click', (event) => {
     if (typeof dailyOperationsLocked === 'function' && dailyOperationsLocked()) return;
