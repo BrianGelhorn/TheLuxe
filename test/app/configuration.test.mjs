@@ -139,3 +139,32 @@ test('CFG-015 - Las categorías de gastos se crean, se usan y actualizan sus ref
   app.click(`[data-config-delete="expenseCategories"][data-id="${categoryId}"]`);
   assert.equal(app.alerts.length, 1);
 });
+
+test('CFG-016 - Cambiar barberos mientras se ordenan columnas no conserva nombres obsoletos', (t) => {
+  const app = createApp(t);
+  const names = () => [...app.element('barberColumns').children].map(column => column.dataset.barberColumn);
+  app.click('#reorderBarbers');
+  app.click('[data-config-edit="barbers"][data-id="Mateo"]');
+  app.submit('barberConfigForm', { name: 'Mateo nuevo' });
+  assert.ok(names().includes('Mateo nuevo'));
+  assert.equal(names().includes('Mateo'), false);
+  app.click('[data-config-active="barbers"][data-id="Mateo"]');
+  assert.equal(names().includes('Mateo nuevo'), false);
+  app.click('#addBarberConfig'); app.submit('barberConfigForm', { name: 'Nuevo barbero' });
+  assert.ok(names().includes('Nuevo barbero'));
+  app.click('#cancelBarberOrder');
+  assert.ok(names().includes('Nuevo barbero'));
+  assert.equal(names().includes('Mateo nuevo'), false);
+});
+
+test('CFG-017 - Cambiar solo la comisión no descarta un orden de barberos pendiente', (t) => {
+  const app = createApp(t);
+  app.click('#reorderBarbers');
+  const columns = app.element('barberColumns');
+  const moved = columns.lastElementChild;
+  columns.prepend(moved); app.emit(moved, 'dragend');
+  const pending = app.snapshot('pendingBarberOrder');
+  app.submit('commissionForm', { commission: 60 });
+  assert.deepEqual(app.snapshot('pendingBarberOrder'), pending);
+  assert.deepEqual([...columns.children].map(column => column.dataset.barberColumn), pending);
+});

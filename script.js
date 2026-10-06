@@ -164,9 +164,15 @@ function saveOpeningAdjustments() {
   queueStateSave();
 }
 
-function saveConfig() {
-  barbers = config.barbers.filter(({ active }) => active !== false).map(({ name }) => name);
+function syncConfigIndexes() {
+  const nextBarbers = config.barbers.filter(({ active }) => active !== false).map(({ name }) => name);
+  if (reorderingBarbers && JSON.stringify(nextBarbers) !== JSON.stringify(barbers)) pendingBarberOrder = [...nextBarbers];
+  barbers = nextBarbers;
   prices = Object.fromEntries(config.services.map(({ name, price }) => [name, price]));
+}
+
+function saveConfig() {
+  syncConfigIndexes();
   populateSelectors();
   renderConfig();
   render();
@@ -1245,6 +1251,7 @@ function hydrateState(state) {
     || !['entries', 'sales', 'advances', 'expenses', 'transfers', 'openingAdjustments'].every((key) => Array.isArray(state[key]))
     || !state.cashRegisters || !state.barberPayments || inventoryError(state.inventory)) throw new Error('Respuesta inválida');
   ({ config, entries, sales, advances, expenses, transfers, openingAdjustments, cashRegisters, barberPayments, inventory } = state);
+  syncConfigIndexes();
   inventory = inventory.version === 1 ? migrateInventory(inventory) : inventory;
   inventoryReadError = false;
   let migratedPayments = false;

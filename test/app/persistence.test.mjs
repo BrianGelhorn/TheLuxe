@@ -50,6 +50,76 @@ test('PERSIST-002 - hidrata todo y coalesce pago e inventario en un snapshot CAS
   assert.equal(puts[0].state.inventory.movements[0].id, 'stock');
 });
 
+test('PERSIST-031 - barberos y precios de SQLite aparecen en el panel al iniciar y recargar', async (t) => {
+  let state = emptyState();
+  state.config.services = [{ id: 'cliente-corte', name: 'Corte del cliente', price: 4200 }];
+  state.config.barbers = [{ id: 'a', name: 'Ana', active: true }, { id: 'b', name: 'Beto', active: false }, { id: 'c', name: 'Carla', active: true }];
+  state.config.expenseCategories = [{ id: 'cliente-category', name: 'Gastos del cliente' }];
+  state.config.commission = 37;
+  state.inventory.products = [{ id: 'cliente-product', name: 'Gel del cliente', saleEnabled: true, stockEnabled: false, salePrice: 3300, active: true }];
+  state.cashRegisters = { '2026-09-03': { opened: true, initialCash: 10000, initialMp: 0 } };
+  state.entries = [{ id: 'cliente-cut', date: '2026-09-03', time: '10:00', barber: 'Ana', service: 'Corte del cliente', amount: 4200, payment: 'Efectivo', commissionRate: 50, commissionAmount: 2100 }];
+  state.advances = [{ id: 'cliente-advance', date: '2026-09-03', time: '11:00', barber: 'Ana', amount: 100, payment: 'Efectivo', reason: '' }];
+  state.barberPayments = { '2026-09-03': { Ana: { status: 'Mixto', cashAmount: 500, mpAmount: 0 } } };
+  let revision = 1;
+  const fetch = async (url, options = {}) => {
+    if (options.method === 'PUT') { state = structuredClone(JSON.parse(options.body).state); return response({ revision: ++revision }); }
+    return response({ revision, state: structuredClone(state) });
+  };
+  const names = app => [...app.element('barberColumns').children].map(column => column.dataset.barberColumn);
+  const app = createApp(t, { clean: false, fetch }); await wait(app);
+  assert.deepEqual(names(app), ['Ana', 'Carla']);
+  const balance = app.run('dayBalance("Efectivo")');
+  app.click('[data-config-edit="barbers"][data-id="a"]');
+  app.submit('barberConfigForm', { name: 'Ana nueva' }); await wait(app);
+  assert.deepEqual(names(app), ['Ana nueva', 'Carla']);
+  assert.equal(app.run('dayBalance("Efectivo")'), balance);
+  assert.equal(state.entries[0].barber, 'Ana nueva');
+  assert.equal(state.advances[0].barber, 'Ana nueva');
+  assert.equal(state.barberPayments['2026-09-03']['Ana nueva'].cashAmount, 500);
+  app.click('[data-config-active="barbers"][data-id="c"]'); await wait(app);
+  const reload = createApp(t, { clean: false, fetch }); await wait(reload);
+  assert.deepEqual(names(reload), ['Ana nueva']);
+  assert.equal(reload.query('[data-barber-column="Ana nueva"]').querySelectorAll('[data-cut]').length, 1);
+  assert.equal(reload.run('dayBalance("Efectivo")'), balance);
+  assert.deepEqual([...reload.element('advanceForm').elements.barber.options].slice(1).map(option => option.value), ['Ana nueva']);
+  assert.deepEqual([...reload.element('expenseForm').elements.category.options].slice(1).map(option => option.value), ['Gastos del cliente']);
+  assert.deepEqual([...reload.element('summaryBarberFilter').options].slice(2).map(option => option.value), ['Ana nueva', 'Beto', 'Carla']);
+  assert.deepEqual([...reload.query('#stockMovementForm [name="stockBarber"]').options].slice(1).map(option => option.textContent), ['Ana nueva']);
+  assert.equal(reload.run('defaultCommission(workday.value)'), 37);
+  reload.click('#addSale');
+  reload.element('saleForm').elements.product.value = 'cliente-product';
+  reload.emit('#saleProduct', 'change');
+  assert.equal(reload.run('parseAmount(saleForm.elements.unitPrice.value)'), 3300);
+  reload.click('#closeSaleDialog');
+  reload.click('[data-barber="Ana nueva"]');
+  reload.element('service').value = 'Corte del cliente'; reload.emit('#service', 'change');
+  assert.equal(reload.run('parseAmount(amountInput.value)'), 4200);
+});
+
+test('PERSIST-032 - Resolver un conflicto refresca barberos y precios de la configuración remota', async (t) => {
+  const initial = emptyState();
+  initial.config.barbers = [{ id: 'old', name: 'Viejo', active: true }];
+  const remote = emptyState();
+  remote.config.barbers = [{ id: 'new', name: 'Actualizado', active: true }];
+  remote.config.services = [{ id: 'new-service', name: 'Servicio remoto', price: 6700 }];
+  remote.cashRegisters = { '2026-09-03': { opened: true, initialCash: 0, initialMp: 0 } };
+  let reads = 0;
+  const app = createApp(t, { clean: false, fetch: async (url, options = {}) => {
+    if (options.method === 'PUT') return response({}, 409);
+    return response({ revision: reads++ ? 2 : 1, state: structuredClone(reads === 1 ? initial : remote) });
+  } });
+  await wait(app);
+  app.run("config.barbers[0].name='Pendiente local'; saveConfig()"); await wait(app);
+  assert.equal(app.run('stateConflict'), true);
+  app.click('#useDatabaseState'); await wait(app);
+  assert.equal(app.run('stateConflict'), false);
+  assert.deepEqual([...app.element('barberColumns').children].map(column => column.dataset.barberColumn), ['Actualizado']);
+  app.click('[data-barber="Actualizado"]');
+  app.element('service').value = 'Servicio remoto'; app.emit('#service', 'change');
+  assert.equal(app.run('parseAmount(amountInput.value)'), 6700);
+});
+
 test('PERSIST-003 - conflicto o fallo mantiene cambios pendientes sin sobrescribir', async (t) => {
   const app = createApp(t, { fetch: async (url, options = {}) => options.method === 'PUT' ? response({}, 409) : response({ revision: 4, state: { config: { services: [], barbers: [], expenseCategories: [], commission: 50, commissionHistory: [] }, entries: [], sales: [], advances: [], expenses: [], transfers: [], openingAdjustments: [], cashRegisters: {}, barberPayments: {}, inventory: { version: 2, products: [], movements: [] } } }) });
   await wait(app);
