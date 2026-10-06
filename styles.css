@@ -36,7 +36,6 @@ button { color: inherit; }
 
 .main { min-width: 0; padding: 32px clamp(18px, 2vw, 32px) 56px; transition: padding-left .22s ease; }
 .app-shell:not(.sidebar-open) .main { padding-left: max(88px, 2vw); }
-.test-update-banner { margin: 0 0 24px; padding: 16px; border: 2px solid var(--gold); background: var(--gold-soft); color: var(--gold); text-align: center; font-family: Manrope, sans-serif; font-size: clamp(2rem, 6vw, 4rem); font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
 .workspace-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
 .workspace-tab { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 14px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; font-size: .84rem; font-weight: 700; line-height: 1.2; }
 .workspace-tab span { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 6px; background: var(--surface-2); color: var(--muted); }
