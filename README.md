@@ -4,7 +4,7 @@ La instalación **nativa** ejecuta la web, la API SQLite y el actualizador con N
 
 ## Instalación nativa — recomendada para el cliente
 
-Requiere Windows x64 compatible con Node.js 24 o superior, Git para Windows en `Program Files`, Internet para instalar/actualizar y permisos de administrador para configurar el arranque. **No exige 8 GB de RAM**: una PC de 4 GB no queda descartada por el instalador, pero su rendimiento debe comprobarse con Windows, el navegador y las otras aplicaciones reales. Windows 10 build 19045 se admite técnicamente; hay que confirmar su cobertura de seguridad/ESU, no basta con que la app arranque.
+Requiere Windows x64 compatible con Node.js 24 o superior, Git para Windows en `Program Files`, Google Chrome, Internet para instalar/actualizar y permisos de administrador para instalar y asignar acceso al usuario. **No exige 8 GB de RAM**: una PC de 4 GB no queda descartada por el instalador, pero su rendimiento debe comprobarse con Windows, el navegador y las otras aplicaciones reales. Windows 10 build 19045 se admite técnicamente; hay que confirmar su cobertura de seguridad/ESU, no basta con que la app arranque.
 
 Una vez publicada esta versión, pegá en PowerShell:
 
@@ -12,11 +12,13 @@ Una vez publicada esta versión, pegá en PowerShell:
 $installer = Join-Path $env:TEMP 'theluxe-install-native.ps1'; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/BrianGelhorn/TheLuxe/main/install-native.ps1' -OutFile $installer; if ($?) { powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer }
 ```
 
-El comando descarga código del repositorio: ejecutalo solo si confiás en él, o descargá y revisá el archivo antes. El instalador pide elevación UAC e instala Git/Node faltantes mediante winget, con sus avisos de licencia y permisos. Si winget no está disponible, instalá **App Installer** desde Microsoft Store o instalá Git y Node LTS manualmente para todos los usuarios, y repetí el comando. No instala Docker ni dependencias npm; no acepta licencias ni reinicia Windows por vos.
+El comando descarga código del repositorio: ejecutalo solo si confiás en él, o descargá y revisá el archivo antes. Ejecutalo con el usuario que usará la app: conserva su SID aunque UAC requiera otra cuenta de administrador. El instalador instala Git/Node/Chrome faltantes mediante winget, con sus avisos de licencia y permisos. Si winget no está disponible, instalá **App Installer** desde Microsoft Store o las herramientas manualmente y repetí el comando. No instala Docker ni dependencias npm; no acepta licencias ni reinicia Windows por vos.
 
-### Arranque y ubicación de datos
+### Doble clic para iniciar
 
-La tarea **TheLuxe Native** del Programador de tareas se configura **al arrancar Windows**, con la cuenta integrada `LocalService`, sin guardar una contraseña y sin requerir login. Mantiene Node en ejecución, reintenta hasta tres veces si el proceso falla y no impone un límite de horas ni de batería. Es una **tarea con cuenta de servicio**, no un servicio de `Services.msc`. Los archivos financieros solo tienen acceso de archivo para administradores, SYSTEM y LocalService; el navegador accede a la API local.
+Abrí el acceso directo **TheLuxe Native** o hacé doble clic en `%ProgramData%\TheLuxeNative\TheLuxe.bat`. El lanzador inicia Node en una consola propia bajo tu usuario, comprueba web, API y actualizador y **después abre Google Chrome** en `http://127.0.0.1:8000/`. Si ya está funcionando, reutiliza el servidor; no crea otra instancia. Si los puertos están ocupados por una app incompleta o ajena, informa el error sin matar procesos. Chrome es explícito: no abre Edge como reemplazo.
+
+**No hay autostart ni servicio.** Mantené abierta la consola de Node mientras trabajás: cerrarla o pulsar Ctrl+C detiene operaciones, backups y actualizaciones. Cerrar Chrome no detiene el servidor. Tras reiniciar la PC, volvé a abrir el BAT. Los archivos financieros tienen acceso de archivo para el usuario asignado, administradores y SYSTEM, no para todos los usuarios de Windows.
 
 | Ubicación predeterminada | Contenido |
 | --- | --- |
@@ -24,28 +26,21 @@ La tarea **TheLuxe Native** del Programador de tareas se configura **al arrancar
 | `%ProgramData%\TheLuxeNative\releases` | Versiones de código, separadas de los datos |
 | `%ProgramData%\TheLuxeNative\data\theluxe.sqlite` | Base SQLite |
 | `%ProgramData%\TheLuxeNative\data\backups` | Copias SQLite diarias y previas a actualizar |
-| `%ProgramData%\TheLuxeNative\logs` | `native-current.log` y el arranque anterior |
+| `%ProgramData%\TheLuxeNative\logs` | Registros del ejecutor anterior; el arranque manual muestra los errores en su consola |
 
-Abrí **http://127.0.0.1:8000/** o el acceso directo **TheLuxe Native**. La instalación comienza con su propia base, sin operaciones de prueba. Web/API y actualizador escuchan solo en loopback (`8000`/`8001`); no expongas los puertos en la red ni en Internet: no hay autenticación de usuarios.
+La instalación comienza con su propia base, sin operaciones de prueba. Web/API y actualizador escuchan solo en loopback (`8000`/`8001`); no expongas los puertos en la red ni en Internet: no hay autenticación de usuarios.
 
-Las copias diarias se comprueban al iniciar y cada hora, una por fecha después de inicializar la base. Cuando existe una copia válida de hoy, se eliminan las copias automáticas anteriores a los últimos **14 días calendario, incluido hoy**, sin tocar copias manuales. Si falla el respaldo o la limpieza, queda el diagnóstico en los logs. Una PC apagada no genera copias retrospectivas. **Definí también una copia fuera de la PC**: el instalador no configura USB/nube, y un respaldo local no cubre robo o rotura del disco.
+Las copias diarias se comprueban al iniciar y cada hora **mientras la consola de Node siga abierta**, una por fecha después de inicializar la base. Cuando existe una copia válida de hoy, se eliminan las copias automáticas anteriores a los últimos **14 días calendario, incluido hoy**, sin tocar copias manuales. Si falla el respaldo o la limpieza, el error se muestra en la consola. Una app cerrada o PC apagada no genera copias retrospectivas. **Definí también una copia fuera de la PC**: el instalador no configura USB/nube, y un respaldo local no cubre robo o rotura del disco.
 
-El instalador puede repetirse para completar etapas pendientes sin borrar la base o reemplazar el puntero activo. Rechaza carpetas/tareas ajenas, enlaces y puertos ocupados por otra instalación. No hace `git pull`, no fuerza cierres de otras apps y no desinstala Docker. Usá la ubicación predeterminada: LocalService no puede ejecutar código desde el perfil privado de otro usuario.
+El instalador puede repetirse para completar etapas pendientes y actualizar los lanzadores sin borrar la base o reemplazar el puntero activo. Rechaza carpetas/tareas ajenas, enlaces y puertos ocupados por otra instalación. Actualiza solo el repo administrado mediante fetch y fast-forward, nunca reset; no fuerza cierres de otras apps ni desinstala Docker. Fuera de horario y sin guardados pendientes, cerrá una instancia manual previa con Ctrl+C antes de convertir o reinstalar. Si encuentra la tarea anterior **TheLuxe Native**, valida que sea propia, la detiene y elimina para quitar el autostart; no toca tareas ajenas.
 
 ### Fixes y recuperación nativos
 
 El desarrollador verifica y publica a `main`; el cliente usa **Buscar → Actualizar → Recargar**, fuera de horario y sin cambios pendientes. El actualizador prepara y comprueba la versión antes de detener la app, respalda SQLite y verifica que no hubo escrituras entre el respaldo y la detención. Mantiene el archivo de datos fuera del código y conserva la versión activa y la anterior tras una actualización correcta. Si falla el candidato, vuelve al código anterior **sin reemplazar SQLite**: las operaciones nuevas no se pisan con el respaldo.
 
-Los cambios al coordinador del host requieren reiniciar la tarea fuera de horario con PowerShell elevado:
+Los cambios al coordinador del host requieren cerrar la consola con Ctrl+C fuera de horario y abrir el BAT de nuevo. Si cambian el BAT o `launch-native.ps1`, repetí el instalador para actualizar sus copias protegidas. El botón no promete actualizar componentes del host en memoria ni migraciones destructivas de esquema. Si el rollback del código no puede leer una base de una versión futura incompatible, conservá también el estado actual antes de decidir restaurar la copia previa.
 
-```powershell
-Stop-ScheduledTask -TaskName 'TheLuxe Native'
-Start-ScheduledTask -TaskName 'TheLuxe Native'
-```
-
-El ejecutor `start-native.ps1` queda copiado fuera del repo para el arranque; si se modifica ese archivo, requiere intervención de mantenimiento para actualizar su copia protegida. El botón no promete actualizar componentes del host en memoria ni migraciones destructivas de esquema. Si el rollback del código no puede leer una base de una versión futura incompatible, conservá también el estado actual antes de decidir restaurar la copia previa.
-
-Para una restauración manual, detené la tarea, comprobá que no haya procesos nativos escuchando y respaldá también la base actual antes de reemplazarla. Copiá el respaldo elegido sobre `data\theluxe.sqlite` y volvé a iniciar la tarea; la restauración reemplaza datos y requiere revisar qué operaciones perdería. No uses el instalador para sobrescribir una base existente.
+Para una restauración manual, cerrá la consola, comprobá que no haya procesos nativos escuchando y respaldá también la base actual antes de reemplazarla. Copiá el respaldo elegido sobre `data\theluxe.sqlite` y abrí el BAT; la restauración reemplaza datos y requiere revisar qué operaciones perdería. No uses el instalador para sobrescribir una base existente.
 
 ### Migrar desde Docker (explícito, no automático)
 
@@ -62,9 +57,9 @@ Conservá el volumen y la copia original. Cerrá el actualizador Docker anterior
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\install-native.ps1" -DatabaseBackupPath "$env:USERPROFILE\theluxe-migracion.sqlite"
 ```
 
-La importación crea y verifica otra copia de SQLite sin modificar el archivo fuente ni sobrescribir una base destino. Comprobá versión, operaciones y un nuevo respaldo antes de dejar de usar Docker. No operes a la vez en ambas instalaciones: sus bases divergirían. Para volver atrás, detené la tarea nativa antes de arrancar Docker; su volumen no contiene operaciones posteriores hechas en la base nativa.
+La importación crea y verifica otra copia de SQLite sin modificar el archivo fuente ni sobrescribir una base destino. Comprobá versión, operaciones y un nuevo respaldo antes de dejar de usar Docker. No operes a la vez en ambas instalaciones: sus bases divergirían. Para volver atrás, cerrá la consola nativa antes de arrancar Docker; su volumen no contiene operaciones posteriores hechas en la base nativa.
 
-**Antes de entregar:** comprobá en la notebook que arranque tras reiniciar y antes del login, que una operación guardada sobreviva, que exista un respaldo verificable y que pueda recuperarse en un entorno descartable. Hay pruebas reales de procesos, persistencia y rollback; también se ensayó una tarea real con LocalService en ProgramData, verificando web/API/actualizador/backup y liberación de puertos al detenerla. Eso no sustituye la verificación del reinicio físico ni del rendimiento en la PC del cliente.
+**Antes de entregar:** comprobá el doble clic en la notebook, que Chrome abra solo con el servidor listo, que una operación guardada sobreviva al cerrar/reabrir, que exista un respaldo verificable y que pueda recuperarse en un entorno descartable. Hay pruebas reales de procesos, persistencia y rollback, y pruebas del lanzador para disponibilidad, duplicados y errores; no sustituyen la verificación del rendimiento en la PC del cliente.
 
 ## Variante Docker — instalación anterior
 

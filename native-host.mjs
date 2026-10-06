@@ -49,7 +49,12 @@ export class NativeHost {
     if (!health.ok || !(await health.json()).ok || !versionResponse.ok || version.commit !== commit) throw new Error('El hijo anunció una versión incorrecta.');
     if (child.exitCode !== null || child.signalCode !== null) throw new Error('La aplicación terminó antes de completar la verificación.');
     child.readyVerified = true;
-    } catch (error) { await this.stopChild(); throw error; }
+    } catch (error) {
+      console.error('Error inicial de la aplicación nativa:', error);
+      try { await this.stopChild(); }
+      catch (cleanup) { throw new AggregateError([error, cleanup], 'Fallaron el arranque y el cierre de la aplicación nativa.', { cause: error }); }
+      throw error;
+    }
   }
   async stopChild() {
     const child = this.child;
@@ -106,7 +111,12 @@ export class NativeHost {
     this.updater = updater; this.updateServer = createUpdateServer(updater);
     await new Promise((done, reject) => { this.updateServer.once('error', reject); this.updateServer.listen(this.updaterPort, '127.0.0.1', done); });
     const tick = () => void updater.dailyBackup().catch((error) => console.error('No se pudo hacer el respaldo diario:', error));
-    tick(); this.timer = setInterval(tick, 60 * 60 * 1000); } catch (error) { await this.close(); throw error; }
+    tick(); this.timer = setInterval(tick, 60 * 60 * 1000); } catch (error) {
+      console.error('No se pudo iniciar TheLuxe Native:', error);
+      try { await this.close(); }
+      catch (cleanup) { throw new AggregateError([error, cleanup], 'Fallaron el arranque y la limpieza del coordinador nativo.', { cause: error }); }
+      throw error;
+    }
   }
   async close() { clearInterval(this.timer); if (this.updateServer?.listening) await new Promise((done) => this.updateServer.close(done)); await this.stopChild(); }
 }

@@ -215,3 +215,19 @@ test('NATIVE-E2E-006 - muerte inesperada de la app avisa al supervisor y no qued
   await app.host.close();
   assert.equal(app.host.child, null);
 });
+
+test('NATIVE-E2E-007 - un cierre fallido no oculta el error que impidió iniciar la aplicación', { timeout: 60000 }, async (t) => {
+  const app = await nativeFixture(t, { noStart: true });
+  const file = join(app.directory, 'releases', app.first, 'native-app.mjs');
+  await writeFile(file, "process.on('message', () => {}); process.send({ready:false,error:'FALLO_INICIAL_DE_PRUEBA'});");
+  const stop = app.host.stopChild.bind(app.host);
+  app.host.stopChild = async () => { throw new Error('FALLO_SECUNDARIO_DE_CIERRE'); };
+  try {
+    await assert.rejects(app.host.start(), (error) => {
+      const causes = (value) => [value.message, ...(value.errors || []).flatMap(causes)].join('\n');
+      assert.match(causes(error), /FALLO_INICIAL_DE_PRUEBA/);
+      assert.match(causes(error), /FALLO_SECUNDARIO_DE_CIERRE/);
+      return true;
+    });
+  } finally { app.host.stopChild = stop; await stop(); }
+});
