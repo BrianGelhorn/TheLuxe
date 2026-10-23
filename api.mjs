@@ -1,6 +1,8 @@
 import http from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
+import { recoveryPlan, mergeRecovery } from './recovery.mjs';
 import './logic.js';
 
 // ponytail: snapshot completo hasta 16 MiB; particionar por registros si el historial supera este techo.
@@ -149,6 +151,7 @@ function body(req) {
 export function createApi({ databasePath, webHandler, host } = {}) {
   const db = new DatabaseSync(databasePath || process.env.DB_PATH || '/data/theluxe.sqlite');
   db.exec('CREATE TABLE IF NOT EXISTS api_state (id INTEGER PRIMARY KEY CHECK (id = 1), revision INTEGER NOT NULL, state TEXT NOT NULL)');
+  db.exec('CREATE TABLE IF NOT EXISTS recovery_history (id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, created_at TEXT NOT NULL, revision INTEGER NOT NULL, result_revision INTEGER NOT NULL, state TEXT NOT NULL, pending TEXT NOT NULL, selection TEXT NOT NULL, summary TEXT NOT NULL)');
   const select = db.prepare('SELECT revision, state FROM api_state WHERE id = 1');
   const insert = db.prepare('INSERT INTO api_state (id, revision, state) VALUES (1, 1, ?)');
   const update = db.prepare('UPDATE api_state SET revision = revision + 1, state = ? WHERE id = 1 AND revision = ?');
@@ -185,11 +188,60 @@ export function createApi({ databasePath, webHandler, host } = {}) {
         res.writeHead(result.status, headers);
         return res.end(content);
       }
-      if (!['GET', 'PUT'].includes(req.method)) return response(res, 405, { error: 'Method not allowed' });
-      if (req.method === 'PUT') {
+      if (!['GET', 'PUT', 'POST'].includes(req.method)) return response(res, 405, { error: 'Method not allowed' });
+      if (['PUT', 'POST'].includes(req.method)) {
         if (req.headers.origin && req.headers.origin !== 'http://127.0.0.1:8000') return response(res, 403, { error: 'Forbidden origin' });
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) return response(res, 415, { error: 'Content-Type must be application/json' });
       }
+      if (url.pathname === '/api/recovery/history' && req.method === 'GET') {
+        return response(res, 200, { items: db.prepare('SELECT id,created_at AS createdAt,summary FROM recovery_history ORDER BY created_at DESC').all().map(row => ({ ...row, summary: JSON.parse(row.summary) })) });
+      }
+      if (url.pathname.startsWith('/api/recovery/history/') && req.method === 'GET') {
+        const row = db.prepare('SELECT * FROM recovery_history WHERE id=?').get(url.pathname.slice('/api/recovery/history/'.length));
+        return row ? response(res, 200, { revision: row.revision, state: JSON.parse(row.state), pendingRaw: row.pending, selected: JSON.parse(row.selection), createdAt: row.created_at }) : response(res, 404, { error: 'Respaldo no encontrado' });
+      }
+      if (['/api/recovery/preview', '/api/recovery/apply', '/api/recovery/archive'].includes(url.pathname) && req.method === 'POST') {
+        const payload = await body(req);
+        const archive = url.pathname.endsWith('/archive');
+        const preview = url.pathname.endsWith('/preview');
+        if (!payload || typeof payload.raw !== 'string' || !payload.raw.length) return response(res, 400, { error: 'Copia pendiente inválida' });
+        let pending;
+        if (!archive) {
+          try { pending = JSON.parse(payload.raw); } catch { return response(res, 400, { error: 'La copia no se puede leer. Podés descargarla o archivarla sin cambiar los datos guardados.' }); }
+          if (!revision(pending?.revision) || !validState(pending.state) || pending.state.inventory.version !== 2) return response(res, 400, { error: 'La copia está incompleta o contiene datos inválidos. Conservála para revisarla; no se modificó la base.' });
+        }
+        if (preview) {
+          const current = read();
+          if (!current) return response(res, 409, { error: 'Primero debe inicializarse la base de datos.' });
+          return response(res, 200, { revision: current.revision, ...recoveryPlan(current.state, pending.state) });
+        }
+        if (!id(payload.requestId) || !revision(payload.revision) || !archive && !Array.isArray(payload.selected)) return response(res, 400, { error: 'Solicitud de recuperación inválida' });
+        const hash = createHash('sha256').update(JSON.stringify([url.pathname, payload.raw, payload.revision, payload.selected ?? []])).digest('hex');
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          const previous = db.prepare('SELECT request_hash,summary FROM recovery_history WHERE id=?').get(payload.requestId);
+          const current = read();
+          if (!current) { db.exec('ROLLBACK'); return response(res, 409, { error: 'Primero debe inicializarse la base de datos.' }); }
+          if (previous) {
+            db.exec('ROLLBACK');
+            return previous.request_hash === hash ? response(res, 200, { ...current, backupId: payload.requestId, summary: JSON.parse(previous.summary), replayed: true }) : response(res, 409, { error: 'La solicitud cambió; volvé a revisar la copia.' });
+          }
+          if (current.revision !== payload.revision) { db.exec('ROLLBACK'); return response(res, 409, { error: 'La base cambió desde la comparación. Volvé a revisar antes de recuperar.' }); }
+          let merged = { state: current.state, added: {} };
+          if (!archive) {
+            try { merged = mergeRecovery(current.state, recoveryPlan(current.state, pending.state), payload.selected); }
+            catch (error) { db.exec('ROLLBACK'); return response(res, 400, { error: error.message }); }
+            if (!validState(merged.state) || !validChanges(current.state, merged.state)) { db.exec('ROLLBACK'); return response(res, 400, { error: 'Los datos seleccionados no se pueden combinar. Revisá las operaciones relacionadas; no se modificó la base.' }); }
+          }
+          const summary = { action: archive ? 'archived' : 'recovered', added: merged.added };
+          const nextRevision = current.revision + Number(!archive);
+          db.prepare('INSERT INTO recovery_history VALUES(?,?,?,?,?,?,?,?,?)').run(payload.requestId, hash, new Date().toISOString(), current.revision, nextRevision, JSON.stringify(current.state), payload.raw, JSON.stringify(payload.selected ?? []), JSON.stringify(summary));
+          if (!archive && update.run(JSON.stringify(merged.state), current.revision).changes !== 1) throw new Error('La base cambió');
+          db.exec('COMMIT');
+          return response(res, 200, { revision: nextRevision, state: merged.state, backupId: payload.requestId, summary });
+        } catch (error) { if (db.isTransaction) db.exec('ROLLBACK'); throw error; }
+      }
+      if (req.method === 'POST') return response(res, 405, { error: 'Method not allowed' });
       if (url.pathname === '/api/state') {
         if (req.method === 'GET') {
           const current = read();

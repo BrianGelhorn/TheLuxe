@@ -16,7 +16,7 @@ import { verifiedRevision } from '../host-updater.mjs';
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL('..', import.meta.url));
-const appFiles = ['api.mjs', 'logic.js', 'native-app.mjs', 'native-host.mjs', 'native-deployment.mjs', 'host-updater.mjs', 'build.mjs', 'package.json', 'index.html', 'styles.css', 'inventory.js', 'script.js', 'reports.js', 'dialogs.js'];
+const appFiles = ['api.mjs', 'logic.js', 'recovery.mjs', 'recovery-ui.js', 'native-app.mjs', 'native-host.mjs', 'native-deployment.mjs', 'host-updater.mjs', 'build.mjs', 'package.json', 'index.html', 'styles.css', 'inventory.js', 'script.js', 'reports.js', 'dialogs.js'];
 const snapshot = () => ({
   config: { services: [], barbers: [], expenseCategories: [], commission: 50, commissionHistory: [] },
   entries: [{ id: 'native-cut', date: '2026-10-05', time: '10:00', barber: 'Prueba', service: 'Corte', amount: 100, tip: 0, payment: 'Efectivo', commissionRate: 50, commissionAmount: 50 }],

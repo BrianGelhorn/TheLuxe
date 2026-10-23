@@ -377,7 +377,7 @@ test('PERSIST-013 - inventario legado en una base existente se migra sin borrar 
   assert.deepEqual(app.snapshot('inventory.products.map((product) => product.name)'), ['Pomada', 'Shampoo']);
 });
 
-test('PERSIST-014 - un borrador pendiente se recupera tras recargar y se elimina al confirmarlo', async (t) => {
+test('PERSIST-014 - un borrador al recargar queda disponible para revisión sin aplicarlo automáticamente', async (t) => {
   const cut = { id: 'c1', date: '2026-09-03', time: '12:00', barber: 'Mateo', service: 'Corte clásico', amount: 15000, tip: 0, payment: 'Efectivo' };
   let base;
   let writes = 0;
@@ -400,9 +400,11 @@ test('PERSIST-014 - un borrador pendiente se recupera tras recargar y se elimina
   const restored = createApp(t, { clean: false, storage: { [key]: backup }, session: { 'theluxe-tab-v1': app.window.sessionStorage.getItem('theluxe-tab-v1') }, fetch: async (url, options = {}) => options.method === 'PUT'
     ? response({ revision: 2 }) : response({ revision: 1, state: base }) });
   await wait(restored);
-  assert.equal(restored.run('entries[0].id'), 'c1');
+  assert.equal(restored.run('entries.length'), 0);
   assert.equal(restored.run('stateDirty'), false);
-  assert.equal(restored.window.localStorage.getItem(key), null);
+  assert.equal(restored.window.localStorage.getItem(key), backup);
+  assert.notEqual(restored.run('pendingStateKey'), key);
+  assert.equal(restored.element('pendingRecoveryNotice').hidden, false);
 });
 
 test('PERSIST-015 - una base avanzada no es reemplazada por el respaldo pendiente de otra sesión', async (t) => {
@@ -420,8 +422,9 @@ test('PERSIST-015 - una base avanzada no es reemplazada por el respaldo pendient
   } });
   await wait(app);
   assert.equal(writes, 0);
-  assert.equal(app.run('stateConflict'), true);
-  assert.equal(app.query('.app-shell').inert, true);
+  assert.equal(app.run('stateConflict'), false);
+  assert.equal(app.query('.app-shell').inert, false);
+  assert.equal(app.element('pendingRecoveryNotice').hidden, false);
   assert.equal(app.window.localStorage.getItem(key), pending);
 });
 
@@ -453,7 +456,7 @@ test('PERSIST-017 - si SQLite aún está vacío recupera un respaldo aunque el i
   assert.equal(app.window.localStorage.getItem('theluxe-inventory-v1'), '{broken');
 });
 
-test('PERSIST-018 - un respaldo incompleto queda intacto y bloquea el inicio', async (t) => {
+test('PERSIST-018 - un respaldo incompleto queda intacto para revisión mientras carga la base válida', async (t) => {
   const key = 'theluxe-pending-state-v1:incompleto';
   let writes = 0;
   const app = createApp(t, { clean: false, storage: { [key]: JSON.stringify({ revision: -1, state: emptyState() }) }, session: { 'theluxe-tab-v1': 'incompleto' }, fetch: async (url, options = {}) => {
@@ -462,8 +465,8 @@ test('PERSIST-018 - un respaldo incompleto queda intacto y bloquea el inicio', a
   } });
   await wait(app);
   assert.equal(writes, 0);
-  assert.equal(app.run('stateLoaded'), false);
-  assert.equal(app.element('retryPersistence').hidden, false);
+  assert.equal(app.run('stateLoaded'), true);
+  assert.equal(app.element('pendingRecoveryNotice').hidden, false);
   assert.ok(app.window.localStorage.getItem(key));
 });
 

@@ -4,7 +4,7 @@ import vm from 'node:vm';
 
 export const root = new URL('../../', import.meta.url);
 export const read = (file) => readFileSync(new URL(file, root), 'utf8');
-export const scripts = ['logic.js', 'reports.js', 'dialogs.js', 'inventory.js', 'script.js'];
+export const scripts = ['logic.js', 'reports.js', 'dialogs.js', 'inventory.js', 'script.js', 'recovery-ui.js'];
 
 export function loadLogic() {
   const context = {};

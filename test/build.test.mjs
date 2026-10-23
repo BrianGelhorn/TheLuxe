@@ -23,7 +23,7 @@ test('HTTP-011 - Docker publica solo archivos web y escucha en la PC', () => {
   assert.match(version, /^[a-f0-9]{64}$/);
   assert.equal(commit, process.env.SOURCE_COMMIT || null);
   assert.equal(read(`${outputDirectory}/index.html`), read('index.html')
-    .replace(/((?:href|src)=")(styles\.css|logic\.js|inventory\.js|script\.js|reports\.js|dialogs\.js)(?:\?[^\"]*)?"/g, (_, prefix, file) => `${prefix}${file}?v=${version}"`)
+    .replace(/((?:href|src)=")(styles\.css|logic\.js|inventory\.js|script\.js|reports\.js|dialogs\.js|recovery-ui\.js)(?:\?[^\"]*)?"/g, (_, prefix, file) => `${prefix}${file}?v=${version}"`)
     .replace('</head>', `  <meta name="theluxe-build" content="${version}">\n</head>`));
   assert.match(read('nginx.conf'), /location = \/version\.json \{[\s\S]*?Cache-Control "no-store, max-age=0"/);
 });
@@ -45,7 +45,7 @@ test('HTTP-012 - La versión desplegada no queda cacheada', async () => {
 });
 
 for (const [index, file] of ['styles.css', ...scripts].entries()) {
-  test(`HTTP-${String(index + 2).padStart(3, '0')} - El build sirve ${file} completo con version de cache`, async () => {
+  test(`HTTP-${file === 'recovery-ui.js' ? '013' : String(index + 2).padStart(3, '0')} - El build sirve ${file} completo con version de cache`, async () => {
     const response = await worker.fetch(new Request(`http://local/${file}?v=test`));
     assert.equal(response.status, 200);
     assert.equal(await response.text(), read(file));

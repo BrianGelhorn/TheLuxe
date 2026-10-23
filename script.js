@@ -1191,6 +1191,12 @@ function stateMessage(message, error = false, retry = false) {
   notice.setAttribute('aria-live', error ? 'assertive' : 'polite');
   document.getElementById('persistenceMessage').textContent = message;
   document.getElementById('retryPersistence').hidden = !retry;
+  window.dispatchEvent(new Event('theluxe-persistence'));
+}
+function rotatePendingStateKey() {
+  tabId = crypto.randomUUID();
+  try { sessionStorage.setItem('theluxe-tab-v1', tabId); } catch { /* Discovery also finds this copy without sessionStorage. */ }
+  pendingStateKey = `theluxe-pending-state-v1:${tabId}`;
 }
 function conflictActions(visible) { document.getElementById('conflictActions').hidden = !visible; }
 function backUpPendingState(snapshot = stateSnapshot()) {
@@ -1289,7 +1295,16 @@ async function bootstrapState() {
     if (!Number.isSafeInteger(stored.revision) || stored.revision < 0) throw new Error('Respuesta inválida');
     stateRevision = stored.revision;
     const pendingRaw = localStorage.getItem(pendingStateKey);
-    const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+    let pending = null;
+    if (pendingRaw && stored.state) {
+      let matches = false;
+      try {
+        const savedCopy = JSON.parse(pendingRaw);
+        matches = Number.isSafeInteger(savedCopy.revision) && savedCopy.revision >= 0 && JSON.stringify(savedCopy.state) === JSON.stringify(stored.state);
+      } catch { /* Keep unreadable copies available for review. */ }
+      if (matches) clearPendingState(pendingRaw);
+      else rotatePendingStateKey(); // Never overwrite a previous session's copy with new operations.
+    } else if (pendingRaw) pending = JSON.parse(pendingRaw);
     let migratedPayments = false;
     if (pending && (!Number.isSafeInteger(pending.revision) || pending.revision < 0 || !pending.state)) throw new Error('Respaldo pendiente inválido');
     if (pending && stored.state && JSON.stringify(pending.state) === JSON.stringify(stored.state)) clearPendingState(pendingRaw);
@@ -1353,6 +1368,21 @@ async function useDatabaseState() {
 }
 document.getElementById('exportPendingState').addEventListener('click', exportPendingState);
 document.getElementById('useDatabaseState').addEventListener('click', () => { void useDatabaseState(); });
+window.TheLuxePersistence = {
+  get key() { return pendingStateKey; },
+  get saving() { return stateSaving; },
+  get dirty() { return stateDirty; },
+  protect() { return !stateDirty || Boolean(backUpPendingState()); },
+  accept(stored) {
+    if (stateSaving) throw new Error('Esperá a que termine el guardado de esta ventana.');
+    if (localStorage.getItem(pendingStateKey)) rotatePendingStateKey();
+    hydrateState(stored.state);
+    stateRevision = stored.revision; stateDirty = false; stateConflict = false; stateLoaded = true;
+    initInventory(false); populateSelectors(); renderConfig(); render();
+    document.querySelector('.app-shell').inert = false;
+    conflictActions(false); stateMessage('');
+  },
+};
 window.addEventListener('beforeunload', (event) => {
   if (!stateDirty && !stateSaving) return;
   event.preventDefault(); event.returnValue = '';

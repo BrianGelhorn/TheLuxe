@@ -2,20 +2,20 @@
 
 ## Resultado
 
-Verificado con Node 24.13.0: **703 tests aprobados, 0 fallos, 0 omitidos**.
+Verificado con Node 24.22.1: **909 tests aprobados, 0 fallos, 15 omitidos por condiciones del entorno** (924 casos en total).
 
-La explicacion minima de **cada test** esta en [TESTS.md](TESTS.md): una linea por ID, agrupada por archivo.
+El índice histórico está en [TESTS.md](TESTS.md). El comportamiento y los 27 casos nuevos de recuperación están descritos en [RECOVERY.md](RECOVERY.md).
 
 | Codigo medido | Lineas | Ramas | Funciones |
 | --- | ---: | ---: | ---: |
-| `logic.js` | 100% | 100% | 100% |
-| `inventory.js` | 100% | 100% | 100% |
-| `reports.js` | 100% | 100% | 100% |
-| `dialogs.js` | 100% | 96.67% | 100% |
-| `script.js` | 100% | 94.91% | 99.54% |
-| **Total** | **100%** | **97.12%** | **99.72%** |
+| `logic.js` | 100% | 99.14% | 100% |
+| `inventory.js` | 100% | 98.11% | 100% |
+| `reports.js` | 100% | 98.39% | 100% |
+| `dialogs.js` | 100% | 97.10% | 100% |
+| `script.js` | 99.08% | 93.70% | 98.65% |
+| **Total** | **99.46%** | **96.27%** | **99.30%** |
 
-Cobertura V8 de esos cinco archivos de produccion, no de helpers ni dependencias. El build y sus respuestas HTTP tienen tests separados. La cobertura puede variar al modificar codigo o actualizar Node.
+Última medición V8 de esos cinco archivos de producción, no de helpers ni dependencias. La suite específica de recuperación mide además `recovery.mjs` y `recovery-ui.js`: 100% de líneas, 92,66% de ramas y 96,04% de funciones. El build y sus respuestas HTTP tienen tests separados. La cobertura puede variar al modificar código o actualizar Node.
 
 ## Ejecutar
 
@@ -25,15 +25,17 @@ Requiere **Node 24 o posterior** y npm. La dependencia de desarrollo `jsdom` est
 npm ci
 npm test
 npm run test:coverage
+npm run test:recovery
 npm run build
 npm run test:docs
 ```
 
 - `npm test`: ejecuta todos los archivos `test/**/*.test.mjs`.
 - `npm run test:coverage`: ejecuta todo y exige al menos 99% lineas, 96% ramas y 99% funciones globales.
+- `npm run test:recovery`: ejecuta 27 casos de recuperación y exige 99% de líneas, 90% de ramas y 90% de funciones en los dos módulos nuevos.
 - `npm run build`: ejecuta tests primero; solo construye si pasan.
 - `npm run test:docs`: vuelve a ejecutar la suite y regenera el indice desde los casos realmente ejecutados, incluidos los parametrizados.
-- GitHub Actions instala con `npm ci` y comprueba build y cobertura en Node 24.
+- GitHub Actions instala con `npm ci` y comprueba build, cobertura general y recuperación en Node 24.
 
 Un modulo o un test por ID:
 
@@ -108,7 +110,7 @@ MP = 2.000 apertura + 2.400 cobros + 700 ventas
 - Se conserva la regla actual del panel: pago mostrado = comision + propinas, sin deducir adelantos en ese importe. Los adelantos se descuentan aparte de caja. Cambiar esa liquidacion requiere definir otra regla de negocio.
 - Balance comercial = facturado menos comision; saldo disponible incluye apertura, movimientos y pagos. Son indicadores distintos.
 - Las semanas empiezan en el primer lunes del mes. Los dias anteriores se asignan al selector de semana 1, cuyo rango comienza en ese lunes.
-- Las finanzas son de sesion; inventario persiste localmente. Vender un producto no consume stock automaticamente.
+- Las finanzas y el inventario se guardan en SQLite. Las operaciones relacionadas, como venta y descuento de stock, se guardan juntas. Las copias pendientes del navegador pueden compararse y recuperarse desde la UI sin reemplazar datos actuales.
 
 ## Fallos corregidos
 
@@ -127,4 +129,4 @@ Ninguna suite garantiza que nunca aparezca un bug. Estos tests prueban reglas y 
 
 `jsdom` no dibuja: no certifica estilos, recortes, responsive, geometria de arrastre, backdrop nativo, accesibilidad completa ni comportamiento tactil. Se sustituyen solo presentacion modal, scroll, reloj, UUID, confirmaciones y APIs ausentes; calculos, formularios, eventos y almacenamiento se ejecutan.
 
-`parseAmount` es un formateador de pesos enteros, no un validador universal. Los tests respetan la validacion de cada formulario; no afirman soporte para importes decimales, negativos o infinitos en todos los puntos de entrada. Tampoco agregan funcionalidades pendientes como persistencia financiera o liquidacion neta de adelantos.
+`parseAmount` es un formateador de pesos enteros, no un validador universal. Los tests respetan la validacion de cada formulario; no afirman soporte para importes decimales, negativos o infinitos en todos los puntos de entrada. La recuperación no inventa pagos ni reconcilia automáticamente diferencias de cierre.

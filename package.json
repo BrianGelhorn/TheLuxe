@@ -4,6 +4,7 @@
     "prebuild": "npm test",
     "build": "node build.mjs",
     "test": "node --test \"test/**/*.test.mjs\"",
+    "test:recovery": "node --test --experimental-test-coverage --test-coverage-lines=99 --test-coverage-branches=90 --test-coverage-functions=90 --test-coverage-include=**/recovery.mjs --test-coverage-include=**/recovery-ui.js test/recovery.test.mjs test/app/recovery.test.mjs",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=99 --test-coverage-branches=96 --test-coverage-functions=99 --test-coverage-include=**/logic.js --test-coverage-include=**/script.js --test-coverage-include=**/reports.js --test-coverage-include=**/dialogs.js --test-coverage-include=**/inventory.js \"test/**/*.test.mjs\"",
     "test:docs": "node --test --test-reporter=./test/support/index-reporter.mjs --test-reporter-destination=docs/TESTS.md \"test/**/*.test.mjs\""
   },

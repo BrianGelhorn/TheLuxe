@@ -136,7 +136,19 @@ El estado completo (configuración, cortes, ventas, adelantos, gastos, transfere
 
 Si se corta la conexión durante un guardado, la app muestra el error y conserva una copia **provisional** de los cambios pendientes en ese navegador hasta que SQLite confirme el guardado. Reintentá antes de cerrar. Si otra pestaña cambió la base, se bloquea el guardado para no pisarla: conservá esa pestaña y resolvé el conflicto manualmente; no borres el almacenamiento del navegador mientras queden cambios pendientes.
 
-Si aparece un conflicto entre pestañas, **Descargar copia sin guardar** conserva el borrador en un archivo JSON; **Usar versión de la base de datos** descarta ese borrador solo después de confirmarlo y vuelve a leer la base. No se combinan automáticamente operaciones diferentes: revisá el archivo y cargá manualmente las que falten.
+Si aparece un conflicto entre pestañas, **Revisar y recuperar** permite comparar la copia con la base actual antes de incorporar datos. **Descargar copia sin guardar** conserva el borrador en un archivo JSON; **Usar versión de la base de datos** descarta el borrador de esa ventana solo después de confirmarlo y vuelve a leer la base.
+
+### Revisar y recuperar copias pendientes
+
+La aplicación detecta las copias pendientes de este navegador, incluidas las de pestañas o sesiones anteriores y la clave de reserva antigua. El aviso **Hay copias pendientes de revisión → Revisar copias** abre una comparación con la base actual. También se puede abrir desde Configuración o desde un conflicto de guardado. Una copia anterior no se reemplaza con las operaciones nuevas de la ventana.
+
+La revisión muestra fechas, cantidades, importes y el detalle **Guardado / En la copia**. Se pueden seleccionar los registros que faltan. Los que ya tienen valores distintos o parecen recargados con otro identificador se muestran para revisión y se conservan como están en la base; no se sobrescriben ni se eliminan datos actuales. Ventas y movimientos de stock se recuperan juntos, y los pagos requieren sus operaciones relacionadas. Comisiones generales distintas se señalan sin cambiar la configuración vigente. Una copia inválida puede descargarse o archivarse, pero no recuperarse automáticamente.
+
+**Recuperar seleccionados** vuelve a verificar la revisión de SQLite y guarda un respaldo del estado previo y la copia original en la tabla `recovery_history`, dentro de la misma transacción que incorpora los registros. Si otra ventana cambió la base, se pide **Volver a comparar**. Reintentar una respuesta perdida no duplica las operaciones. Un fallo de escritura revierte la transacción completa.
+
+Después de recuperar, la copia del navegador permanece disponible hasta elegir **Archivar copia / Finalizar revisión**. El archivo de una copia se confirma y guarda en el historial antes de retirarla del navegador; si otra pestaña modificó su contenido, ese contenido nuevo no se borra. El historial permite revisar nuevamente una copia o descargar el respaldo. Estos respaldos están en la misma PC; complementan las copias SQLite diarias y no reemplazan una copia externa.
+
+Esta recuperación incorpora lo que contiene el borrador. Los saldos y cierres ya guardados se conservan y pueden requerir revisión después de incorporar operaciones. Las copias solo se detectan en el mismo navegador, perfil y origen con que se trabajó; no se accede a datos de otro perfil o de otra PC.
 
 ## API
 
