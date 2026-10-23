@@ -304,7 +304,7 @@ test('PAY-020 - Un nuevo corte deja mixto incompleto sin cambiar importes entreg
   app.render();
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '2000' });
+  app.submit('cutForm', { service: 'Barba', amount: '2000', payment: 'Efectivo' });
   assert.equal(app.query(mateo).dataset.paymentDue, '1950');
   assert.equal(app.query(mateo).classList.contains('is-payment-incomplete'), true);
   assert.equal(app.query(`${mateo} [data-payment-balance]`).textContent, app.money(700));
@@ -420,9 +420,9 @@ test('PAY-028 - Tras pagar por MP se rechaza un peso sobre el remanente', (t) =>
 test('PAY-029 - El pago unico descuenta el redondeo mostrado de la suma de cortes', (t) => {
   const app = createApp(t);
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '101', tip: '1' });
+  app.submit('cutForm', { service: 'Barba', amount: '101', tip: '1', payment: 'Efectivo' });
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '101', tip: '1' });
+  app.submit('cutForm', { service: 'Barba', amount: '101', tip: '1', payment: 'Efectivo' });
   assert.deepEqual(app.snapshot('entries.map(({ commissionAmount }) => commissionAmount)'), [50.5, 50.5]);
   assert.equal(app.query(mateo).dataset.paymentDue, '103');
   assert.equal(app.query(`${mateo} .payment-amount-due dd`).textContent, app.money(103));

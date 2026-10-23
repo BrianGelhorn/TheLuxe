@@ -54,7 +54,7 @@ test('COM-005 - Los cortes nuevos usan el override y las ediciones recalculan co
   app.financialFixture();
   change(app, 60);
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '1000' });
+  app.submit('cutForm', { service: 'Barba', amount: '1000', payment: 'Efectivo' });
   assert.equal(app.run('entries.at(-1).commissionAmount'), 600);
   app.click('[data-cut="a"]');
   app.click('#editCut');
@@ -72,7 +72,7 @@ test('COM-006 - La jornada siguiente usa el default y la anterior conserva su ov
   app.element('workday').value = '2026-09-04';
   app.emit('#workday', 'change');
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '1000' });
+  app.submit('cutForm', { service: 'Barba', amount: '1000', payment: 'Efectivo' });
   assert.equal(app.run('entries.at(-1).commissionRate'), 50);
   assert.equal(app.element('dailyCommission').textContent, app.money(500));
   app.element('workday').value = '2026-09-03';
@@ -134,7 +134,7 @@ test('COM-011 - Cambiar default sin override preserva cortes previos incluso al 
   app.submit('cutForm', { amount: '2000' });
   assert.equal(app.run('entries[0].commissionAmount'), 1000);
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '1000' });
+  app.submit('cutForm', { service: 'Barba', amount: '1000', payment: 'Efectivo' });
   assert.equal(app.run('entries.at(-1).commissionAmount'), 800);
 });
 

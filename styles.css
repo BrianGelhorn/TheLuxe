@@ -491,7 +491,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .cut-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 28px; }
 .field { display: grid; gap: 8px; }
 .field[hidden] { display: none; }
-.field > span { color: #c7c3bc; font-size: .84rem; font-weight: 600; }
+.field > span, .field > label { color: #c7c3bc; font-size: .84rem; font-weight: 600; }
 .field small { color: var(--muted); font-weight: 400; }
 .full-width { grid-column: 1 / -1; }
 .split-payment { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 14px; border: 1px solid #6e5936; border-radius: 10px; background: var(--gold-soft); }
@@ -499,6 +499,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .money-input { position: relative; }
 .money-input b { position: absolute; left: 13px; top: 12px; color: var(--gold); }
 .money-input input { padding-left: 30px; }
+.number-stepper { display: grid; grid-template-columns: 50px minmax(0, 1fr) 50px; align-items: stretch; gap: 8px; min-width: 0; }
+.number-stepper input { min-width: 0; width: 100%; min-height: 50px; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.number-stepper input::-webkit-inner-spin-button, .number-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.number-step-button { display: grid; place-items: center; min-width: 50px; min-height: 50px; padding: 0; border: 1px solid #75603e; border-radius: 9px; background: var(--gold-soft); color: var(--gold); font-size: 1.6rem; font-weight: 700; line-height: 1; cursor: pointer; touch-action: manipulation; }
+.number-step-button:hover:not(:disabled) { background: #352a1b; border-color: var(--gold); }
+.number-step-button:active:not(:disabled) { background: #483820; }
+.number-step-button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .primary-btn { grid-column: 1 / -1; justify-self: start; min-width: 190px; padding: 13px 18px; border: 0; border-radius: 9px; background: var(--gold); color: #17120b; cursor: pointer; font-weight: 700; }
 .primary-btn span { margin-left: 18px; }
 .detail-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 24px 0 0; }

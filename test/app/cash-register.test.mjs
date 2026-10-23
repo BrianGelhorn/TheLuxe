@@ -195,7 +195,7 @@ test('REG-013 - Una apertura conserva un override diario de cero', (t) => {
   assert.equal(app.run('effectiveCommission(workday.value)'), 0);
   balances(app, 700, 1200);
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '1000' });
+  app.submit('cutForm', { service: 'Barba', amount: '1000', payment: 'Efectivo' });
   assert.equal(app.run('entries[0].commissionAmount'), 0);
 });
 

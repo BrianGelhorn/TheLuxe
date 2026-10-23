@@ -18,7 +18,7 @@ test('TXN-001 - El servicio carga su precio y permite un importe manual', (t) =>
   assert.equal(app.element('amount').value, '10.000');
   app.input('#amount', '1.500');
   app.input('#cutForm [name="tip"]', '200');
-  assert.equal(app.submit('cutForm', { notes: 'Precio acordado' }), true);
+  assert.equal(app.submit('cutForm', { notes: 'Precio acordado', payment: 'Efectivo' }), true);
   assert.deepEqual(app.snapshot('entries.map(({ id, ...cut }) => cut)'), [{
     barber: 'Mateo', time: '12:00', service: 'Barba', amount: 1500, tip: 200,
     payment: 'Efectivo', cashAmount: 0, mpAmount: 0, notes: 'Precio acordado',
@@ -35,7 +35,7 @@ test('TXN-001 - El servicio carga su precio y permite un importe manual', (t) =>
 test('TXN-002 - Un corte de un peso admite propina vacia', (t) => {
   const app = createApp(t);
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '1', tip: '' });
+  app.submit('cutForm', { service: 'Barba', amount: '1', tip: '', payment: 'Efectivo' });
   assert.deepEqual(app.snapshot('entries.map(({ amount, tip, commissionAmount }) => [amount, tip, commissionAmount])'), [[1, 0, 0.5]]);
   balances(app, 1, 0);
 });
@@ -171,6 +171,10 @@ test('TXN-011 - La propina mixta no puede superar el aporte dominante', (t) => {
 test('TXN-012 - El formulario de corte respeta los campos nativos requeridos', (t) => {
   const app = createApp(t);
   app.click('[data-barber="Mateo"]');
+  assert.equal(app.element('payment').value, '');
+  assert.equal(app.submit('cutForm', { service: 'Barba', amount: '1000' }), false);
+  assert.equal(app.element('payment').validity.valueMissing, true);
+  assert.equal(app.run('entries.length'), 0);
   const valid = { time: '10:30', service: 'Barba', amount: '1000', payment: 'Efectivo' };
   for (const name of Object.keys(valid)) {
     app.setForm('cutForm', { ...valid, [name]: '' });
@@ -183,7 +187,7 @@ test('TXN-012 - El formulario de corte respeta los campos nativos requeridos', (
 test('TXN-013 - El precio cero del corte se rechaza y el input limpia el error', (t) => {
   const app = createApp(t);
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '0' });
+  app.submit('cutForm', { service: 'Barba', amount: '0', payment: 'Efectivo' });
   assert.equal(app.run('entries.length'), 0);
   assert.equal(app.element('amount').validity.customError, true);
   app.input('#amount', '2.345');
@@ -252,6 +256,7 @@ test('TXN-017 - Cerrar alta o edicion de corte descarta el borrador', (t) => {
   assert.deepEqual(app.snapshot('entries'), before);
   app.click('[data-barber="Lucas"]');
   assert.equal(app.run('editingId'), null);
+  assert.equal(app.element('payment').value, '');
   assert.equal(app.element('amount').value, '');
   balances(app, 2850, 4900);
 });
@@ -264,6 +269,14 @@ test('TXN-018 - El producto y los inputs recalculan cantidad por precio', (t) =>
   app.emit('#saleProduct', 'change');
   assert.equal(app.element('saleForm').elements.unitPrice.value, '12.000');
   assert.equal(app.element('saleTotalPreview').textContent, app.money(12000));
+  app.click('#saleForm [data-number-step="1"]');
+  assert.equal(app.element('saleForm').elements.quantity.value, '2');
+  assert.equal(app.element('saleTotalPreview').textContent, app.money(24000));
+  app.click('#saleForm [data-number-step="-1"]');
+  app.click('#saleForm [data-number-step="-1"]');
+  assert.equal(app.element('saleForm').elements.quantity.value, '1');
+  assert.equal(app.element('saleTotalPreview').textContent, app.money(12000));
+  assert.equal(app.run('sales.length'), 0);
   app.input('#saleForm [name="quantity"]', '3');
   assert.equal(app.element('saleTotalPreview').textContent, app.money(36000));
   app.input('#saleForm [name="unitPrice"]', '1.250');
@@ -763,7 +776,7 @@ test('TXN-049 - Las altas usan la jornada seleccionada y no la fecha actual', (t
   app.emit('#workday', 'change');
   app.submit('openingCashForm', { initialCash: '1000', initialMp: '2000' });
   app.click('[data-barber="Mateo"]');
-  app.submit('cutForm', { service: 'Barba', amount: '100', tip: '10' });
+  app.submit('cutForm', { service: 'Barba', amount: '100', tip: '10', payment: 'Efectivo' });
   app.click('#addSale');
   app.submit('saleForm', { product: 'pomada', quantity: '2', unitPrice: '50', payment: 'Mercado Pago' });
   app.click('#addAdvance');

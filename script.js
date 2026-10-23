@@ -183,7 +183,7 @@ function saveBarberPayments() { queueStateSave(); }
 
 function populateSaleProducts() {
   const selectedProduct = saleForm.elements.product.value;
-  document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + inventory.products.filter((product) => product.active && product.saleEnabled).map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join('');
+  document.getElementById('saleProduct').innerHTML = '<option value="">Seleccionar producto</option>' + inventory.products.filter(selectableSaleProduct).map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join('');
   saleForm.elements.product.value = selectedProduct;
 }
 
@@ -859,7 +859,7 @@ saleForm.addEventListener('submit', (event) => {
     saleCashAmountInput.setCustomValidity('La suma debe coincidir con el importe total de la venta.');
   }
   if (!saleForm.reportValidity()) return;
-  const product = inventory.products.find((item) => item.id === values.product && item.active && item.saleEnabled);
+  const product = inventory.products.find((item) => item.id === values.product && selectableSaleProduct(item));
   saleForm.elements.product.setCustomValidity(product ? '' : 'Elegí un producto disponible.');
   if (!saleForm.reportValidity()) return;
   const sale = { ...values, productId: product.id, product: product.name, quantity, unitPrice, total, date: workday.value, id: editingSaleId || crypto.randomUUID() };
@@ -977,8 +977,9 @@ serviceInput.addEventListener('change', (event) => {
 });
 saleForm.elements.product.addEventListener('change', (event) => {
   saleForm.elements.product.setCustomValidity('');
-  const product = inventory.products.find((item) => item.id === event.target.value && item.active && item.saleEnabled);
-  saleForm.elements.unitPrice.value = product ? formatAmount(product.salePrice) : '';
+  const product = inventory.products.find((item) => item.id === event.target.value && selectableSaleProduct(item));
+  const previous = sales.find((sale) => sale.id === editingSaleId);
+  saleForm.elements.unitPrice.value = product ? formatAmount(product.salePrice ?? previous?.unitPrice) : '';
   saleForm.elements.unitPrice.setCustomValidity('');
   updateSaleTotal();
 });
@@ -1357,6 +1358,29 @@ window.addEventListener('beforeunload', (event) => {
   event.preventDefault(); event.returnValue = '';
 });
 void bootstrapState();
+
+document.querySelectorAll('.number-stepper').forEach((control) => {
+  const input = control.querySelector('input');
+  const buttons = control.querySelectorAll('[data-number-step]');
+  const syncDisabled = () => buttons.forEach((button) => { button.disabled = input.disabled || input.readOnly; });
+  syncDisabled();
+  new MutationObserver(syncDisabled).observe(input, { attributes: true, attributeFilter: ['disabled', 'readonly'] });
+  buttons.forEach((button) => button.addEventListener('click', () => {
+    if (input.matches(':disabled') || input.readOnly) return;
+    const previous = input.value;
+    const direction = Number(button.dataset.numberStep);
+    if (input.step === 'any') {
+      const minimum = input.min === '' ? -Infinity : Number(input.min);
+      const maximum = input.max === '' ? Infinity : Number(input.max);
+      input.value = String(Math.min(maximum, Math.max(minimum, (input.valueAsNumber || 0) + direction)));
+    } else if (direction > 0) input.stepUp();
+    else input.stepDown();
+    if (input.value !== previous) {
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }));
+});
 
 let mainUpdateAvailable = false;
 const updaterUrl = 'http://127.0.0.1:8001';

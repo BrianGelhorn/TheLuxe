@@ -365,7 +365,11 @@ test('STO-033 - Consumo por boton real descuenta y limpia campos transitorios', 
 
 test('STO-034 - Ingreso real incrementa stock y contador diario', (t) => {
   const app = stockApp(t);
-  app.submit('stockMovementForm', movementValues({ stockType: 'entrada', stockQuantity: 5 }));
+  app.setForm('stockMovementForm', movementValues({ stockType: 'entrada', stockQuantity: 4 }));
+  app.click('#stockMovementForm [data-number-step="1"]');
+  assert.equal(fields(app, 'stockMovementForm').stockQuantity.value, '5');
+  assert.deepEqual(saved(app).movements, []);
+  app.submit('stockMovementForm');
   assert.deepEqual(saved(app).movements, [movement({ id: 'test-id-1', time: '12:00', type: 'entrada', quantity: 5, unitCost: 100, cost: 500 })]);
   assert.deepEqual(stockCells(app), ['15', '5', '0']);
   message(app, /Reposición registrada/);

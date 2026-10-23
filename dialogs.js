@@ -5,15 +5,15 @@ function updateSaleTotal() {
 }
 
 function openSaleDialog(id = null) {
+  editingSaleId = id;
   populateSelectors();
   saleForm.reset();
   saleForm.elements.unitPrice.setCustomValidity('');
   saleForm.elements.product.setCustomValidity('');
-  editingSaleId = id;
   const sale = sales.find((item) => item.id === id);
   saleForm.elements.time.value = sale?.time || nowTime();
-  const matches = inventory.products.filter((product) => product.active && product.saleEnabled && product.name === sale?.product);
-  saleForm.elements.product.value = sale?.productId || (matches.length === 1 ? matches[0].id : '');
+  const original = saleProduct(sale);
+  saleForm.elements.product.value = original?.active ? original.id : '';
   saleForm.elements.quantity.value = sale?.quantity || 1;
   saleForm.elements.unitPrice.value = sale ? formatAmount(sale.unitPrice) : '';
   saleForm.elements.payment.value = sale?.payment || 'Efectivo';

@@ -41,9 +41,31 @@ test('PERSIST-006 - venta y stock se guardan juntos y sobreviven a otra sesión'
   assert.equal(persisted.inventory.movements[0].sourceId, persisted.sales[0].id);
   assert.equal(persisted.inventory.movements[0].quantity, 2);
 
+  app.click('[data-stock-edit="pomada"]');
+  app.submit('stockProductForm', { stockName: 'Pomada mate', currentStock: 4, unitCost: '200' });
+  await until(async () => (await state()).state?.inventory.products.find((item) => item.id === 'pomada').name === 'Pomada mate');
+  await until(() => app.run('!stateSaving && !stateDirty'));
+  const edited = (await state()).state;
+  assert.deepEqual(edited.sales, persisted.sales);
+  assert.deepEqual(edited.inventory.movements[0], persisted.inventory.movements[0]);
+  assert.equal(edited.inventory.products.find((item) => item.id === 'pomada').initialStock, 5);
+  assert.equal(edited.inventory.movements[1].quantity, 1);
+
+  app.click('[data-stock-edit="pomada"]');
+  app.click('#stockProductForm [name="saleEnabled"]');
+  app.submit('stockProductForm');
+  await until(async () => (await state()).state?.inventory.products.find((item) => item.id === 'pomada').saleEnabled === false);
+  await until(() => app.run('!stateSaving && !stateDirty'));
+  const reclassified = (await state()).state;
+  assert.deepEqual(reclassified.sales, edited.sales);
+  assert.deepEqual(reclassified.inventory.movements, edited.inventory.movements);
+
   const reloaded = createApp(t, { clean: false, fetch: apiFetch });
   await until(() => reloaded.run('stateLoaded'));
   assert.equal(reloaded.run('sales.length'), 1);
-  assert.equal(reloaded.run("inventorySummary(inventory.products.find(p => p.id === 'pomada'), inventory.movements, workday.value).stock"), 3);
+  assert.equal(reloaded.run("inventorySummary(inventory.products.find(p => p.id === 'pomada'), inventory.movements, workday.value).stock"), 4);
+  assert.equal(reloaded.run("inventory.products.find(p => p.id === 'pomada').name"), 'Pomada mate');
+  assert.equal(reloaded.run("inventory.products.find(p => p.id === 'pomada').saleEnabled"), false);
+  assert.equal(reloaded.run("inventory.products.find(p => p.id === 'pomada').supplyEnabled"), true);
   assert.equal(reloaded.run("cashRegisters[workday.value].opened"), true);
 });

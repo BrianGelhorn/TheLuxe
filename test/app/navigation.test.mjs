@@ -142,13 +142,13 @@ test('NAV-010 - Elegir un precio de catalogo limpia errores de cero al reabrir f
   ]) {
     app.click(add);
     app.query(select).value = value;
-    app.submit(form, { [field]: '0' });
+    app.submit(form, { [field]: '0', payment: 'Efectivo' });
     assert.equal(app.element(form).elements.namedItem(field).validity.customError, true);
     app.click(`#${close}`);
     app.click(add);
     app.query(select).value = value;
     app.emit(select, 'change');
-    assert.equal(app.submit(form), true);
+    assert.equal(app.submit(form, { payment: 'Efectivo' }), true);
   }
   assert.equal(app.run('entries.length'), 1);
   assert.equal(app.run('sales.length'), 1);
