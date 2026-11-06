@@ -1,5 +1,11 @@
 # The Luxe — instalación local
 
+### Contraseña para Resúmenes y Configuración
+
+En Configuración se puede crear una contraseña de al menos ocho caracteres. Después, el acceso a Resúmenes y Configuración la solicita y el apartado para cambiarla queda detrás del ícono de candado. Para cambiarla se pide la contraseña anterior o un código de recuperación. Cada código se consume una vez por base de datos. Los códigos privados se entregan por separado y deben guardarse fuera de la PC del cliente; no deben subirse al repositorio. Guardá respaldos actuales de la base: restaurar un respaldo anterior puede volver a habilitar códigos ya usados.
+
+El control restringe las pantallas de la aplicación para el uso habitual. La API local entrega el estado completo para operar y la base no está cifrada: una persona con acceso a la PC puede acceder a los datos o modificar archivos por fuera de la interfaz. No debe considerarse una barrera de seguridad contra usuarios con acceso al equipo.
+
 La instalación **nativa** ejecuta la web, la API SQLite y el actualizador con Node.js, **solo en esta PC**, sin Docker, WSL ni máquina virtual. La variante Docker anterior se conserva para instalaciones existentes; no se migra ni se elimina su base automáticamente.
 
 ## Instalación nativa — recomendada para el cliente

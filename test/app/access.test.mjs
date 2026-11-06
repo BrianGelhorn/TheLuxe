@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createApp } from '../support/app.mjs';
+import { read } from '../support/logic.mjs';
+import { recoveryServer, until } from '../support/recovery.mjs';
+
+test('La interfaz pide contraseña para resúmenes y configuración y permite cambiarla', async t => {
+  const api = await recoveryServer(t);
+  const app = createApp(t, { clean: false, fetch: api.fetch });
+  app.run(read('access-ui.js'));
+  app.click('[data-view="configView"]');
+  await until(() => app.element('configView').classList.contains('active'));
+  app.click('#openAccessSettings');
+  assert.equal(app.element('accessDialog').open, true);
+  app.submit('accessForm', {password: 'primera clave', confirmation: 'primera clave'});
+  await until(() => !app.element('accessDialog').open);
+  assert.equal(app.element('accessSettings').hidden, true);
+  assert.equal(app.element('accessSettingsIcon').hidden, false);
+  app.click('[data-view="summaryView"]');
+  await until(() => app.element('accessDialog').open);
+  assert.equal(app.element('summaryView').classList.contains('active'), false);
+  app.submit('accessForm', {password: 'contraseña incorrecta'});
+  await until(() => app.element('accessFeedback').textContent.includes('incorrecta'));
+  assert.equal(app.element('summaryView').classList.contains('active'), false);
+  app.submit('accessForm', {password: 'primera clave'});
+  await until(() => app.element('summaryView').classList.contains('active'));
+  app.click('[data-view="configView"]');
+  await until(() => app.element('accessDialog').open);
+  app.submit('accessForm', {password: 'primera clave'});
+  await until(() => app.element('configView').classList.contains('active'));
+  app.click('#accessSettingsIcon');
+  app.submit('accessForm', {credential: 'primera clave', password: 'segunda clave', confirmation: 'segunda clave'});
+  await until(() => !app.element('accessDialog').open);
+  assert.equal((await api.request('/api/access/verify', {password:'segunda clave'})).status, 200);
+});

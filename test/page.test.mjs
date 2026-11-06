@@ -28,7 +28,7 @@ test('HTML-003 - Los campos referenciados tienen controles con nombre en el HTML
 test('HTML-004 - Los recursos locales existen y los scripts cargan en orden', () => {
   const assets = [...html.matchAll(/(?:src|href)="([^"?]+)(?:\?[^" ]*)?"/g)].map((match) => match[1]).filter((path) => !path.includes('://'));
   assert.deepEqual(assets.filter((path) => !existsSync(new URL(path, root))), []);
-  assert.deepEqual([...html.matchAll(/<script src="([^"?]+)/g)].map((match) => match[1]), scripts);
+  assert.deepEqual([...html.matchAll(/<script src="([^"?]+)/g)].map((match) => match[1]), [...scripts, 'access-ui.js']);
 });
 
 test('HTML-005 - El desglose presenta servicios y propinas antes de su subtotal', () => {

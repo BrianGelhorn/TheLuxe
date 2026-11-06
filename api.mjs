@@ -3,6 +3,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { recoveryPlan, mergeRecovery } from './recovery.mjs';
+import { createAccessControl } from './access-control.mjs';
+import { recoveryCodeHashes } from './access-codes.mjs';
 import './logic.js';
 
 // ponytail: snapshot completo hasta 16 MiB; particionar por registros si el historial supera este techo.
@@ -150,6 +152,9 @@ function body(req) {
 
 export function createApi({ databasePath, webHandler, host } = {}) {
   const db = new DatabaseSync(databasePath || process.env.DB_PATH || '/data/theluxe.sqlite');
+  const access = createAccessControl(db);
+  let accessFailures = 0;
+  let accessBlockedUntil = 0;
   db.exec('CREATE TABLE IF NOT EXISTS api_state (id INTEGER PRIMARY KEY CHECK (id = 1), revision INTEGER NOT NULL, state TEXT NOT NULL)');
   db.exec('CREATE TABLE IF NOT EXISTS recovery_history (id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, created_at TEXT NOT NULL, revision INTEGER NOT NULL, result_revision INTEGER NOT NULL, state TEXT NOT NULL, pending TEXT NOT NULL, selection TEXT NOT NULL, summary TEXT NOT NULL)');
   const select = db.prepare('SELECT revision, state FROM api_state WHERE id = 1');
@@ -192,6 +197,21 @@ export function createApi({ databasePath, webHandler, host } = {}) {
       if (['PUT', 'POST'].includes(req.method)) {
         if (req.headers.origin && req.headers.origin !== 'http://127.0.0.1:8000') return response(res, 403, { error: 'Forbidden origin' });
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) return response(res, 415, { error: 'Content-Type must be application/json' });
+      }
+      if (url.pathname === '/api/access/status' && req.method === 'GET') return response(res, 200, { configured: access.configured() });
+      if (['/api/access/setup', '/api/access/verify', '/api/access/change'].includes(url.pathname) && req.method === 'POST') {
+        if (Date.now() < accessBlockedUntil) return response(res, 429, { error: 'Demasiados intentos. Esperá un minuto y volvé a intentar.' });
+        const payload = await body(req);
+        try {
+          if (url.pathname.endsWith('/setup')) access.setup(payload.password, recoveryCodeHashes);
+          else if (url.pathname.endsWith('/change')) access.change(payload.password, payload.credential);
+          else if (!access.verify(payload.password)) throw new Error('Contraseña incorrecta');
+          accessFailures = 0;
+          return response(res, 200, { ok: true });
+        } catch (error) {
+          if (++accessFailures >= 5) { accessBlockedUntil = Date.now() + 60_000; accessFailures = 0; }
+          return response(res, 400, { error: error.message });
+        }
       }
       if (url.pathname === '/api/recovery/history' && req.method === 'GET') {
         return response(res, 200, { items: db.prepare('SELECT id,created_at AS createdAt,summary FROM recovery_history ORDER BY created_at DESC').all().map(row => ({ ...row, summary: JSON.parse(row.summary) })) });

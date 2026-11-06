@@ -2,12 +2,12 @@ FROM node:24-alpine AS build
 WORKDIR /app
 ARG SOURCE_COMMIT
 ENV SOURCE_COMMIT=$SOURCE_COMMIT
-COPY index.html styles.css logic.js reports.js dialogs.js inventory.js script.js recovery-ui.js build.mjs ./
+COPY index.html styles.css logic.js reports.js dialogs.js inventory.js script.js recovery-ui.js access-ui.js build.mjs ./
 RUN node build.mjs
 
 FROM node:24-alpine AS api
 WORKDIR /app
-COPY api.mjs logic.js recovery.mjs ./
+COPY api.mjs logic.js recovery.mjs access-control.mjs access-codes.mjs ./
 ENV DB_PATH=/data/theluxe.sqlite
 CMD ["node", "api.mjs"]
 
