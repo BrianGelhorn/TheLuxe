@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { createApi } from '../api.mjs';
-import { getActive, importDatabase, prepare, run, setActive } from '../native-deployment.mjs';
+import { createUpdateJournal, getActive, getUpdateJournal, importDatabase, prepare, run, setActive } from '../native-deployment.mjs';
 import { NativeHost } from '../native-host.mjs';
 import { verifiedRevision } from '../host-updater.mjs';
 
@@ -55,7 +55,8 @@ async function nativeFixture(t, options = {}) {
   let latest = first;
   const command = async (program, args, timeout, cwd) => {
     if (program === 'git' && args.includes('get-url')) return 'https://github.com/BrianGelhorn/TheLuxe.git';
-    if (program === 'git' && args.includes('ls-remote')) return `${latest}\trefs/heads/main`;
+    if (program === 'git' && args.includes('ls-remote')) return `${latest}\trefs/heads/stable`;
+    if (program === 'git' && args.includes('fetch') && args.includes('stable')) return run(program, args.map((arg) => arg === 'stable' ? 'main' : arg), timeout, cwd);
     return run(program, args, timeout, cwd);
   };
   await prepare(directory, repo, first);
@@ -72,6 +73,7 @@ async function nativeFixture(t, options = {}) {
   const next = async (app = 'good') => {
     await writeFile(join(repo, 'index.html'), (await readFile(join(repo, 'index.html'), 'utf8')).replace('</body>', `<p>native test ${Date.now()}</p></body>`));
     if (app === 'bad') await writeFile(join(repo, 'native-app.mjs'), 'throw new Error("candidate intentionally broken");');
+    if (app === 'bad-writes') await writeFile(join(repo, 'native-app.mjs'), `import { DatabaseSync } from 'node:sqlite'; const db = new DatabaseSync(process.env.DB_PATH); db.exec('DELETE FROM api_state'); db.close(); throw new Error('failed after modifying preview');`);
     if (app === 'bad-build') await writeFile(join(repo, 'build.mjs'), 'throw new Error("candidate build intentionally broken");');
     latest = await commit();
     return latest;
@@ -134,6 +136,11 @@ test('NATIVE-E2E-001 - servidor real conserva operaciones, respalda y actualiza 
   await app.host.stopChild();
   await app.host.startChild(app.first);
   assert.deepEqual((await app.json('/api/state')).body, { revision: 1, state });
+  const access = new DatabaseSync(join(app.directory, 'data', 'theluxe.sqlite'));
+  try {
+    access.prepare('INSERT INTO access_credentials VALUES (1, ?, ?)').run('sal-de-prueba', 'a'.repeat(64));
+    access.prepare('INSERT INTO access_recovery_codes VALUES (?, 1)').run('b'.repeat(64));
+  } finally { access.close(); }
   assert.equal(await app.host.updater.dailyBackup(), true);
   const files = await readdir(join(app.directory, 'data', 'backups'));
   const daily = files.find((name) => /^theluxe-daily-\d{4}-\d{2}-\d{2}\.sqlite$/.test(name));
@@ -145,21 +152,38 @@ test('NATIVE-E2E-001 - servidor real conserva operaciones, respalda y actualiza 
   assert.equal(await getActive(app.directory), second);
   assert.equal((await app.json('/version.json')).body.commit, second);
   assert.deepEqual((await app.json('/api/state')).body, { revision: 1, state });
+  const after = new DatabaseSync(join(app.directory, 'data', 'theluxe.sqlite'), { readOnly: true });
+  try {
+    assert.equal(after.prepare('SELECT salt FROM access_credentials WHERE id=1').get().salt, 'sal-de-prueba');
+    assert.equal(after.prepare('SELECT used FROM access_recovery_codes WHERE hash=?').get('b'.repeat(64)).used, 1);
+  } finally { after.close(); }
   assert.ok((await readdir(join(app.directory, 'data', 'backups'))).some((name) => /^theluxe-[a-f0-9]{40}-\d{13}-[a-f0-9-]{36}\.sqlite$/.test(name)), 'backup previo compatible con retencion');
   assert.deepEqual(app.fatal, []);
 });
 
-test('NATIVE-E2E-002 - candidato que no arranca revierte codigo y conserva SQLite', { timeout: 60000 }, async (t) => {
+test('NATIVE-E2E-002 - candidato que no arranca no detiene la aplicación ni toca SQLite', { timeout: 60000 }, async (t) => {
   const app = await nativeFixture(t);
   const state = snapshot(); await app.save(0, state);
   await app.next('bad');
   assert.equal((await app.host.updater.update()).started, true);
   const status = await idle(app.host.updater);
-  assert.match(status.error, /restauró la versión anterior/);
+  assert.match(status.error, /versión de prueba/);
   assert.equal(await getActive(app.directory), app.first);
   assert.equal((await app.json('/version.json')).body.commit, app.first);
   assert.deepEqual((await app.json('/api/state')).body, { revision: 1, state });
   assert.deepEqual(app.fatal, []);
+});
+
+test('NATIVE-E2E - candidato que modifica datos y falla solo afecta una copia descartable', { timeout: 60000 }, async (t) => {
+  const app = await nativeFixture(t);
+  const state = snapshot(); await app.save(0, state);
+  const pid = app.host.child.pid;
+  await app.next('bad-writes');
+  await app.host.updater.update();
+  assert.match((await idle(app.host.updater)).error, /versión de prueba/);
+  assert.equal(app.host.child.pid, pid);
+  assert.equal(await getActive(app.directory), app.first);
+  assert.deepEqual((await app.json('/api/state')).body, { revision: 1, state });
 });
 
 test('NATIVE-E2E-003 - rollback nunca restaura una copia sobre operaciones nuevas', { timeout: 60000 }, async (t) => {
@@ -179,6 +203,29 @@ test('NATIVE-E2E-003 - rollback nunca restaura una copia sobre operaciones nueva
   assert.deepEqual(app.fatal, []);
 });
 
+test('NATIVE-E2E - cambios en otras tablas durante el respaldo cancelan la actualización sin perder datos', { timeout: 60000 }, async (t) => {
+  const app = await nativeFixture(t);
+  const state = snapshot();
+  await app.save(0, state);
+  const next = await app.next();
+  const backup = app.host.backup.bind(app.host);
+  app.host.backup = async (...args) => {
+    const result = await backup(...args);
+    const db = new DatabaseSync(join(app.directory, 'data', 'theluxe.sqlite'));
+    try { db.exec("CREATE TABLE other_configuration (value TEXT); INSERT INTO other_configuration VALUES ('conservar')"); }
+    finally { db.close(); }
+    return result;
+  };
+  await app.host.updater.update();
+  assert.match((await idle(app.host.updater)).error, /base cambió durante el respaldo/);
+  assert.equal(await getActive(app.directory), app.first);
+  assert.notEqual((await app.json('/version.json')).body.commit, next);
+  assert.deepEqual((await app.json('/api/state')).body, { revision: 1, state });
+  const db = new DatabaseSync(join(app.directory, 'data', 'theluxe.sqlite'), { readOnly: true });
+  try { assert.equal(db.prepare('SELECT value FROM other_configuration').get().value, 'conservar'); }
+  finally { db.close(); }
+});
+
 test('NATIVE-E2E-004 - fallo de build no detiene la app y el candidato fallido se puede reintentar', { timeout: 60000 }, async (t) => {
   const app = await nativeFixture(t);
   const state = snapshot(); await app.save(0, state);
@@ -196,6 +243,28 @@ test('NATIVE-E2E-004 - fallo de build no detiene la app y el candidato fallido s
   assert.equal(await getActive(app.directory), good);
   assert.deepEqual((await app.json('/api/state')).body, { revision: 1, state });
   assert.deepEqual((await readdir(join(app.directory, 'releases'))).sort(), [app.first, good].sort(), 'solo conserva activa y anterior');
+});
+
+test('NATIVE-E2E - reinicio tras actualización interrumpida recupera la versión activa sin sustituir datos', { timeout: 60000 }, async (t) => {
+  const app = await nativeFixture(t);
+  const state = snapshot(); await app.save(0, state);
+  await app.host.close();
+  await createUpdateJournal(app.directory, app.first, 'b'.repeat(40));
+  await app.host.start();
+  assert.deepEqual((await app.json('/api/state')).body, { revision: 1, state });
+  assert.equal((await app.json('/version.json')).body.commit, app.first);
+  assert.equal(await getUpdateJournal(app.directory), null);
+});
+
+test('NATIVE-E2E - registro interrumpido incompatible bloquea el arranque sin alterar la base', { timeout: 60000 }, async (t) => {
+  const app = await nativeFixture(t);
+  const state = snapshot(); await app.save(0, state);
+  await app.host.close();
+  await createUpdateJournal(app.directory, 'b'.repeat(40), 'c'.repeat(40));
+  await assert.rejects(app.host.start(), /no coincide con la versión activa/);
+  const db = new DatabaseSync(join(app.directory, 'data', 'theluxe.sqlite'), { readOnly: true });
+  try { assert.deepEqual(JSON.parse(db.prepare('SELECT state FROM api_state WHERE id=1').get().state), state); }
+  finally { db.close(); }
 });
 
 test('NATIVE-E2E-005 - conflicto de puerto del actualizador no deja un servidor o SQLite abiertos', { timeout: 60000 }, async (t) => {

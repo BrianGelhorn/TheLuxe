@@ -26,7 +26,7 @@ test('UPD-001 - Avisa solo cuando el despliegue tiene una versión distinta', as
   assert.equal(requested.options.cache, 'no-store');
   app.confirm(false);
   app.click('#reloadUpdate');
-  assert.match(app.confirmations[0], /No se perderán las ventas/);
+  assert.match(app.confirmations[0], /Guardá o cerrá antes los formularios/);
   assert.equal(app.element('updateNotice').hidden, false);
   app.window.fetch = async () => ({ ok: true, json: async () => ({ version: 'a'.repeat(64) }) });
   await app.run('checkForUpdates()');
@@ -46,10 +46,11 @@ test('UPD-003 - Configuración permite buscar y actualizar solo cuando hay una v
   await new Promise((resolve) => app.window.setTimeout(resolve, 0));
   assert.equal(app.element('checkUpdates').disabled, false);
   assert.equal(app.element('configApplyUpdate').hidden, false);
-  assert.match(app.element('configUpdateStatus').textContent, /GitHub main/);
+  assert.match(app.element('configUpdateStatus').textContent, /nueva versión disponible/);
   app.confirm(false);
   app.click('#configApplyUpdate');
-  assert.match(app.confirmations[0], /datos financieros confirmados permanecen guardados/);
+  await new Promise((resolve) => app.window.setTimeout(resolve, 0));
+  assert.match(app.confirmations[0], /otras pestañas/);
   available = false;
   app.click('#checkUpdates');
   await new Promise((resolve) => app.window.setTimeout(resolve, 0));
@@ -75,7 +76,7 @@ test('UPD-006 - Instalar desde main espera Docker y ofrece recargar sin hacerlo 
   let requested;
   app.window.fetch = async (url, options) => {
     if (url.startsWith('version.json')) return { ok: true, json: async () => ({ version: deployed }) };
-    if (url.endsWith('/status')) return { ok: true, json: async () => ({ available: true }) };
+    if (url.endsWith('/status')) return { ok: true, json: async () => ({ available: deployed === 'a'.repeat(64) }) };
     requested = { url, options };
     deployed = 'b'.repeat(64);
     return { ok: true, json: async () => ({ started: true }) };
@@ -89,6 +90,59 @@ test('UPD-006 - Instalar desde main espera Docker y ofrece recargar sin hacerlo 
   assert.equal(app.element('configApplyUpdate').textContent, 'Recargar');
   assert.match(app.element('configUpdateStatus').textContent, /instalada/);
   assert.equal(app.confirmations.length, 1);
+});
+
+test('UPD - No anuncia la versión mientras el host todavía está verificando o revierte', async (t) => {
+  const app = createApp(t, { buildVersion: 'a'.repeat(64) });
+  let installed = false;
+  let statusReads = 0;
+  app.window.fetch = async (url) => {
+    if (url.startsWith('version.json')) return { ok: true, json: async () => ({ version: installed ? 'b'.repeat(64) : 'a'.repeat(64) }) };
+    if (url.endsWith('/update')) { installed = true; return { ok: true, json: async () => ({ started: true }) }; }
+    return { ok: true, json: async () => !installed ? { available: true } : ++statusReads === 1 ? { busy: true, phase: 'Comprobando' } : { available: true, error: 'Se restauró la versión anterior' } };
+  };
+  app.click('#checkUpdates');
+  await new Promise((resolve) => app.window.setTimeout(resolve, 0));
+  app.window.setTimeout = (callback) => { queueMicrotask(callback); return 1; };
+  await app.run('applyUpdate()');
+  assert.match(app.element('configUpdateStatus').textContent, /Se restauró la versión anterior/);
+  assert.equal(app.element('updateNotice').hidden, true);
+});
+
+test('UPD - Bloquea la actualización si hay un formulario abierto', async (t) => {
+  const app = createApp(t);
+  app.run('mainUpdateAvailable = true');
+  app.element('commissionDialog').showModal();
+  await app.run('applyUpdate()');
+  assert.match(app.alerts.at(-1), /Cerrá los formularios/);
+  assert.equal(app.confirmations.length, 0);
+});
+
+test('UPD - Muestra el resultado de la verificación del respaldo', async (t) => {
+  const app = createApp(t);
+  app.window.fetch = async () => ({ ok: true, json: async () => ({ found: true, valid: true, modified: Date.parse('2026-10-02T15:00:00Z') }) });
+  app.click('#checkBackup');
+  await app.settle();
+  assert.match(app.element('configUpdateStatus').textContent, /Última copia automática verificada/);
+  app.window.fetch = async () => ({ ok: true, json: async () => ({ found: true, valid: false, modified: 1 }) });
+  app.click('#checkBackup');
+  await app.settle();
+  assert.match(app.element('configUpdateStatus').textContent, /no pasó la verificación/);
+});
+
+test('UPD - Detecta otra pestaña de la misma versión antes de actualizar', async (t) => {
+  const channels = new Map();
+  class FakeChannel {
+    constructor(name) { this.name = name; if (!channels.has(name)) channels.set(name, new Set()); channels.get(name).add(this); }
+    postMessage(data) { for (const peer of channels.get(this.name)) if (peer !== this) queueMicrotask(() => peer.onmessage?.({ data })); }
+    close() { channels.get(this.name).delete(this); }
+  }
+  const app = createApp(t, { broadcastChannel: FakeChannel });
+  createApp(t, { broadcastChannel: FakeChannel });
+  app.run('mainUpdateAvailable = true');
+  await app.run('applyUpdate()');
+  assert.match(app.alerts.at(-1), /otra pestaña/);
+  assert.equal(app.confirmations.length, 0);
 });
 
 test('UPD-002 - Sin conexión o respuesta inválida no interrumpe la jornada', async (t) => {
@@ -135,7 +189,7 @@ test('UPD-009 - Una actualización sin cambios web termina sin pedir recarga', a
   await new Promise((resolve) => app.window.setTimeout(resolve, 0));
   app.window.setTimeout = (callback) => { queueMicrotask(callback); return 1; };
   await app.run('applyUpdate()');
-  assert.match(app.element('configUpdateStatus').textContent, /No hubo cambios/);
+  assert.match(app.element('configUpdateStatus').textContent, /cerrá y volvé a abrir The Luxe/);
   assert.equal(app.element('configApplyUpdate').hidden, true);
 });
 
@@ -173,5 +227,5 @@ test('UPD-013 - el host no anuncia éxito si Docker sigue sirviendo la versión 
   await new Promise((resolve) => app.window.setTimeout(resolve, 0));
   app.window.setTimeout = (callback) => { queueMicrotask(callback); return 1; };
   await app.run('applyUpdate()');
-  assert.match(app.element('configUpdateStatus').textContent, /Docker no está sirviendo la actualización/);
+  assert.match(app.element('configUpdateStatus').textContent, /No se pudo confirmar la nueva versión/);
 });

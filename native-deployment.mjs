@@ -10,6 +10,7 @@ import { verifiedRevision } from './host-updater.mjs';
 const exec = promisify(execFile);
 const sha = /^[a-f0-9]{40}$/;
 const activeFile = (home) => join(resolve(home), 'data', 'active.json');
+const updateJournal = (home) => join(resolve(home), 'data', 'update-pending.json');
 const releasePath = (home, commit) => join(resolve(home), 'releases', commit);
 const assertSha = (commit) => { if (!sha.test(commit)) throw new Error('Commit inválido.'); return commit; };
 const assertAbsolute = (path, name) => { if (!isAbsolute(path)) throw new Error(`${name} debe ser absoluto.`); return resolve(path); };
@@ -36,6 +37,32 @@ export async function setActive(home, commit) {
   const temporary = `${target}.${randomUUID()}.tmp`;
   try { await writeFile(temporary, JSON.stringify({ commit }), { mode: 0o600, flag: 'wx' }); await rename(temporary, target); }
   catch (error) { await rm(temporary, { force: true }); throw error; }
+}
+
+export async function getUpdateJournal(home) {
+  let value;
+  try { value = JSON.parse(await readFile(updateJournal(home), 'utf8')); }
+  catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw new Error('El registro de actualización está dañado. No se modificó la base.');
+  }
+  if (!value || !sha.test(value.previous) || !sha.test(value.candidate)) throw new Error('El registro de actualización es inválido. No se modificó la base.');
+  return value;
+}
+
+export async function createUpdateJournal(home, previous, candidate) {
+  assertSha(previous); assertSha(candidate);
+  const target = updateJournal(home);
+  await mkdir(dirname(target), { recursive: true });
+  const temporary = `${target}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, JSON.stringify({ previous, candidate }), { mode: 0o600, flag: 'wx' });
+    await link(temporary, target); // Exclusivo: nunca reemplazar una operación anterior sin revisar.
+  } finally { await rm(temporary, { force: true }); }
+}
+
+export async function clearUpdateJournal(home) {
+  await rm(updateJournal(home), { force: true });
 }
 
 export async function prepare(home, repo, commit, { command = run, node = process.execPath, git = process.env.THELUXE_GIT || 'git', rejectDifferentActive = false } = {}) {

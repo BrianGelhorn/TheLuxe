@@ -2,7 +2,7 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { resolve, join, basename } from 'node:path';
+import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
 import { mkdir, stat, rename, unlink, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -11,6 +11,8 @@ import { DatabaseSync } from 'node:sqlite';
 const exec = promisify(execFile);
 const repo = fileURLToPath(new URL('.', import.meta.url));
 const appOrigin = 'http://127.0.0.1:8000';
+// Solo se distribuyen commits promovidos explícitamente a esta rama.
+const releaseBranch = 'stable';
 const sha = /^[a-f0-9]{40}$/;
 const expectedRemote = /^(?:https:\/\/github\.com\/BrianGelhorn\/TheLuxe(?:\.git)?|git@github\.com:BrianGelhorn\/TheLuxe\.git)$/;
 const backupDirectory = join(process.env.LOCALAPPDATA || homedir(), 'TheLuxe', 'backups');
@@ -83,6 +85,18 @@ export function createUpdater({ run = command, installed = installedVersion, hea
   let phase = '';
   let error = '';
 
+  async function backupStatus() {
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); }
+    catch (failure) { if (failure.code === 'ENOENT') return { found: false }; throw failure; }
+    const names = entries.filter((entry) => entry.isFile() && /^theluxe-(?:daily-\d{4}-\d{2}-\d{2}|(?:[a-f0-9]{40}|null)-\d{13}-[a-f0-9-]{36})\.sqlite$/.test(entry.name));
+    const files = await Promise.all(names.map(async (entry) => ({ path: join(directory, entry.name), modified: (await stat(join(directory, entry.name))).mtimeMs })));
+    files.sort((a, b) => b.modified - a.modified);
+    if (!files.length) return { found: false };
+    try { return { found: true, modified: files[0].modified, valid: verifiedRevision(files[0].path) > 0 }; }
+    catch { return { found: true, modified: files[0].modified, valid: false }; }
+  }
+
   async function dailyBackup() {
     if (busy) return false;
     busy = true;
@@ -115,9 +129,9 @@ export function createUpdater({ run = command, installed = installedVersion, hea
       run('git', ['status', '--porcelain']),
     ]);
     if (branch !== 'main' || !expectedRemote.test(remote) || dirty) throw new Error('La instalación debe ser una copia limpia de main con origin en GitHub.');
-    const [remoteLine, current] = await Promise.all([run('git', ['ls-remote', 'origin', 'refs/heads/main']), installed()]);
-    const latestCommit = remoteLine.match(/^([a-f0-9]{40})\s+refs\/heads\/main$/)?.[1];
-    if (!latestCommit) throw new Error('No se pudo consultar main en GitHub.');
+    const [remoteLine, current] = await Promise.all([run('git', ['ls-remote', 'origin', `refs/heads/${releaseBranch}`]), installed()]);
+    const latestCommit = remoteLine.match(/^([a-f0-9]{40})\s+refs\/heads\/stable$/)?.[1];
+    if (!latestCommit) throw new Error('No hay una versión estable publicada. No se modificó la instalación.');
     return { busy: false, available: current.commit !== latestCommit, latestCommit, installedCommit: current.commit, error };
   }
 
@@ -145,14 +159,14 @@ export function createUpdater({ run = command, installed = installedVersion, hea
       let oldApiImage = false;
       let snapshot = null;
       try {
-        phase = 'Descargando main';
-        await run('git', ['fetch', 'origin', 'main']);
+        phase = 'Descargando versión estable';
+        await run('git', ['fetch', 'origin', releaseBranch]);
         const fetched = await run('git', ['rev-parse', 'FETCH_HEAD']);
-        if (fetched !== current.latestCommit) throw new Error('main cambió durante la descarga. Buscá actualizaciones de nuevo.');
+        if (fetched !== current.latestCommit) throw new Error('La versión estable cambió durante la descarga. Buscá actualizaciones de nuevo.');
         if (await run('git', ['status', '--porcelain'])) throw new Error('La instalación cambió durante la descarga. No se modificó.');
         await run('git', ['merge-base', '--is-ancestor', 'HEAD', 'FETCH_HEAD']);
         await run('git', ['merge', '--ff-only', 'FETCH_HEAD']);
-        if (await run('git', ['rev-parse', 'HEAD']) !== fetched) throw new Error('La copia local no coincide con main.');
+        if (await run('git', ['rev-parse', 'HEAD']) !== fetched) throw new Error('La copia local no coincide con la versión estable.');
         if (deploy) {
           await deploy({ commit: fetched, previousCommit: current.installedCommit, setPhase: (value) => { phase = value; } });
           return;
@@ -192,12 +206,9 @@ export function createUpdater({ run = command, installed = installedVersion, hea
         if (restartAttempted) {
           try {
             await run('docker', ['compose', '-f', 'compose.yaml', 'stop', 'web'], 180000);
-            let restored = false;
             if (snapshot) await run('docker', ['compose', '-f', 'compose.yaml', 'stop', 'api'], 180000);
-            if (snapshot && await revision(run) === snapshot.revision) {
-              await run('docker', ['compose', '-f', 'compose.yaml', 'cp', snapshot.path, 'api:/data/theluxe.sqlite'], 180000);
-              restored = true;
-            }
+            // La revisión de api_state no cubre credenciales ni otras tablas.
+            // Nunca reemplazar automáticamente la base viva por una copia anterior.
             await run('docker', ['tag', 'theluxe-rollback', 'theluxe-local']);
             if (oldApiImage) await run('docker', ['tag', 'theluxe-api-rollback', 'theluxe-api-local']);
             await run('docker', ['compose', '-f', 'compose.yaml', 'up', '-d', 'api', 'web'], 180000);
@@ -207,7 +218,7 @@ export function createUpdater({ run = command, installed = installedVersion, hea
               await new Promise((resolve) => setTimeout(resolve, 1000));
             }
             error += ready ? ' Se restauró la versión anterior.' : ' No se pudo confirmar la restauración. Revisá Docker.';
-            if (snapshot) error += restored ? ` Base restaurada desde ${basename(snapshot.path)}.` : ` La base cambió: no se sobrescribió. Copia previa: ${snapshot.path}.`;
+            if (snapshot) error += ` No se reemplazó la base. Copia previa: ${snapshot.path}.`;
           } catch { error += ` No se pudo restaurar la versión anterior. Revisá Docker.${snapshot ? ` Copia previa: ${snapshot.path}.` : ''}`; }
         }
       } finally {
@@ -218,7 +229,7 @@ export function createUpdater({ run = command, installed = installedVersion, hea
     return { started: true };
   }
 
-  return { status, update, dailyBackup };
+  return { status, update, dailyBackup, backupStatus };
 }
 
 export function createUpdateServer(updater = createUpdater()) {
@@ -230,9 +241,10 @@ export function createUpdateServer(updater = createUpdater()) {
     headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
     headers['Access-Control-Allow-Headers'] = 'Content-Type';
     const path = new URL(request.url, 'http://127.0.0.1').pathname;
-    if (request.method === 'OPTIONS' && ['/status', '/update'].includes(path)) return send(204, {});
+    if (request.method === 'OPTIONS' && ['/status', '/update', '/backup'].includes(path)) return send(204, {});
     try {
       if (request.method === 'GET' && path === '/status') return send(200, await updater.status());
+      if (request.method === 'GET' && path === '/backup') return send(200, await updater.backupStatus());
       if (request.method === 'POST' && path === '/update' && request.headers['content-type'] === 'application/json') {
         const result = await updater.update();
         return send(result.busy ? 409 : result.started ? 202 : 200, result);

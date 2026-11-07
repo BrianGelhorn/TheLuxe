@@ -267,7 +267,7 @@ function openConfigDialog(type, item = null) {
   formElement.elements.id.value = item?.id || '';
   formElement.elements.name.value = item?.name || '';
   if (type === 'services') formElement.elements.price.value = item ? formatAmount(item.price) : '';
-  document.getElementById(`${type === 'expenseCategories' ? 'expenseCategory' : type.slice(0, -1)}ConfigMode`).textContent = item ? `MODIFICAR ${configLabels[type]}` : `NUEVO ${configLabels[type]}`;
+  document.getElementById(`${type === 'expenseCategories' ? 'expenseCategory' : type.slice(0, -1)}ConfigMode`).textContent = item ? `MODIFICAR ${configLabels[type]}` : `${type === 'expenseCategories' ? 'NUEVA' : 'NUEVO'} ${configLabels[type]}`;
   configDialogs[type].showModal();
 }
 
@@ -346,6 +346,14 @@ function updateBarberPaymentColumn(column, payment) {
   column.querySelector('[data-payment-sum]').textContent = money.format(state.paidAmount);
   column.querySelector('[data-payment-balance-label]').textContent = state.excess ? 'De más' : 'Falta pagar';
   column.querySelector('[data-payment-balance]').textContent = money.format(state.excess || state.remaining);
+}
+
+function alignPaymentControls() {
+  const controls = [...document.querySelectorAll('#barberColumns .barber-payment-control')];
+  controls.forEach((control) => { control.style.minHeight = ''; });
+  if (!controls.some((control) => control.open)) return;
+  const height = Math.max(...controls.map((control) => control.getBoundingClientRect().height));
+  controls.forEach((control) => { control.style.minHeight = `${height}px`; });
 }
 
 function isDayOpen(date) {
@@ -474,7 +482,11 @@ function render() {
   document.getElementById('transferCashAvailable').textContent = money.format(cashBalance);
   document.getElementById('transferMpAvailable').textContent = money.format(mpBalance);
   const barberColumns = document.getElementById('barberColumns');
-  barberColumns.innerHTML = (reorderingBarbers ? pendingBarberOrder : barbers).map((barber) => barberColumn(barber, list)).join('');
+  const visibleBarbers = reorderingBarbers ? pendingBarberOrder : barbers;
+  const settlements = new Map(visibleBarbers.map((barber) => [barber, barberSettlement(list.filter((entry) => entry.barber === barber), dayAdvances.filter((advance) => advance.barber === barber), barberPaymentRecord(barber), effectiveCommission)]));
+  const showAdvance = [...settlements.values()].some((settlement) => settlement.advance > 0);
+  const showExcess = [...settlements.values()].some((settlement) => settlement.advanceExcess > 0);
+  barberColumns.innerHTML = visibleBarbers.map((barber) => barberColumn(barber, list, settlements.get(barber), { showAdvance, showExcess })).join('');
   barberColumns.classList.toggle('reordering', reorderingBarbers);
   renderSales(daySales);
   renderAdvances(dayAdvances);
@@ -523,12 +535,11 @@ function render() {
   renderSummary();
 }
 
-function barberColumn(barber, list) {
+function barberColumn(barber, list, settlement, { showAdvance, showExcess }) {
   const cuts = list.filter((entry) => entry.barber === barber).sort((a, b) => a.time.localeCompare(b.time));
   const total = cuts.reduce((sum, entry) => sum + Number(entry.amount) + Number(entry.tip || 0), 0);
   const payment = barberPaymentRecord(barber);
   const paymentStatus = payment.status;
-  const settlement = barberSettlement(cuts, selectedAdvances().filter((advance) => advance.barber === barber), payment, effectiveCommission);
   const payout = { tips: settlement.tips, commission: settlement.commission, total: settlement.due };
   const paymentState = barberPaymentState(payment, settlement.due);
   if (settlement.gross && !settlement.due && payment.status === 'No pago') {
@@ -567,8 +578,8 @@ function barberColumn(barber, list) {
        <dl class="payment-breakdown">
           <div><dt>Propinas</dt><dd>${money.format(payout.tips)}</dd></div>
            <div title="Suma de los cortes con su comisión aplicada, sin propinas"><dt>Comisión</dt><dd>${money.format(payout.commission)}</dd></div>
-           ${settlement.advance ? `<div><dt>Adelantos entregados</dt><dd>−${money.format(settlement.advance)}</dd></div>` : ''}
-           ${settlement.advanceExcess ? `<div><dt>Adelanto excedente</dt><dd>${money.format(settlement.advanceExcess)}</dd></div>` : ''}
+           ${showAdvance ? `<div><dt>Adelantos entregados</dt><dd>${settlement.advance ? '−' : ''}${money.format(settlement.advance)}</dd></div>` : ''}
+           ${showExcess ? `<div><dt>Adelanto excedente</dt><dd>${money.format(settlement.advanceExcess)}</dd></div>` : ''}
           <div class="payment-amount-due" title="Comisión y propinas pendientes luego de adelantos ya egresados de caja"><dt>Total a pagar</dt><dd>${money.format(payout.total)}</dd></div>
         </dl>
         <details class="barber-payment-control">
@@ -645,6 +656,8 @@ function openEditDialog(id) {
   dialog.showModal();
 }
 
+document.getElementById('barberColumns').addEventListener('toggle', alignPaymentControls, true);
+window.addEventListener('resize', alignPaymentControls);
 document.getElementById('barberColumns').addEventListener('click', (event) => {
   if (dailyOperationsLocked()) return;
   if (reorderingBarbers) {
@@ -665,6 +678,7 @@ document.getElementById('barberColumns').addEventListener('click', (event) => {
     barberPayments[workday.value] = { ...(barberPayments[workday.value] || {}), [barber]: payment };
     saveBarberPayments();
     updateBarberPaymentColumn(column, payment);
+    alignPaymentControls();
     renderAvailableBalances();
     renderSummary();
     if (payment.status === 'Mixto') column.querySelector('[data-payment-amount]').focus({ preventScroll: true });
@@ -1413,9 +1427,33 @@ document.querySelectorAll('.number-stepper').forEach((control) => {
 });
 
 let mainUpdateAvailable = false;
+let updateInProgress = false;
 const updaterUrl = 'http://127.0.0.1:8001';
+// Las pestañas que ejecutan esta versión se anuncian entre sí. Esto no permite
+// detectar ventanas en otros perfiles o versiones antiguas, por eso se mantiene
+// la advertencia para el cliente antes de actualizar.
+const updateChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('theluxe-update-presence') : null;
+const updatePresenceChecks = new Map();
+if (updateChannel) updateChannel.onmessage = (event) => {
+  const { type, id } = event.data || {};
+  if (typeof id !== 'string') return;
+  if (type === 'ping') updateChannel.postMessage({ type: 'present', id });
+  if (type === 'present') updatePresenceChecks.get(id)?.();
+};
 
-async function checkForUpdates() {
+async function hasOtherUpdateTabs() {
+  if (!updateChannel) return false;
+  const id = `${Date.now()}-${Math.random()}`;
+  return new Promise((resolve) => {
+    let found = false;
+    updatePresenceChecks.set(id, () => { found = true; });
+    updateChannel.postMessage({ type: 'ping', id });
+    window.setTimeout(() => { updatePresenceChecks.delete(id); resolve(found); }, 300);
+  });
+}
+
+async function checkForUpdates({ allowDuringUpdate = false } = {}) {
+  if (updateInProgress && !allowDuringUpdate) return 'pending';
   const current = document.querySelector('meta[name="theluxe-build"]')?.content;
   if (!/^[a-f0-9]{64}$/.test(current || '')) return 'unavailable';
   if (typeof window.fetch !== 'function') return 'error';
@@ -1435,7 +1473,7 @@ async function checkForUpdates() {
     const status = document.getElementById('configUpdateStatus');
     if (available || !status.hidden && !mainUpdateAvailable) {
       status.hidden = false;
-      status.textContent = available ? 'Actualización instalada. Recargá para usarla.' : 'Ya tenés la última versión publicada.';
+      status.textContent = available ? 'Actualización instalada. Recargá para usarla. Al terminar la jornada, cerrá y volvé a abrir The Luxe para aplicar también los cambios del host.' : 'Ya tenés la última versión publicada.';
     }
     return available ? 'available' : 'current';
   } catch { return 'error'; }
@@ -1444,9 +1482,24 @@ async function checkForUpdates() {
 async function updaterStatus() {
   const response = await fetch(`${updaterUrl}/status`, { cache: 'no-store' });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'No se pudo consultar GitHub main.');
+  if (!response.ok) throw new Error(result.error || 'No se pudo consultar la versión disponible.');
   return result;
 }
+
+document.getElementById('checkBackup').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const status = document.getElementById('configUpdateStatus');
+  button.disabled = true; status.hidden = false; status.textContent = 'Revisando la copia automática…';
+  try {
+    const response = await fetch(`${updaterUrl}/backup`, { cache: 'no-store' });
+    if (!response.ok) throw new Error('No disponible');
+    const result = await response.json();
+    if (!result.found) status.textContent = 'No se encontró una copia automática de la base en esta PC.';
+    else if (!result.valid || !Number.isFinite(result.modified)) status.textContent = 'La copia automática más reciente no pasó la verificación. Revisá los respaldos antes de actualizar.';
+    else status.textContent = `Última copia automática verificada: ${new Date(result.modified).toLocaleString('es-AR')}. Está guardada en esta PC.`;
+  } catch { status.textContent = 'No se pudo revisar la copia. Abrí nuevamente The Luxe y volvé a intentar.'; }
+  finally { button.disabled = false; }
+});
 
 document.getElementById('checkUpdates').addEventListener('click', async (event) => {
   const button = event.currentTarget;
@@ -1469,25 +1522,35 @@ document.getElementById('checkUpdates').addEventListener('click', async (event) 
     mainUpdateAvailable = release.available;
     document.getElementById('configApplyUpdate').hidden = !release.available;
     document.getElementById('configApplyUpdate').textContent = 'Actualizar';
-    status.textContent = release.available ? 'Hay una nueva versión en GitHub main.' : 'Ya tenés la última versión de GitHub main.';
+    status.textContent = release.available ? 'Hay una nueva versión disponible.' : 'Ya tenés la última versión disponible.';
   } catch (failure) {
     status.textContent = `No se pudo consultar GitHub. ${String(failure.message || '').slice(0, 200)} Iniciá el actualizador local o revisá la conexión.`;
   } finally { button.disabled = false; }
 });
 
 async function applyUpdate() {
+  if (updateInProgress) return;
   if (stateDirty || stateSaving) {
     alert('Hay cambios pendientes de guardado. Reintentá el guardado antes de actualizar o recargar.');
     return;
   }
   if (!mainUpdateAvailable) {
-    if (confirm('Se recargará la aplicación. No se perderán las ventas ni los datos financieros confirmados. ¿Continuar?')) window.location.reload();
+    if (confirm('Se recargará la aplicación. Guardá o cerrá antes los formularios que tengas abiertos. ¿Continuar?')) window.location.reload();
     return;
   }
-  if (!confirm('Se instalará main y se reiniciará Docker. Los datos financieros confirmados permanecen guardados. ¿Continuar?')) return;
+  if (document.querySelector('dialog[open]')) {
+    alert('Cerrá los formularios abiertos antes de actualizar.');
+    return;
+  }
+  if (await hasOtherUpdateTabs()) {
+    alert('Hay otra pestaña de The Luxe abierta. Guardá sus cambios y cerrala antes de actualizar.');
+    return;
+  }
+  if (!confirm('Se instalará la nueva versión y se reiniciará la aplicación. Antes de continuar, guardá los cambios y cerrá los formularios y otras pestañas de The Luxe. ¿Continuar?')) return;
   const button = document.getElementById('configApplyUpdate');
   const status = document.getElementById('configUpdateStatus');
   button.disabled = true;
+  updateInProgress = true;
   status.hidden = false;
   status.textContent = 'Instalando actualización…';
   try {
@@ -1496,22 +1559,22 @@ async function applyUpdate() {
     if (!response.ok || !result.started) throw new Error(result.error || 'No se pudo iniciar la actualización.');
     for (let attempt = 0; attempt < 500; attempt++) {
       await new Promise((resolve) => window.setTimeout(resolve, 2000));
-      if (await checkForUpdates() === 'available') return;
       const progress = await updaterStatus();
       if (progress.busy) { status.textContent = `Actualizando: ${progress.phase}.`; continue; }
       if (progress.error) throw new Error(progress.error);
       if (!progress.available) {
+        if (await checkForUpdates({ allowDuringUpdate: true }) === 'available') return;
         mainUpdateAvailable = false;
         button.hidden = true;
-        status.textContent = 'Actualización instalada. No hubo cambios en la aplicación.';
+        status.textContent = 'Actualización instalada. Al terminar la jornada, cerrá y volvé a abrir The Luxe para aplicar también los cambios del host.';
         return;
       }
-      throw new Error('Docker no está sirviendo la actualización. Intentá buscar de nuevo.');
+      throw new Error('No se pudo confirmar la nueva versión. Intentá buscar de nuevo.');
     }
-    throw new Error('La actualización tardó demasiado. Revisá Docker e intentá buscar de nuevo.');
+    throw new Error('La actualización tardó demasiado. Revisá el host e intentá buscar de nuevo.');
   } catch (error) {
     status.textContent = `No se pudo actualizar: ${error.message}`;
-  } finally { button.disabled = false; }
+  } finally { updateInProgress = false; button.disabled = false; }
 }
 
 document.getElementById('configApplyUpdate').addEventListener('click', () => { void applyUpdate(); });

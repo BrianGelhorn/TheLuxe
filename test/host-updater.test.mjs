@@ -21,7 +21,7 @@ test('UPD-004 - Descarga solo main limpio, reconstruye Docker y espera versión 
     if (args[0] === 'branch') return 'main';
     if (args[0] === 'remote') return 'https://github.com/BrianGelhorn/TheLuxe';
     if (args[0] === 'status') return dirty;
-    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/main`;
+    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/stable`;
     if (args[0] === 'fetch' || args[0] === 'merge-base') return '';
     if (args[0] === 'rev-parse') return args[1] === 'FETCH_HEAD' ? latest : head;
     if (args[0] === 'merge') { head = latest; return ''; }
@@ -37,9 +37,24 @@ test('UPD-004 - Descarga solo main limpio, reconstruye Docker y espera versión 
   for (let attempt = 0; attempt < 30 && (await updater.status()).busy; attempt++) await new Promise((resolve) => setTimeout(resolve, 1));
   assert.equal((await updater.status()).available, false);
   assert.ok(calls.includes(`docker compose -f compose.yaml build --build-arg SOURCE_COMMIT=${latest} api web`));
+  assert.ok(calls.includes('git fetch origin stable'));
   assert.ok(calls.includes('docker compose -f compose.yaml stop web'));
   assert.ok(calls.includes('docker compose -f compose.yaml up -d --no-deps api'));
   assert.ok(calls.includes('docker compose -f compose.yaml up -d --no-deps web'));
+});
+
+test('UPD - Sin versión estable publicada no instala main ni toca los datos', async () => {
+  const calls = [];
+  const run = async (program, args) => {
+    calls.push([program, ...args].join(' '));
+    if (args[0] === 'branch') return 'main';
+    if (args[0] === 'remote') return 'https://github.com/BrianGelhorn/TheLuxe';
+    if (args[0] === 'status' || args[0] === 'ls-remote') return '';
+    throw new Error('Operación inesperada');
+  };
+  const updater = createUpdater({ run, installed: async () => ({ version: 'c'.repeat(64), commit: 'a'.repeat(40) }) });
+  await assert.rejects(updater.update(), /No hay una versión estable publicada/);
+  assert.equal(calls.some(call => /fetch|merge|docker/.test(call)), false);
 });
 
 test('UPD-005 - Solo la app local puede solicitar una actualización al servicio', async (t) => {
@@ -66,7 +81,7 @@ test('UPD-007 - Si falla el reinicio intenta restaurar la imagen anterior', asyn
     if (args[0] === 'branch') return 'main';
     if (args[0] === 'remote') return 'https://github.com/BrianGelhorn/TheLuxe';
     if (args[0] === 'status') return '';
-    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/main`;
+    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/stable`;
     if (args[0] === 'rev-parse') return args[1] === 'FETCH_HEAD' ? latest : head;
     if (args[0] === 'merge') head = latest;
     if (program === 'docker' && args.includes('up') && !restarted) { restarted = true; throw new Error('Docker no pudo reiniciar'); }
@@ -80,8 +95,8 @@ test('UPD-007 - Si falla el reinicio intenta restaurar la imagen anterior', asyn
   assert.match(state.error, /Se restauró la versión anterior/);
   assert.ok(calls.includes('docker tag theluxe-rollback theluxe-local'));
   assert.ok(calls.includes('docker tag theluxe-api-rollback theluxe-api-local'));
-  assert.ok(calls.indexOf('docker compose -f compose.yaml stop api') < calls.indexOf('docker compose -f compose.yaml cp C:/theluxe-backup.sqlite api:/data/theluxe.sqlite'));
-  assert.ok(calls.includes('docker compose -f compose.yaml cp C:/theluxe-backup.sqlite api:/data/theluxe.sqlite'));
+  assert.ok(calls.includes('docker compose -f compose.yaml stop api'));
+  assert.equal(calls.some(call => call.includes('cp C:/theluxe-backup.sqlite api:/data/theluxe.sqlite')), false);
 });
 
 test('UPD-012 - No da por instalada la actualización hasta que la API esté sana', async () => {
@@ -91,7 +106,7 @@ test('UPD-012 - No da por instalada la actualización hasta que la API esté san
     if (args[0] === 'branch') return 'main';
     if (args[0] === 'remote') return 'https://github.com/BrianGelhorn/TheLuxe';
     if (args[0] === 'status') return '';
-    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/main`;
+    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/stable`;
     if (args[0] === 'rev-parse') return args[1] === 'FETCH_HEAD' ? latest : head;
     if (args[0] === 'merge') head = latest;
     if (program === 'docker' && args.includes('up')) deployed = latest;
@@ -106,25 +121,25 @@ test('UPD-012 - No da por instalada la actualización hasta que la API esté san
 
 test('UPD-013 - Si la base cambió tras el respaldo no pisa operaciones nuevas', async () => {
   const old = 'a'.repeat(40), latest = 'b'.repeat(40);
-  let head = old, deployed = old, restarted = false, reads = 0;
+  let head = old, deployed = old, restarted = false;
   const calls = [];
   const run = async (program, args) => {
     calls.push([program, ...args].join(' '));
     if (args[0] === 'branch') return 'main';
     if (args[0] === 'remote') return 'https://github.com/BrianGelhorn/TheLuxe';
     if (args[0] === 'status') return '';
-    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/main`;
+    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/stable`;
     if (args[0] === 'rev-parse') return args[1] === 'FETCH_HEAD' ? latest : head;
     if (args[0] === 'merge') head = latest;
     if (program === 'docker' && args.includes('up') && args.includes('web') && !restarted) { restarted = true; throw new Error('No se pudo iniciar web'); }
     if (program === 'docker' && args.includes('up') && args.includes('web')) deployed = old;
     return '';
   };
-  const updater = createUpdater({ run, installed: async () => ({ version: 'c'.repeat(64), commit: deployed }), healthy: async () => true, backup, revision: async () => { reads++; if (reads === 2) assert.ok(calls.includes('docker compose -f compose.yaml stop api')); return reads === 1 ? 1 : 2; } });
+  const updater = createUpdater({ run, installed: async () => ({ version: 'c'.repeat(64), commit: deployed }), healthy: async () => true, backup, revision });
   assert.equal((await updater.update()).started, true);
   for (let attempt = 0; attempt < 30 && (await updater.status()).busy; attempt++) await new Promise((resolve) => setTimeout(resolve, 1));
   const state = await updater.status();
-  assert.match(state.error, /La base cambió: no se sobrescribió/);
+  assert.match(state.error, /No se reemplazó la base/);
   assert.equal(calls.some((call) => call.includes('cp C:/theluxe-backup.sqlite api:/data/theluxe.sqlite')), false);
   assert.equal(state.available, true);
 });
@@ -138,7 +153,7 @@ test('UPD-014 - Sin respaldo no detiene la web ni intenta instalar', async () =>
     if (args[0] === 'branch') return 'main';
     if (args[0] === 'remote') return 'https://github.com/BrianGelhorn/TheLuxe';
     if (args[0] === 'status') return '';
-    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/main`;
+    if (args[0] === 'ls-remote') return `${latest}\trefs/heads/stable`;
     if (args[0] === 'rev-parse') return args[1] === 'FETCH_HEAD' ? latest : head;
     if (args[0] === 'merge') head = latest;
     return '';
@@ -168,6 +183,20 @@ test('UPD-015 - La copia caliente de SQLite conserva la revisión previa a cambi
     assert.equal(previous.prepare('PRAGMA quick_check').get().quick_check, 'ok');
     assert.equal(previous.prepare('SELECT revision FROM api_state WHERE id=1').get().revision, 1);
   } finally { previous.close(); }
+});
+
+test('UPD - Informa si la copia automática más reciente se puede verificar', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'theluxe-backup-status-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const updater = createUpdater({ directory });
+  assert.deepEqual(await updater.backupStatus(), { found: false });
+  const path = join(directory, 'theluxe-daily-2026-10-02.sqlite');
+  const db = new DatabaseSync(path);
+  db.exec('CREATE TABLE api_state (id INTEGER PRIMARY KEY, revision INTEGER NOT NULL); INSERT INTO api_state VALUES (1, 4)');
+  db.close();
+  assert.equal((await updater.backupStatus()).valid, true);
+  await writeFile(path, 'copia dañada');
+  assert.equal((await updater.backupStatus()).valid, false);
 });
 
 test('UPD-016 - Una copia diaria persiste tras reiniciar, no se repite y permite actualizar al terminar', async (t) => {

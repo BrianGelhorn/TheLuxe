@@ -490,3 +490,20 @@ test('PAY-032 - Un pago simple no cambia al variar la comisión y permite pagar 
   assert.equal(app.query(mateo).classList.contains('is-paid'), true);
   balances(app, 1710, 4900);
 });
+
+test('PAY-ALINEACION - Los adelantos y excedentes ocupan las mismas filas para todos los barberos', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  app.seed({ advances: [{ id: 'adelanto-alineacion', date: '2026-09-03', time: '10:00', barber: 'Mateo', amount: 999999, payment: 'Efectivo', reason: 'Prueba' }] });
+  app.render();
+  const labels = selector => [...app.query(`${selector} .payment-breakdown`).querySelectorAll('dt')].map(row => row.textContent);
+  assert.deepEqual(labels(mateo), labels(lucas));
+  assert.deepEqual(labels(mateo), ['Propinas', 'Comisión', 'Adelantos entregados', 'Adelanto excedente', 'Total a pagar']);
+  const lucasRows = [...app.query(`${lucas} .payment-breakdown`).querySelectorAll('dd')].map(row => row.textContent);
+  assert.equal(lucasRows[2], app.money(0));
+  assert.equal(lucasRows[3], app.money(0));
+  app.seed({ advances: [] });
+  app.render();
+  assert.deepEqual(labels(mateo), ['Propinas', 'Comisión', 'Total a pagar']);
+  assert.deepEqual(labels(mateo), labels(lucas));
+});

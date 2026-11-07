@@ -75,8 +75,8 @@ test('HTML-012 - El control de actualizaciones está dentro de Configuración', 
 
 test('HTML-008 - El scroll horizontal queda limitado al kanban de barberos', () => {
   const css = read('styles.css');
-  assert.match(css, /#salesView > \.daily-sheet\s*\{[^}]*grid-column: auto;[^}]*height: 28rem;/);
-  assert.match(css, /#salesView \.movement-body\s*\{[^}]*min-height: 0;[^}]*overflow-x: clip;[^}]*overflow-y: auto;/);
+  assert.match(css, /#salesView > \.daily-sheet\s*\{[^}]*grid-column: auto;[^}]*height: auto;/);
+  assert.match(css, /#salesView \.movement-body\s*\{[^}]*overflow: visible;/);
   assert.match(css, /\.barber-columns\s*\{[^}]*overflow-x:\s*auto/);
   assert.doesNotMatch(css, /\.sales-table-wrap\s*\{[^}]*overflow-x:\s*auto/);
   assert.doesNotMatch(css, /\.collection-table-wrap\s*\{[^}]*overflow-x:\s*auto/);

@@ -1,10 +1,11 @@
 import { fork } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
 import { createUpdater, createUpdateServer, verifiedRevision } from './host-updater.mjs';
-import { backupDatabase, getActive, prepare, pruneReleases, run, setActive } from './native-deployment.mjs';
+import { backupDatabase, clearUpdateJournal, createUpdateJournal, getActive, getUpdateJournal, prepare, pruneReleases, run, setActive } from './native-deployment.mjs';
 
 const sha = /^[a-f0-9]{40}$/;
 
@@ -81,37 +82,88 @@ export class NativeHost {
     await mkdir(this.backups, { recursive: true });
     return backupDatabase(this.database, join(this.backups, `theluxe-${commit}-${Date.now()}-${randomUUID()}.sqlite`));
   }
+  async verifyCandidate(commit, snapshot) {
+    const temporary = join(this.backups, `.verify-${randomUUID()}.sqlite`);
+    let child;
+    try {
+      await backupDatabase(snapshot.path, temporary);
+      const app = join(this.home, 'releases', commit, 'native-app.mjs');
+      child = fork(app, [], { execPath: this.node, cwd: dirname(app), env: { ...process.env, DB_PATH: temporary, PORT: '0', SOURCE_COMMIT: commit }, stdio: ['ignore', 'inherit', 'inherit', 'ipc'] });
+      const port = await new Promise((resolveReady, reject) => {
+        const finish = (error, port) => { clearTimeout(timer); child.off('message', message); child.off('exit', exited); child.off('error', failed); error ? reject(error) : resolveReady(port); };
+        const timer = setTimeout(() => finish(new Error('La versión de prueba no inició a tiempo.')), 20000);
+        const message = (value) => value?.ready && Number.isInteger(value.port) && value.port > 0 && value.port <= 65535 ? finish(null, value.port) : finish(new Error(value?.error || 'La versión de prueba no inició.'));
+        const exited = () => finish(new Error('La versión de prueba terminó al iniciar.'));
+        const failed = (error) => finish(error);
+        child.once('message', message); child.once('exit', exited); child.once('error', failed);
+      });
+      const base = `http://127.0.0.1:${port}`;
+      const [health, version] = await Promise.all([fetch(`${base}/api/health`, { signal: AbortSignal.timeout(5000) }), fetch(`${base}/version.json`, { signal: AbortSignal.timeout(5000) })]);
+      if (!health.ok || !(await health.json()).ok || !version.ok || (await version.json()).commit !== commit) throw new Error('La versión de prueba no pasó las comprobaciones.');
+    } finally {
+      if (child?.pid && child.exitCode === null && child.signalCode === null) {
+        await new Promise((done) => {
+          const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+          child.once('exit', () => { clearTimeout(timer); done(); });
+          child.kill('SIGTERM');
+        });
+      }
+      for (const suffix of ['', '-wal', '-shm']) await rm(`${temporary}${suffix}`, { force: true });
+    }
+  }
   async deploy({ commit, previousCommit, setPhase }) {
     const previous = await getActive(this.home);
     if (previous !== previousCommit) throw new Error('El puntero activo cambió durante la actualización.');
     setPhase('Preparando versión nativa');
     await prepare(this.home, this.repo, commit, { command: this.gitRun.bind(this), git: this.git, node: this.node });
-    setPhase('Respaldando base de datos');
-    const snapshot = await this.backup(null, previous || 'null');
+    // Mantener la misma conexión permite detectar escrituras en todas las tablas,
+    // incluidas credenciales y recuperación, que no incrementan api_state.revision.
+    const observer = new DatabaseSync(this.database, { readOnly: true });
+    let snapshot, journalCreated = false;
     try {
+      const dataVersion = observer.prepare('PRAGMA data_version').get().data_version;
+      setPhase('Respaldando base de datos');
+      snapshot = await this.backup(null, previous || 'null');
+      setPhase('Probando versión con una copia');
+      await this.verifyCandidate(commit, snapshot);
+      await createUpdateJournal(this.home, previous, commit);
+      journalCreated = true;
       setPhase('Deteniendo versión anterior'); await this.stopChild();
-      if (verifiedRevision(this.database) !== snapshot.revision) throw new Error('La base cambió durante el respaldo.');
+      if (observer.prepare('PRAGMA data_version').get().data_version !== dataVersion || verifiedRevision(this.database) !== snapshot.revision) throw new Error('La base cambió durante el respaldo.');
       setPhase('Iniciando versión nueva'); await this.startChild(commit);
       await setActive(this.home, commit);
     } catch (error) {
+      if (!snapshot || !journalCreated) throw error;
       await this.stopChild();
-      try { if (previous) await this.startChild(previous); }
+      try {
+        if (await getActive(this.home) !== previous) throw new Error('El puntero activo cambió; se necesita revisión.');
+        if (previous) await this.startChild(previous);
+        await clearUpdateJournal(this.home);
+      }
       catch (rollback) { console.error('Falló el rollback nativo:', rollback, 'Copia previa:', snapshot.path); throw new Error(`${error.message.slice(0, 80)} No se pudo restaurar la versión anterior. Copia previa: ${snapshot.path}`); }
       console.error('Actualización nativa revertida:', error, 'Copia previa:', snapshot.path);
       throw new Error(`${error.message.slice(0, 80)} Se restauró la versión anterior sin reemplazar la base. Copia previa: ${snapshot.path}`);
-    }
+    } finally { observer.close(); }
+    try { await clearUpdateJournal(this.home); }
+    catch (error) { console.error('No se pudo limpiar el registro de actualización:', error); }
     try { await pruneReleases(this.home, this.repo, [commit, previous], { command: this.gitRun.bind(this), git: this.git }); }
     catch (error) { console.error('No se pudieron limpiar versiones anteriores:', error); }
   }
   async start() {
     const commit = await getActive(this.home);
     if (!commit) throw new Error('No hay versión nativa activa.');
+    const journal = await getUpdateJournal(this.home);
+    if (journal && commit !== journal.previous && commit !== journal.candidate) throw new Error('La actualización interrumpida no coincide con la versión activa. No se modificó la base.');
     try { await this.startChild(commit);
     const updater = createUpdater({ run: this.gitRun.bind(this), directory: this.backups, installed: async () => { const response = await fetch(`http://127.0.0.1:${this.port}/version.json`, { signal: AbortSignal.timeout(5000) }); if (!response.ok) throw new Error('Versión no disponible.'); return response.json(); }, healthy: async () => { const response = await fetch(`http://127.0.0.1:${this.port}/api/health`, { signal: AbortSignal.timeout(5000) }); return response.ok && (await response.json()).ok === true; }, backup: this.backup.bind(this), revision: async () => verifiedRevision(this.database), deploy: this.deploy.bind(this) });
     this.updater = updater; this.updateServer = createUpdateServer(updater);
     await new Promise((done, reject) => { this.updateServer.once('error', reject); this.updateServer.listen(this.updaterPort, '127.0.0.1', done); });
     const tick = () => void updater.dailyBackup().catch((error) => console.error('No se pudo hacer el respaldo diario:', error));
-    tick(); this.timer = setInterval(tick, 60 * 60 * 1000); } catch (error) {
+    tick(); this.timer = setInterval(tick, 60 * 60 * 1000);
+    if (journal) {
+      console.error('Se recuperó el arranque después de una actualización interrumpida, conservando la base actual.');
+      try { await clearUpdateJournal(this.home); } catch (error) { console.error('No se pudo limpiar el registro de actualización:', error); }
+    } } catch (error) {
       console.error('No se pudo iniciar TheLuxe Native:', error);
       try { await this.close(); }
       catch (cleanup) { throw new AggregateError([error, cleanup], 'Fallaron el arranque y la limpieza del coordinador nativo.', { cause: error }); }
