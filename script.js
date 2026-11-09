@@ -17,6 +17,7 @@ const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&'
 const formatAmount = (value) => value === '' || value == null ? '' : integer.format(parseAmount(value));
 const searchText = (value) => String(value).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('es');
 const matchesSearch = (name, query) => searchText(name).startsWith(searchText(query));
+const serviceIncludesCut = (name) => config.services.find((item) => item.name === name)?.includesCut ?? searchText(name).includes('corte');
 
 const form = document.getElementById('cutForm');
 const dialog = document.getElementById('cutDialog');
@@ -207,18 +208,27 @@ function populateSelectors() {
   expenseForm.elements.category.innerHTML = '<option value="">Sin categoría</option>' + config.expenseCategories.map(({ name }) => `<option>${escapeHtml(name)}</option>`).join('');
 }
 
+function orderedConfigBarbers() {
+  const byId = new Map(config.barbers.map((item) => [item.id, item]));
+  const ordered = (config.barberConfigOrder || []).map((id) => byId.get(id)).filter(Boolean);
+  const seen = new Set(ordered.map((item) => item.id));
+  return [...ordered, ...config.barbers.filter((item) => !seen.has(item.id))];
+}
+
 function renderConfig() {
   const list = (type, price = false) => config[type].map((item) => `<div class="config-item"><span>${escapeHtml(item.name)}${price ? ` · ${money.format(item.price)}` : ''}</span><span class="config-actions"><button type="button" data-config-edit="${type}" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="${type}" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
   document.getElementById('serviceConfigList').innerHTML = list('services', true);
   document.getElementById('expenseCategoryConfigList').innerHTML = list('expenseCategories');
-  document.getElementById('barberConfigList').innerHTML = config.barbers.map((item) => `<div class="config-item" data-name="${escapeHtml(item.name)}"><span>${escapeHtml(item.name)}</span><span class="config-actions"><label class="config-active"><input type="checkbox" data-config-active="barbers" data-id="${escapeHtml(item.id)}" ${item.active !== false ? 'checked' : ''}> Activo</label><button type="button" data-config-edit="barbers" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="barbers" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
+  document.getElementById('barberConfigList').innerHTML = orderedConfigBarbers().map((item) => `<div class="config-item" data-name="${escapeHtml(item.name)}" data-config-barber-id="${escapeHtml(item.id)}"><span class="config-barber-name"><button class="config-drag-handle" type="button" draggable="true" data-barber-drag aria-label="Ordenar ${escapeHtml(item.name)}. Usá las flechas arriba y abajo" title="Arrastrar para ordenar">☰</button><span>${escapeHtml(item.name)}</span></span><span class="config-actions"><label class="config-active"><input type="checkbox" data-config-active="barbers" data-id="${escapeHtml(item.id)}" ${item.active !== false ? 'checked' : ''}> Activo</label><button type="button" data-config-edit="barbers" data-id="${escapeHtml(item.id)}">Editar</button><button type="button" data-config-delete="barbers" data-id="${escapeHtml(item.id)}">Eliminar</button></span></div>`).join('');
   filterBarberConfig();
   commissionForm.elements.commission.value = config.commission;
 }
 
 function filterBarberConfig() {
   const query = document.getElementById('barberConfigSearch').value;
-  document.querySelectorAll('#barberConfigList [data-name]').forEach((item) => { item.style.display = matchesSearch(item.dataset.name, query) ? '' : 'none'; });
+  const rows = [...document.querySelectorAll('#barberConfigList [data-name]')];
+  rows.forEach((item) => { item.style.display = matchesSearch(item.dataset.name, query) ? '' : 'none'; });
+
 }
 
 function saveCatalog(type, formElement) {
@@ -228,7 +238,7 @@ function saveCatalog(type, formElement) {
   formElement.elements.name.setCustomValidity(duplicate ? 'Ya existe un elemento con ese nombre.' : '');
   if (!formElement.reportValidity()) return;
   const priced = type === 'services';
-  const item = { id: values.id || crypto.randomUUID(), name: values.name.trim(), ...(priced ? { price: parseAmount(values.price) } : type === 'barbers' ? { active: existing?.active !== false } : {}) };
+  const item = { id: values.id || crypto.randomUUID(), name: values.name.trim(), ...(priced ? { price: parseAmount(values.price), ...(values.cutCategory === 'yes' ? { includesCut: true } : values.cutCategory === 'no' ? { includesCut: false } : {}) } : type === 'barbers' ? { active: existing?.active !== false } : {}) };
   if (priced && item.price <= 0) {
     formElement.elements.price.setCustomValidity('El precio debe ser mayor que cero.');
     return formElement.reportValidity();
@@ -267,6 +277,7 @@ function openConfigDialog(type, item = null) {
   formElement.elements.id.value = item?.id || '';
   formElement.elements.name.value = item?.name || '';
   if (type === 'services') formElement.elements.price.value = item ? formatAmount(item.price) : '';
+  if (type === 'services') formElement.elements.cutCategory.value = item?.includesCut === undefined ? 'auto' : item.includesCut ? 'yes' : 'no';
   document.getElementById(`${type === 'expenseCategories' ? 'expenseCategory' : type.slice(0, -1)}ConfigMode`).textContent = item ? `MODIFICAR ${configLabels[type]}` : `${type === 'expenseCategories' ? 'NUEVA' : 'NUEVO'} ${configLabels[type]}`;
   configDialogs[type].showModal();
 }
@@ -386,8 +397,9 @@ function defaultCommission(date) {
   return Number([...(config.commissionHistory || [])].filter((item) => item.date <= date).sort((a, b) => a.date.localeCompare(b.date)).at(-1)?.rate ?? config.commission);
 }
 
-function effectiveCommission(date) {
-  return Number(cashRegisters[date]?.commissionRate ?? defaultCommission(date));
+function effectiveCommission(date, barber = '') {
+  const barberId = config.barbers.find((item) => item.name === barber)?.id;
+  return Number((barberId ? cashRegisters[date]?.barberCommissionRates?.[barberId] : undefined) ?? cashRegisters[date]?.commissionRate ?? defaultCommission(date));
 }
 
 function dayBalance(type, list = selectedEntries(), daySales = selectedSales(), dayAdvances = selectedAdvances(), dayExpenses = selectedExpenses(), dayTransfers = selectedTransfers()) {
@@ -568,7 +580,7 @@ function barberColumn(barber, list, settlement, { showAdvance, showExcess }) {
   return `
     <section class="barber-column${paymentState.isPaid ? ' is-paid' : paymentStatus !== 'No pago' ? ' is-payment-incomplete' : ''}" data-payment-due="${payout.total}" data-advance-covered="${Boolean(settlement.gross && !settlement.due && settlement.advance)}" data-payment-status="${escapeHtml(paymentStatus)}" data-barber-column="${escapeHtml(barber)}" ${reorderingBarbers ? 'draggable="true" tabindex="0"' : ''}>
       <header class="barber-column-header">
-        <strong>${escapeHtml(barber)}</strong>
+        <div class="barber-header-name"><strong>${escapeHtml(barber)}</strong><button class="barber-commission-button" type="button" data-commission-barber="${escapeHtml(barber)}" aria-label="Cambiar comisión de ${escapeHtml(barber)} para esta jornada" title="Comisión para nuevos cortes de esta jornada" ${reorderingBarbers ? 'disabled' : ''}>Comisión ${effectiveCommission(workday.value, barber)}% ✎</button></div>
         <button class="add-cut" type="button" data-barber="${escapeHtml(barber)}" aria-label="Registrar corte para ${escapeHtml(barber)}" title="Agregar corte" ${isDayOpen(workday.value) ? '' : 'disabled'}>+</button>
       </header>
       <div class="barber-services">${rows}</div>
@@ -659,6 +671,8 @@ function openEditDialog(id) {
 document.getElementById('barberColumns').addEventListener('toggle', alignPaymentControls, true);
 window.addEventListener('resize', alignPaymentControls);
 document.getElementById('barberColumns').addEventListener('click', (event) => {
+  const commissionButton = event.target.closest('[data-commission-barber]');
+  if (commissionButton && !reorderingBarbers) return openDailyCommission(commissionButton.dataset.commissionBarber);
   if (dailyOperationsLocked()) return;
   if (reorderingBarbers) {
     if (event.target.closest('.barber-payment-control')) event.preventDefault();
@@ -1018,7 +1032,7 @@ form.addEventListener('submit', (event) => {
   }
   if (!form.reportValidity()) return;
   const previous = entries.find((cut) => cut.id === editingId);
-  const commissionRate = previous?.commissionRate ?? effectiveCommission(workday.value);
+  const commissionRate = previous?.barber === values.barber ? (previous.commissionRate ?? effectiveCommission(workday.value, values.barber)) : effectiveCommission(workday.value, values.barber);
   const entry = { ...values, date: workday.value, amount, tip, cashAmount, mpAmount, commissionRate, commissionAmount: amount * commissionRate / 100, id: editingId || crypto.randomUUID() };
   entries = editingId ? entries.map((cut) => cut.id === editingId ? entry : cut) : [...entries, entry];
   save();
@@ -1126,9 +1140,18 @@ commissionForm.addEventListener('submit', (event) => {
   config.commissionHistory = [...history.filter(({ date }) => date !== today()), { date: today(), rate: config.commission }];
   saveConfig();
 });
-document.getElementById('changeCommission').addEventListener('click', () => {
-  dailyCommissionForm.elements.commission.value = effectiveCommission(workday.value);
+function openDailyCommission(barberName = '') {
+  dailyCommissionForm.elements.barber.innerHTML = '<option value="">Todos los barberos</option>' + config.barbers.filter(({ active, name }) => active !== false || selectedEntries().some((cut) => cut.barber === name)).map(({ id, name }) => `<option value="${escapeHtml(id)}">${escapeHtml(name)}</option>`).join('');
+  const barber = config.barbers.find((item) => item.name === barberName);
+  dailyCommissionForm.elements.barber.value = barber?.id || '';
+  dailyCommissionForm.elements.commission.value = effectiveCommission(workday.value, barber?.name);
+  document.getElementById('commissionDate').textContent = workday.value.split('-').reverse().join('/');
   commissionDialog.showModal();
+}
+document.getElementById('changeCommission').addEventListener('click', () => openDailyCommission());
+dailyCommissionForm.elements.barber.addEventListener('change', () => {
+  const barber = config.barbers.find((item) => item.id === dailyCommissionForm.elements.barber.value);
+  dailyCommissionForm.elements.commission.value = effectiveCommission(workday.value, barber?.name);
 });
 document.getElementById('closeCommissionDialog').addEventListener('click', () => commissionDialog.close());
 commissionDialog.addEventListener('mousedown', (event) => { if (event.target === commissionDialog) commissionDialog.close(); });
@@ -1136,14 +1159,71 @@ dailyCommissionForm.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!dailyCommissionForm.reportValidity()) return;
   const commissionRate = Number(dailyCommissionForm.elements.commission.value);
-  cashRegisters[workday.value] = { ...(cashRegisters[workday.value] || {}), commissionRate };
+  const barberId = dailyCommissionForm.elements.barber.value;
+  const barber = config.barbers.find((item) => item.id === barberId);
+  if (barberId && !barber) return;
+  const register = cashRegisters[workday.value] || {};
+  cashRegisters[workday.value] = barber
+    ? { ...register, barberCommissionRates: { ...register.barberCommissionRates, [barberId]: commissionRate } }
+    : { ...register, commissionRate, barberCommissionRates: {} };
   // An explicit daily override replaces that day's snapshots; changing the
   // default configuration still preserves commissions recorded on other days.
-  entries = entries.map((cut) => cut.date === workday.value ? { ...cut, commissionRate, commissionAmount: Number(cut.amount) * commissionRate / 100 } : cut);
+  entries = entries.map((cut) => cut.date === workday.value && (!barber || cut.barber === barber.name) ? { ...cut, commissionRate, commissionAmount: Number(cut.amount) * commissionRate / 100 } : cut);
   save();
   commissionDialog.close();
   saveCashRegisters();
   render();
+});
+const barberConfigList = document.getElementById('barberConfigList');
+let draggingConfigBarber = null;
+function moveConfigBarber(fromId, targetId, after = false) {
+  const order = orderedConfigBarbers().map((item) => item.id);
+  const from = order.indexOf(fromId);
+  if (from < 0 || !order.includes(targetId) || fromId === targetId) return;
+  order.splice(from, 1);
+  order.splice(order.indexOf(targetId) + Number(after), 0, fromId);
+  config.barberConfigOrder = order;
+  saveConfig();
+  [...barberConfigList.querySelectorAll('[data-config-barber-id]')].find((row) => row.dataset.configBarberId === fromId)?.querySelector('[data-barber-drag]')?.focus();
+}
+barberConfigList.addEventListener('keydown', (event) => {
+  const handle = event.target.closest('[data-barber-drag]');
+  if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+  event.preventDefault();
+  const row = handle.closest('[data-config-barber-id]');
+  const visible = [...barberConfigList.querySelectorAll('[data-config-barber-id]')].filter((item) => item.style.display !== 'none');
+  const down = event.key === 'ArrowDown';
+  const neighbor = visible[visible.indexOf(row) + (down ? 1 : -1)];
+  if (neighbor) moveConfigBarber(row.dataset.configBarberId, neighbor.dataset.configBarberId, down);
+});
+barberConfigList.addEventListener('dragstart', (event) => {
+  const handle = event.target.closest('[data-barber-drag]');
+  if (!handle) return;
+  draggingConfigBarber = handle.closest('[data-config-barber-id]').dataset.configBarberId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', draggingConfigBarber);
+  handle.closest('[data-config-barber-id]').classList.add('config-dragging');
+});
+barberConfigList.addEventListener('dragover', (event) => {
+  const row = event.target.closest('[data-config-barber-id]');
+  if (!draggingConfigBarber || !row || row.dataset.configBarberId === draggingConfigBarber) return;
+  event.preventDefault();
+  barberConfigList.querySelectorAll('.config-drop-before, .config-drop-after').forEach((item) => item.classList.remove('config-drop-before', 'config-drop-after'));
+  row.classList.add(event.clientY > row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2 ? 'config-drop-after' : 'config-drop-before');
+});
+barberConfigList.addEventListener('drop', (event) => {
+  const row = event.target.closest('[data-config-barber-id]');
+  if (!draggingConfigBarber || !row) return;
+  event.preventDefault();
+  const source = draggingConfigBarber;
+  draggingConfigBarber = null;
+  const after = event.clientY > row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2;
+  moveConfigBarber(source, row.dataset.configBarberId, after);
+  barberConfigList.querySelectorAll('.config-dragging, .config-drop-before, .config-drop-after').forEach((item) => item.classList.remove('config-dragging', 'config-drop-before', 'config-drop-after'));
+});
+barberConfigList.addEventListener('dragend', () => {
+  draggingConfigBarber = null;
+  barberConfigList.querySelectorAll('.config-dragging, .config-drop-before, .config-drop-after').forEach((item) => item.classList.remove('config-dragging', 'config-drop-before', 'config-drop-after'));
 });
 document.getElementById('configView').addEventListener('click', (event) => {
   const button = event.target.closest('[data-config-edit], [data-config-delete], [data-config-active]');
@@ -1159,6 +1239,7 @@ document.getElementById('configView').addEventListener('click', (event) => {
     if (configInUse(type, item.name)) return alert('No se puede eliminar porque tiene operaciones asociadas.');
     if (!confirm(`¿Eliminar ${item.name}?`)) return;
     config[type] = config[type].filter((current) => current.id !== item.id);
+    if (type === 'barbers' && config.barberConfigOrder) config.barberConfigOrder = config.barberConfigOrder.filter((id) => id !== item.id);
     return saveConfig();
   }
   openConfigDialog(type, item);
@@ -1299,7 +1380,7 @@ async function bootstrapState() {
     }
     initInventory(); renderConfig(); render(); return;
   }
-  shell.inert = true; stateMessage('Cargando datos guardados…');
+  shell.inert = true; document.getElementById('openLoadRecovery').hidden = true; document.getElementById('retryLoadRecovery').disabled = true; stateMessage('Cargando datos guardados…');
   const localInventoryOk = loadInventory(); // Legacy inventory stays as a backup until DB import succeeds.
   try {
     await claimTab();
@@ -1340,13 +1421,26 @@ async function bootstrapState() {
     }
     initInventory(false); renderConfig(); render();
     stateLoaded = true; shell.inert = false; conflictActions(false); stateMessage('');
+    if (document.getElementById('loadRecoveryDialog').open) document.getElementById('loadRecoveryDialog').close();
     if (stored.state === null || pending && pending.revision === stateRevision || migratedPayments) queueStateSave();
   } catch (error) {
     stateMessage(error.message === 'Inventario local inválido'
       ? 'El inventario local no es válido. No se creó una base nueva ni se sobrescribió el respaldo. Reparalo antes de reintentar.'
       : 'No se pudieron cargar los datos guardados. La aplicación permanece bloqueada para no sobrescribir información.', true, true);
+    document.getElementById('openLoadRecovery').hidden = false;
+    const recoveryDialog = document.getElementById('loadRecoveryDialog');
+    if (!recoveryDialog.open && !document.getElementById('pendingRecoveryDialog').open) recoveryDialog.showModal();
+  } finally {
+    document.getElementById('retryLoadRecovery').disabled = false;
   }
 }
+document.getElementById('openLoadRecovery').addEventListener('click', () => document.getElementById('loadRecoveryDialog').showModal());
+document.getElementById('closeLoadRecovery').addEventListener('click', () => document.getElementById('loadRecoveryDialog').close());
+document.getElementById('retryLoadRecovery').addEventListener('click', () => { void bootstrapState(); });
+document.getElementById('reviewLoadRecovery').addEventListener('click', () => {
+  document.getElementById('loadRecoveryDialog').close();
+  document.getElementById('openPendingRecovery').click();
+});
 document.getElementById('retryPersistence').addEventListener('click', () => {
   if (!stateLoaded) { void bootstrapState(); return; }
   if (!stateConflict) { stateMessage(''); void flushStateSave(); }

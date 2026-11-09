@@ -232,8 +232,11 @@ textarea { resize: vertical; }
 .summary-filter-card { padding: 26px 28px; }
 .summary-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 16px; }
 .summary-controls .field, .summary-controls input, .summary-controls select { min-width: 0; }
-.summary-range { grid-column: 1 / -1; padding-top: 18px; border-top: 1px solid var(--line); }
-.summary-range h2 { margin-top: 8px; }
+.period-overview { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.period-overview-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
+.period-overview-heading h2 { margin: 7px 0 0; font-size: 1.05rem; }
+.period-overview-title { display: flex; align-items: center; gap: 7px; }
+.period-overview-title h3 { margin: 0; color: var(--muted); font-size: .82rem; font-weight: 600; }
 .checkbox-dropdown { position: relative; }
 .checkbox-dropdown summary { display: flex; align-items: center; min-height: 47px; padding: 10px 32px 10px 11px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); cursor: pointer; list-style: none; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
 .checkbox-dropdown summary::-webkit-details-marker { display: none; }
@@ -288,6 +291,12 @@ textarea { resize: vertical; }
 .summary-metrics .summary-secondary + .summary-secondary { border-left: 1px solid var(--line); }
 .summary-secondary > span { min-width: 0; color: var(--muted); font-size: .82rem; }
 .summary-secondary strong { margin: 0; min-width: 0; font-size: 1rem; white-space: normal; overflow-wrap: anywhere; }
+.period-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; border: 1px solid #403727; border-radius: 10px; background: #191815; }
+.period-count { display: grid; gap: 5px; min-width: 0; padding: 13px 16px; }
+.period-count + .period-count { border-left: 1px solid #403727; }
+.period-count span { color: var(--text); font-size: .82rem; font-weight: 700; }
+.period-count strong { color: var(--gold); font-size: 1.55rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.period-count small { color: var(--muted); font-size: .73rem; }
 .compact-btn { grid-column: auto; min-width: 0; }
 .sales-table-wrap { overflow: visible; }
 .sales-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
@@ -469,6 +478,16 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .config-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface-2); }
 .config-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .config-actions { display: flex; gap: 6px; }
+.config-order-hint { display: block; margin-top: 10px; color: var(--muted); font-size: .75rem; line-height: 1.4; }
+.config-barber-name { display: inline-flex; align-items: center; gap: 10px; }
+.config-drag-handle { flex: none; border: 0; padding: 5px; background: transparent; color: var(--muted); cursor: grab; font-size: 1rem; line-height: 1; }
+.config-drag-handle:active { cursor: grabbing; }
+.config-drag-handle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.config-dragging { opacity: .5; }
+.config-drop-before { box-shadow: inset 0 3px var(--gold); }
+.config-drop-after { box-shadow: inset 0 -3px var(--gold); }
+#barberConfigList .config-actions { flex-shrink: 0; overflow: visible; align-items: center; }
+@media (max-width: 600px) { #barberConfigList .config-item { flex-wrap: wrap; } #barberConfigList .config-actions { flex-wrap: wrap; } }
 .config-actions button { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; }
 .config-active { display: flex; align-items: center; gap: 5px; padding: 0 5px; color: var(--muted); font-size: .76rem; cursor: pointer; }
 .config-active input { width: auto; accent-color: var(--gold); }
@@ -487,6 +506,10 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .barber-column.dragging { opacity: .4; }
 .barber-column-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #6e5936; background: var(--gold-soft); }
 .barber-column-header strong { font-family: Manrope, sans-serif; }
+.barber-header-name { min-width: 0; }
+.barber-commission-button { display: block; margin-top: 5px; padding: 2px 0; border: 0; background: transparent; color: var(--gold); cursor: pointer; font-size: .75rem; text-align: left; }
+.barber-commission-button:hover, .barber-commission-button:focus-visible { text-decoration: underline; }
+.barber-commission-button:disabled { opacity: .5; cursor: default; }
 .barber-column-header span { display: block; margin-top: 3px; color: var(--gold); font-size: .78rem; }
 .add-cut { flex: 0 0 auto; width: 28px; height: 28px; border: 1px solid #6e5936; border-radius: 50%; background: var(--gold); color: #17120b; cursor: pointer; font-size: 1.1rem; font-weight: 800; line-height: 1; }
 .barber-services { display: grid; flex: 1; align-content: start; gap: 4px; min-height: 72px; padding: 4px; background: #0d0d0d; }
@@ -637,7 +660,6 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .summary-highlights > :first-child { grid-column: 1 / -1; }
   .summary-primary, .summary-secondary { grid-column: span 1; }
   .summary-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .summary-range { grid-column: 1 / -1; }
   .config-grid { grid-template-columns: 1fr; }
   .cash-register-form { grid-template-columns: repeat(2, 1fr); }
   .closing-comparison { grid-template-columns: repeat(2, 1fr); }
@@ -679,6 +701,11 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .primary-btn { width: 100%; }
   .section-heading .primary-btn.compact-btn { width: auto; }
   .summary-controls { grid-template-columns: minmax(0, 1fr); }
+  .period-overview-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .period-counts { grid-template-columns: 1fr; }
+  .period-count { grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; padding: 11px 14px; }
+  .period-count strong { grid-column: 2; grid-row: 1 / 3; }
+  .period-count + .period-count { border-left: 0; border-top: 1px solid #403727; }
   .config-form { grid-template-columns: 1fr; }
   .cash-register-form { grid-template-columns: 1fr; }
   .closing-comparison { grid-template-columns: 1fr 1fr; }

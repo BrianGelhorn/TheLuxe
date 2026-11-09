@@ -10,6 +10,34 @@ const emptyState = () => ({
   inventory: { version: 2, products: [], movements: [] },
 });
 
+test('Un fallo de carga abre opciones para revisar copias y permite reintentar sin escribir', async (t) => {
+  let online = false, writes = 0;
+  const pending = JSON.stringify({ revision: 1, state: emptyState() });
+  const app = createApp(t, { clean: false, storage: { 'theluxe-pending-state-v1:otra': pending }, fetch: async (url, options = {}) => {
+    if (options.method === 'PUT') { writes++; return response({ revision: 2 }); }
+    if (!online) throw new TypeError('Sin conexión');
+    if (url === '/api/recovery/history') return response({ items: [] });
+    return response({ revision: 1, state: emptyState() });
+  } });
+  await wait(app);
+  assert.equal(app.element('loadRecoveryDialog').open, true);
+  assert.equal(app.window.document.querySelector('.app-shell').inert, true);
+  assert.equal(writes, 0);
+  app.click('#reviewLoadRecovery'); await wait(app);
+  assert.equal(app.element('pendingRecoveryDialog').open, true);
+  assert.equal(app.element('pendingRecoverySelect').value, 'theluxe-pending-state-v1:otra');
+  assert.equal(app.element('downloadRecoveryCopy').disabled, false);
+  assert.equal(app.window.localStorage.getItem('theluxe-pending-state-v1:otra'), pending);
+  app.click('#closePendingRecovery');
+  app.click('#openLoadRecovery');
+  online = true;
+  app.click('#retryLoadRecovery'); await wait(app);
+  assert.equal(app.element('loadRecoveryDialog').open, false);
+  assert.equal(app.window.document.querySelector('.app-shell').inert, false);
+  assert.equal(writes, 0);
+  assert.equal(app.window.localStorage.getItem('theluxe-pending-state-v1:otra'), pending);
+});
+
 test('PERSIST-001 - una DB vacía inicia sin demos e importa un único estado completo', async (t) => {
   const calls = [];
   const app = createApp(t, { clean: false, fetch: async (url, options = {}) => {

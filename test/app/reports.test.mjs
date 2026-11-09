@@ -32,6 +32,36 @@ function shopRows(app, id, values) {
   rows.forEach((row, index) => assert.deepEqual([...row.cells].slice(1).map(cell => cell.textContent), values[index].map(value => app.money(value))));
 }
 
+test('El período suma servicios y ventas de varios días y respeta los filtros', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  app.run('entries.push({...entries[0], id:"otro-dia", date:"2026-09-04"}); sales.push({...sales[0], id:"otra-venta", date:"2026-09-04"})');
+  const counts = () => ['periodServiceCount', 'periodCutCount', 'periodSaleCount'].map(id => app.element(id).textContent);
+  report(app, 'week');
+  assert.deepEqual(counts(), ['4', '0', '3']);
+  report(app, 'month', 'Ambas', 'Mateo');
+  assert.deepEqual(counts(), ['3', '0', '0']);
+  report(app, 'month');
+  assert.deepEqual(counts(), ['4', '0', '3']);
+  shopReport(app);
+  assert.deepEqual(counts(), ['4', '0', '3']);
+  app.run('config.services.find(s => s.name === "Barba").includesCut = true; renderSummary()');
+  assert.deepEqual(counts(), ['0', '4', '3']);
+});
+
+test('La clasificación de corte se configura y se conserva al editar el servicio', (t) => {
+  const app = createApp(t);
+  app.click('#addServiceConfig');
+  app.submit('serviceConfigForm', { name: 'Degradado', price: '1000', cutCategory: 'yes' });
+  assert.equal(app.run('serviceIncludesCut("Degradado")'), true);
+  const id = app.run('config.services.find(s => s.name === "Degradado").id');
+  app.click(`[data-config-edit="services"][data-id="${id}"]`);
+  assert.equal(app.element('serviceConfigForm').elements.cutCategory.value, 'yes');
+  app.submit('serviceConfigForm', { cutCategory: 'no' });
+  assert.equal(app.run('serviceIncludesCut("Degradado")'), false);
+  assert.equal(app.run('serviceIncludesCut("Corte + barba")'), true);
+});
+
 for (const [id, medium, invoiced, tips, commission, expenses, balance, revenue, movements] of [
   ['RPT-020', 'Ambas', 5100, 300, 400, 250, 4450, [[3900, 1500, 2400], [1200, 500, 700], [5100, 2000, 3100], [300, 300, 0], [5400, 2300, 3100]], [[250, 50, 200], [500, 500, 0]]],
   ['RPT-021', 'Efectivo', 2000, 300, 300, 50, 1650, [[1500, 1500, 0], [500, 500, 0], [2000, 2000, 0], [300, 300, 0], [2300, 2300, 0]], [[50, 50, 0], [500, 500, 0]]],
@@ -188,7 +218,7 @@ test('RPT-032 - Explicaciones en ayudas enfocables conservan etiquetas y conteos
   assert.equal(movements.querySelector('p, small, .metric-sub, .stock-hint'), null);
   assert.doesNotMatch(view.textContent, /no son gastos|no resta|respeta período|no es el balance/i);
   const tips = [...view.querySelectorAll('.info-tip')];
-  assert.equal(tips.length, 10);
+  assert.equal(tips.length, 11);
   for (const tip of tips) {
     assert.equal(tip.tagName, 'BUTTON');
     assert.equal(tip.type, 'button');
@@ -220,7 +250,7 @@ test('RPT-034 - Jerarquia separa facturado resultado y movimientos sin duplicar 
     assert.ok(app.element(result).closest('.featured.accounting-metric'));
     assert.ok(app.element(result).closest('.net-card'));
   }
-  const movements = app.query('.summary-metrics[role="group"]');
+  const movements = app.query('#barbersSummary .summary-metrics[role="group"]');
   assert.equal(movements.getAttribute('aria-label'), 'Movimientos del período');
   assert.deepEqual([...movements.querySelectorAll('strong')].map(node => node.id), ['summaryAdvances']);
   const shopMovements = app.element('shopMovementRows').closest('.summary-movements');
@@ -621,7 +651,7 @@ test('RPT-018 - Las tres tarjetas reutilizan el panel diario y etiquetan cada im
   assert.match(app.element('summaryAverageTicketNeto').parentElement.textContent, /^Neto/);
   assert.deepEqual([...highlights.querySelectorAll('tbody th')].map(cell => cell.textContent), ['Servicios', 'Propinas']);
   assert.equal(highlights.querySelector('.collection-sales'), null);
-  assert.deepEqual([...app.query('#summaryView .summary-metrics').querySelectorAll('article > span')].map(span => span.textContent), ['Adelantos']);
+  assert.deepEqual([...app.query('#barbersSummary .summary-metrics').querySelectorAll('article > span')].map(span => span.textContent), ['Adelantos']);
   for (const id of ['Services', 'ServicesCash', 'ServicesMp', 'Cuts', 'CashCuts', 'MpCuts', 'Sales', 'SalesCash', 'SalesMp', 'SaleCount', 'Tips', 'Balance', 'InvoicedSales', 'InvoicedSalesCash', 'InvoicedSalesMp']) {
     assert.equal(app.query('#summaryView').querySelector(`#summary${id}`), null, `summary${id} eliminado`);
   }

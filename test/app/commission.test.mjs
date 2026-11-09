@@ -174,3 +174,37 @@ test('COM-017 - El cambio diario reemplaza tambien snapshots antiguos sin tasa',
   assert.equal(app.run('entries[0].commissionAmount'), 800);
   assert.equal(app.run('entries[0].commissionRate'), 80);
 });
+
+test('La comisión individual afecta solo al barbero y fecha elegidos, incluidos cortes nuevos', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  app.click('#changeCommission');
+  app.element('dailyCommissionBarber').value = 'Mateo';
+  app.emit('#dailyCommissionBarber', 'change');
+  app.submit('dailyCommissionForm', { commission: 30 });
+  assert.deepEqual(app.snapshot('entries.map(({barber, commissionRate}) => [barber, commissionRate])'), [['Mateo', 30], ['Lucas', 50], ['Mateo', 30]]);
+  app.click('[data-barber="Mateo"]');
+  app.submit('cutForm', { service: 'Barba', amount: '1000', payment: 'Efectivo' });
+  assert.equal(app.run('entries.at(-1).commissionAmount'), 300);
+  assert.equal(app.run('effectiveCommission("2026-09-04", "Mateo")'), 50);
+  app.click('#changeCommission');
+  app.element('dailyCommissionBarber').value = 'Mateo';
+  app.emit('#dailyCommissionBarber', 'change');
+  assert.equal(app.element('dailyCommissionForm').elements.commission.value, '30');
+  app.click('#closeCommissionDialog');
+  change(app, 70);
+  assert.equal(app.run('effectiveCommission(workday.value, "Mateo")'), 70);
+});
+
+test('La tarjeta abre la comisión individual con la fecha y tasa de la jornada', (t) => {
+  const app = createApp(t);
+  app.financialFixture();
+  app.click('[data-commission-barber="Mateo"]');
+  assert.equal(app.element('dailyCommissionBarber').value, 'Mateo');
+  assert.equal(app.element('commissionDate').textContent, '03/09/2026');
+  app.submit('dailyCommissionForm', { commission: 35 });
+  assert.match(app.query('[data-commission-barber="Mateo"]').textContent, /35%/);
+  assert.match(app.query('[data-commission-barber="Lucas"]').textContent, /50%/);
+  app.click('[data-commission-barber="Mateo"]');
+  assert.equal(app.element('dailyCommissionForm').elements.commission.value, '35');
+});

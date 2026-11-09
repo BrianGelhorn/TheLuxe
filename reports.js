@@ -262,6 +262,10 @@ function renderSummary() {
   const periodAdvances = shopMode ? [] : advances.filter((advance) => inRange(advance) && (!selectedBarber || advance.barber === selectedBarber) && matchesPayment(advance));
   const periodExpenses = shopMode ? expenses.filter((expense) => inRange(expense) && matchesPayment(expense)) : [];
   const total = summarize(periodCuts, periodSales, periodAdvances, periodExpenses, payment, defaultCommission);
+  const haircutCount = periodCuts.filter((cut) => serviceIncludesCut(cut.service) && (payment === 'Ambas' || dominantPayment(cut) === payment)).length;
+  document.getElementById('periodServiceCount').textContent = String(total.cuts - haircutCount);
+  document.getElementById('periodCutCount').textContent = String(haircutCount);
+  document.getElementById('periodSaleCount').textContent = String(total.saleCount);
   renderExpenseCategories(periodExpenses, shopMode);
   renderProductMargin(from, to, payment, shopMode);
   const dateLabel = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });

@@ -98,6 +98,34 @@ test('CFG-012 - Desactivar y reactivar barbero conserva historial y permite busc
   assert.equal(app.query('#barberConfigList [data-name="Mateo"]').style.display, 'none');
 });
 
+test('Ordenar la lista de configuración conserva el orden del panel y los filtros de búsqueda', (t) => {
+  const app = createApp(t);
+  const panel = app.snapshot('config.barbers.map(item => item.id)');
+  const handle = app.query('[data-config-barber-id="Mateo"] [data-barber-drag]');
+  handle.dispatchEvent(new app.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  assert.deepEqual(app.snapshot('orderedConfigBarbers().slice(0, 2).map(item => item.id)'), ['Julián', 'Mateo']);
+  assert.deepEqual(app.snapshot('config.barbers.map(item => item.id)'), panel);
+  assert.equal(app.query('#barberColumns [data-barber-column]').dataset.barberColumn, 'Mateo');
+  app.run('renderConfig()');
+  assert.equal(app.query('#barberConfigList [data-config-barber-id]').dataset.configBarberId, 'Julián');
+  app.input('#barberConfigSearch', 'ma');
+  app.query('[data-config-barber-id="Mateo"] [data-barber-drag]').dispatchEvent(new app.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  assert.deepEqual(app.snapshot('orderedConfigBarbers().slice(0, 2).map(item => item.id)'), ['Julián', 'Mateo']);
+});
+
+test('Arrastrar cambia solo el orden de la lista de configuración', (t) => {
+  const app = createApp(t);
+  const source = app.query('[data-config-barber-id="Mateo"] [data-barber-drag]');
+  const target = app.query('[data-config-barber-id="Nicolás"]');
+  const drag = new app.window.Event('dragstart', { bubbles: true, cancelable: true });
+  Object.defineProperty(drag, 'dataTransfer', { value: { setData() {}, effectAllowed: '' } });
+  source.dispatchEvent(drag);
+  const drop = new app.window.MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 1 });
+  target.dispatchEvent(drop);
+  assert.deepEqual(app.snapshot('orderedConfigBarbers().slice(0, 3).map(item => item.id)'), ['Julián', 'Nicolás', 'Mateo']);
+  assert.equal(app.run('config.barbers[0].id'), 'Mateo');
+});
+
 test('CFG-013 - Guardar configuracion no cambia silenciosamente los filtros del reporte', (t) => {
   const app = createApp(t);
   app.financialFixture();
